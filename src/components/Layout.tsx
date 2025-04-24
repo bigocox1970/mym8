@@ -1,9 +1,8 @@
-
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Home, FileText, Settings, LogOut } from "lucide-react";
+import { Home, FileText, Settings, LogOut, ListTodo } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
@@ -18,7 +17,6 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (user) {
-      // Load profile data when the layout mounts
       const loadProfileData = async () => {
         try {
           setLoading(true);
@@ -39,14 +37,12 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
           if (data) {
             setProfileData(data);
             
-            // Apply dark mode setting
             if (data.dark_mode) {
               document.documentElement.classList.add("dark");
             } else {
               document.documentElement.classList.remove("dark");
             }
           } else if (user) {
-            // If no profile exists, create one with default settings
             console.log("No profile found, creating default profile");
             const { error: insertError } = await supabase
               .from("profiles")
@@ -68,7 +64,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
       
       loadProfileData();
     }
-  }, [user, location.pathname]); // Re-fetch when user changes or pathname changes
+  }, [user, location.pathname]);
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -93,6 +89,15 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                   <span className="hidden md:inline">Dashboard</span>
                 </Button>
               </Link>
+              <Link to="/goals">
+                <Button 
+                  variant={isActive("/goals") ? "default" : "ghost"} 
+                  className="w-full justify-start"
+                >
+                  <ListTodo className="mr-2 h-4 w-4" />
+                  <span className="hidden md:inline">Goals</span>
+                </Button>
+              </Link>
               <Link to="/journal">
                 <Button 
                   variant={isActive("/journal") ? "default" : "ghost"} 
@@ -111,7 +116,6 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                   <span className="hidden md:inline">Settings</span>
                 </Button>
               </Link>
-              {/* Admin link only visible to admin users */}
               {user?.email === "admin@mym8.app" && (
                 <Link to="/admin">
                   <Button 
