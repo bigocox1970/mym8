@@ -3,11 +3,19 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Session, User } from "@supabase/supabase-js";
 
+type Profile = {
+  id: string;
+  nickname: string | null;
+  avatar_url: string | null;
+  dark_mode: boolean;
+  is_admin: boolean;
+};
+
 type AuthContextType = {
   session: Session | null;
   user: User | null;
+  profile: Profile | null;
   loading: boolean;
-  isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<{
     error: Error | null;
     data: any;
@@ -24,23 +32,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const fetchAdminStatus = async (userId: string) => {
+    const loadProfile = async (userId: string) => {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', userId)
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
         .single();
-      
+
       if (error) {
-        console.error("Error fetching admin status:", error);
+        console.error("Error loading profile:", error);
         return;
       }
-      
-      setIsAdmin(data?.is_admin || false);
+
+      setProfile(data);
     };
 
     // Get session from Supabase
@@ -52,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user || null);
       if (session?.user) {
-        await fetchAdminStatus(session.user.id);
+        await loadProfile(session.user.id);
       }
       setLoading(false);
     };
@@ -64,7 +72,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user || null);
       if (session?.user) {
-        await fetchAdminStatus(session.user.id);
+        await loadProfile(session.user.id);
+      } else {
+        setProfile(null);
       }
       setLoading(false);
     });
@@ -97,8 +107,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     session,
     user,
+    profile,
     loading,
-    isAdmin,
     signIn,
     signUp,
     signOut,
