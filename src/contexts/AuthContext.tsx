@@ -3,9 +3,18 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Session, User } from "@supabase/supabase-js";
 
+type Profile = {
+  id: string;
+  nickname: string | null;
+  avatar_url: string | null;
+  dark_mode: boolean;
+  is_admin: boolean;
+};
+
 type AuthContextType = {
   session: Session | null;
   user: User | null;
+  profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{
     error: Error | null;
@@ -23,9 +32,25 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const loadProfile = async (userId: string) => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (error) {
+        console.error("Error loading profile:", error);
+        return;
+      }
+
+      setProfile(data);
+    };
+
     // Get session from Supabase
     const getSession = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -34,15 +59,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setSession(session);
       setUser(session?.user || null);
+      if (session?.user) {
+        await loadProfile(session.user.id);
+      }
       setLoading(false);
     };
 
     getSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user || null);
+      if (session?.user) {
+        await loadProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
       setLoading(false);
     });
 
@@ -74,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     session,
     user,
+    profile,
     loading,
     signIn,
     signUp,

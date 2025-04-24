@@ -6,7 +6,7 @@ import { Home, FileText, Settings, LogOut, ListTodo } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, profile } = useAuth();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState<{
@@ -116,7 +116,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                   <span className="hidden md:inline">Settings</span>
                 </Button>
               </Link>
-              {user?.email === "admin@mym8.app" && (
+              {profile?.is_admin && (
                 <Link to="/admin">
                   <Button 
                     variant={isActive("/admin") ? "default" : "ghost"} 

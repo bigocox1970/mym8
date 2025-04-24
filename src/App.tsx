@@ -40,13 +40,13 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 // Admin Route wrapper
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, profile } = useAuth();
 
   if (loading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
 
-  if (!user || user.email !== "admin@mym8.app") {
+  if (!user || !profile?.is_admin) {
     return <Navigate to="/dashboard" replace />;
   }
 
