@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Home, FileText, Settings, LogOut, ListTodo } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { toast } from "@/components/ui/sonner";
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user, signOut, profile, refreshProfile } = useAuth();
@@ -13,12 +13,35 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (user && !profile) {
-      refreshProfile();
+      const loadProfile = async () => {
+        try {
+          console.log("Layout fetching profile for user ID:", user.id);
+          await refreshProfile();
+        } catch (error) {
+          console.error("Error loading profile:", error);
+          toast.error("Failed to load profile settings");
+        }
+      };
+      
+      loadProfile();
     }
-  }, [user, profile, location.pathname, refreshProfile]);
+  }, [user, profile, refreshProfile]);
 
   const isActive = (path: string) => {
     return location.pathname === path;
+  };
+
+  const handleSignOut = async () => {
+    try {
+      setLoading(true);
+      await signOut();
+      toast.success("Logged out successfully");
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast.error("Failed to log out");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -83,10 +106,11 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
               <Button 
                 variant="ghost" 
                 className="w-full justify-start" 
-                onClick={() => signOut()}
+                onClick={handleSignOut}
+                disabled={loading}
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                <span className="hidden md:inline">Logout</span>
+                <span className="hidden md:inline">{loading ? "Logging out..." : "Logout"}</span>
               </Button>
             </div>
           </div>

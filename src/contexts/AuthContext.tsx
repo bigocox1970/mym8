@@ -44,10 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from("profiles")
         .select("*")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
       
       // If profile doesn't exist, create it
-      if (checkError && checkError.code === "PGRST116") {
+      if (!existingProfile) {
         console.log("Profile doesn't exist, creating one");
         const { error: insertError } = await supabase
           .from("profiles")
@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from("profiles")
         .select("nickname, avatar_url, dark_mode")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("Error fetching profile:", error);
@@ -100,13 +100,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Set up auth state listener
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
+        (event, session) => {
           setSession(session);
           setUser(session?.user || null);
           
           if (session?.user) {
-            const profileData = await fetchProfile(session.user.id);
-            setProfile(profileData);
+            // Use setTimeout to avoid potential recursion with auth state changes
+            setTimeout(async () => {
+              const profileData = await fetchProfile(session.user.id);
+              setProfile(profileData);
+            }, 0);
           } else {
             setProfile(null);
           }
