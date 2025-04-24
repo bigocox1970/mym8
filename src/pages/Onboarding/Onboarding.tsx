@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,6 +43,11 @@ const Onboarding = () => {
     },
   });
 
+  useEffect(() => {
+    // Update the form's goals field when selectedGoals changes
+    form.setValue("goals", selectedGoals);
+  }, [selectedGoals, form]);
+
   const toggleGoal = (goal: string) => {
     if (goal === "Other (please specify)") {
       setShowCustomGoal(!showCustomGoal);
@@ -67,7 +72,14 @@ const Onboarding = () => {
       return;
     }
     
+    if (selectedGoals.length === 0) {
+      toast.error("Please select at least one goal");
+      return;
+    }
+    
     setIsLoading(true);
+    console.log("Submitting form with values:", values);
+    console.log("Selected goals:", selectedGoals);
     
     // Prepare goals to save
     const goalsToSave = [...selectedGoals];
@@ -76,21 +88,29 @@ const Onboarding = () => {
     }
     
     try {
+      console.log("Saving goals:", goalsToSave);
       // Save each goal to the database
-      for (const goal of goalsToSave) {
-        if (goal === "Other (please specify)") continue;
+      const promises = goalsToSave.map(goal => {
+        if (goal === "Other (please specify)") return null;
         
-        const { error } = await supabase
+        return supabase
           .from("goals")
           .insert({
             user_id: user.id,
             goal_text: goal,
           });
-          
-        if (error) throw error;
+      }).filter(Boolean);
+      
+      const results = await Promise.all(promises);
+      const errors = results.filter(result => result?.error).map(result => result?.error);
+      
+      if (errors.length > 0) {
+        console.error("Errors saving goals:", errors);
+        throw new Error("Failed to save some goals");
       }
       
       toast.success("Onboarding completed successfully");
+      console.log("Navigation to dashboard");
       navigate("/dashboard");
     } catch (error) {
       console.error("Error saving goals:", error);
