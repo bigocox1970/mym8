@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Session, User } from "@supabase/supabase-js";
+import { toast } from "@/components/ui/sonner";
 
 type ProfileType = {
   nickname: string | null;
@@ -37,11 +38,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchProfile = async (userId: string) => {
     try {
       console.log("Fetching profile for user ID:", userId);
+      
+      // Check if profile exists
+      const { data: existingProfile, error: checkError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+      
+      // If profile doesn't exist, create it
+      if (checkError && checkError.code === "PGRST116") {
+        console.log("Profile doesn't exist, creating one");
+        const { error: insertError } = await supabase
+          .from("profiles")
+          .insert({ 
+            id: userId,
+            dark_mode: false
+          });
+          
+        if (insertError) {
+          console.error("Error creating profile:", insertError);
+          return null;
+        }
+      }
+      
+      // Now fetch the profile data
       const { data, error } = await supabase
         .from("profiles")
         .select("nickname, avatar_url, dark_mode")
         .eq("id", userId)
-        .maybeSingle();
+        .single();
 
       if (error) {
         console.error("Error fetching profile:", error);
@@ -70,26 +96,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initializeAuth = async () => {
+      setLoading(true);
+      
       // Set up auth state listener
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        (event, session) => {
+        async (event, session) => {
           setSession(session);
           setUser(session?.user || null);
           
           if (session?.user) {
-            // Defer profile loading to prevent recursion
-            setTimeout(() => {
-              fetchProfile(session.user.id).then(profileData => {
-                setProfile(profileData);
-              });
-            }, 0);
+            const profileData = await fetchProfile(session.user.id);
+            setProfile(profileData);
           } else {
             setProfile(null);
           }
         }
       );
 
-      // Then check for existing session
+      // Check for existing session
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setUser(session?.user || null);

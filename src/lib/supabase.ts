@@ -2,7 +2,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "../types/supabase";
 
-// Use the client from integrations/supabase/client.ts instead of duplicating
+// Use the client from integrations/supabase/client.ts to avoid duplication
 import { supabase as supabaseClient } from "@/integrations/supabase/client";
 
 export const supabase = supabaseClient;
