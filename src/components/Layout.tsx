@@ -1,15 +1,23 @@
-
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Home, FileText, Settings, LogOut, ListTodo } from "lucide-react";
+import { Home, FileText, Settings, LogOut, ListTodo, Menu, X } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+
+// No need to import logo - will use direct path
+
+// Context to share sidebar state with page components
+export const SidebarContext = React.createContext({
+  toggleSidebar: () => {},
+  isOpen: true
+});
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user, signOut, profile, refreshProfile } = useAuth();
   const location = useLocation();
   const [loading, setLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     if (user && !profile) {
@@ -26,6 +34,26 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
       loadProfile();
     }
   }, [user, profile, refreshProfile]);
+
+  // Close sidebar on mobile when navigating
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+    };
+
+    // Initial check
+    handleResize();
+
+    // Add event listener
+    window.addEventListener('resize', handleResize);
+    
+    // Clean up
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -44,79 +72,127 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  // Context value
+  const contextValue = {
+    toggleSidebar,
+    isOpen: sidebarOpen
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 flex dark:bg-gray-900">
-      {user && (
-        <aside className="w-16 md:w-64 bg-white border-r shadow-sm dark:bg-gray-800 dark:border-gray-700">
-          <div className="p-4 flex flex-col h-full">
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold text-center hidden md:block dark:text-white">MyM8.app</h1>
-              <h1 className="text-2xl font-bold text-center md:hidden dark:text-white">M8</h1>
+    <SidebarContext.Provider value={contextValue}>
+      <div className="min-h-screen bg-gray-50 flex dark:bg-gray-900">
+        {/* Sidebar */}
+        {user && (
+          <aside 
+            className={`${
+              sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            } fixed md:static h-screen z-40 w-64 bg-white border-r shadow-sm dark:bg-gray-800 dark:border-gray-700 flex flex-col transition-transform duration-300 ease-in-out`}
+          >
+            <div className="pt-4 pb-4 flex justify-center items-center">
+              <Link to="/dashboard" className="flex justify-center w-full">
+                <img 
+                  src="mym8-logo1.png" 
+                  alt="MyM8 Logo" 
+                  className="w-4/5 max-w-40" 
+                />
+              </Link>
             </div>
-            <nav className="space-y-2 flex-1">
-              <Link to="/dashboard">
-                <Button 
-                  variant={isActive("/dashboard") ? "default" : "ghost"} 
-                  className="w-full justify-start"
-                >
-                  <Home className="mr-2 h-4 w-4" />
-                  <span className="hidden md:inline">Dashboard</span>
-                </Button>
-              </Link>
-              <Link to="/goals">
-                <Button 
-                  variant={isActive("/goals") ? "default" : "ghost"} 
-                  className="w-full justify-start"
-                >
-                  <ListTodo className="mr-2 h-4 w-4" />
-                  <span className="hidden md:inline">Goals</span>
-                </Button>
-              </Link>
-              <Link to="/journal">
-                <Button 
-                  variant={isActive("/journal") ? "default" : "ghost"} 
-                  className="w-full justify-start"
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  <span className="hidden md:inline">Journal</span>
-                </Button>
-              </Link>
-              <Link to="/settings">
-                <Button 
-                  variant={isActive("/settings") ? "default" : "ghost"} 
-                  className="w-full justify-start"
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span className="hidden md:inline">Settings</span>
-                </Button>
-              </Link>
-              {user?.email === "admin@mym8.app" && (
-                <Link to="/admin">
+            <div className="p-4 flex-1 flex flex-col">
+              <nav className="space-y-2 flex-1">
+                <Link to="/dashboard">
                   <Button 
-                    variant={isActive("/admin") ? "default" : "ghost"} 
+                    variant={isActive("/dashboard") ? "default" : "ghost"} 
                     className="w-full justify-start"
+                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
                   >
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span className="hidden md:inline">Admin</span>
+                    <Home className="mr-2 h-4 w-4" />
+                    <span>Dashboard</span>
                   </Button>
                 </Link>
-              )}
-            </nav>
-            <div>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start" 
-                onClick={handleSignOut}
-                disabled={loading}
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span className="hidden md:inline">{loading ? "Logging out..." : "Logout"}</span>
-              </Button>
+                <Link to="/goals">
+                  <Button 
+                    variant={isActive("/goals") ? "default" : "ghost"} 
+                    className="w-full justify-start"
+                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
+                  >
+                    <ListTodo className="mr-2 h-4 w-4" />
+                    <span>Goals</span>
+                  </Button>
+                </Link>
+                <Link to="/journal">
+                  <Button 
+                    variant={isActive("/journal") ? "default" : "ghost"} 
+                    className="w-full justify-start"
+                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    <span>Journal</span>
+                  </Button>
+                </Link>
+                <Link to="/settings">
+                  <Button 
+                    variant={isActive("/settings") ? "default" : "ghost"} 
+                    className="w-full justify-start"
+                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
+                  >
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </Button>
+                </Link>
+                {user?.email === "admin@mym8.app" && (
+                  <Link to="/admin">
+                    <Button 
+                      variant={isActive("/admin") ? "default" : "ghost"} 
+                      className="w-full justify-start"
+                      onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Admin</span>
+                    </Button>
+                  </Link>
+                )}
+              </nav>
+              <div>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start" 
+                  onClick={handleSignOut}
+                  disabled={loading}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>{loading ? "Logging out..." : "Logout"}</span>
+                </Button>
+              </div>
             </div>
+          </aside>
+        )}
+        {/* Main content */}
+        <main className="flex-1 dark:bg-gray-900 dark:text-white">
+          <div className="p-4 md:p-8 w-full">
+            {children}
           </div>
-        </aside>
-      )}
-      <main className="flex-1 p-4 md:p-8 dark:bg-gray-900 dark:text-white">{children}</main>
-    </div>
+        </main>
+      </div>
+    </SidebarContext.Provider>
+  );
+};
+
+// Export a menu button component that can be used directly in page headers
+export const MenuToggleButton = () => {
+  const { toggleSidebar, isOpen } = React.useContext(SidebarContext);
+  
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      className="md:hidden bg-white text-gray-800"
+      onClick={toggleSidebar}
+    >
+      {isOpen ? <X size={20} /> : <Menu size={20} />}
+    </Button>
   );
 };

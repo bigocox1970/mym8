@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -7,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { Layout } from "@/components/Layout";
+import { Layout, MenuToggleButton } from "@/components/Layout";
 
 type Goal = {
   id: string;
@@ -42,7 +41,7 @@ const GoalsList = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto py-6">
+      <div className="w-full py-6">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Your Goals</h1>
@@ -50,12 +49,15 @@ const GoalsList = () => {
               Set and track your personal goals
             </p>
           </div>
-          <Link to="/goals/new">
-            <Button>
-              <ListPlus className="mr-2 h-4 w-4" />
-              New Goal
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/goals/new">
+              <Button>
+                <ListPlus className="mr-2 h-4 w-4" />
+                New Goal
+              </Button>
+            </Link>
+            <MenuToggleButton />
+          </div>
         </div>
 
         {isLoading ? (

@@ -1,7 +1,6 @@
-
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Layout } from "@/components/Layout";
+import { Layout, MenuToggleButton } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -94,12 +93,15 @@ const Dashboard = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <Link to="/goals/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Goal
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/goals/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Goal
+              </Button>
+            </Link>
+            <MenuToggleButton />
+          </div>
         </div>
 
         <div className="space-y-6">

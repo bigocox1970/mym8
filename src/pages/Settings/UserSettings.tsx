@@ -1,7 +1,6 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Layout } from "@/components/Layout";
+import { Layout, MenuToggleButton } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader } from "lucide-react";
 import { ProfileSettings } from "./components/ProfileSettings";
@@ -66,8 +65,11 @@ const UserSettings = () => {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto space-y-6">
-        <h1 className="text-3xl font-bold">Settings</h1>
+      <div className="w-full space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Settings</h1>
+          <MenuToggleButton />
+        </div>
         
         <ProfileSettings 
           user={user} 
