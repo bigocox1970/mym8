@@ -172,7 +172,7 @@ const AISettings = () => {
         p_assistant_name: assistantName,
         p_personality_type: personalityType,
         p_pre_prompt: fullPrompt,
-        p_voice_type: voiceType,
+        p_voice_gender: voiceType,
         p_llm_provider: selectedModel,
         p_voice_service: voiceService,
         p_elevenlabs_voice: elevenlabsVoice,

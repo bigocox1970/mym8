@@ -354,7 +354,7 @@ export type Database = {
           p_assistant_name?: string
           p_personality_type?: string
           p_pre_prompt?: string
-          p_voice_type?: string
+          p_voice_gender?: string
           p_llm_provider?: string
           p_voice_service?: string
           p_elevenlabs_voice?: string

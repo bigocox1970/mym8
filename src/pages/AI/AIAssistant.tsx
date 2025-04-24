@@ -108,7 +108,7 @@ interface LLMConfig {
   personality_type?: string;
   pre_prompt?: string;
   llm_provider?: string;
-  voice_type?: string;
+  voice_gender?: string;
   voice_service?: string;
   elevenlabs_voice?: string;
   elevenlabs_api_key?: string;
@@ -699,7 +699,7 @@ const AIAssistant = () => {
       } else {
         // Use browser's built-in speech synthesis
         const utterance = new SpeechSynthesisUtterance(text);
-        const voiceType = config?.voice_type || 'female';
+        const voiceType = config?.voice_gender || 'female';
         
         // Get available voices and select based on preference
         const voices = window.speechSynthesis.getVoices();
