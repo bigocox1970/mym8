@@ -10,6 +10,17 @@ import { Loader2, Bot } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
+// Import from configuration files
+import { AI_MODELS, DEFAULT_AI_MODEL } from "@/config/ai";
+import { VOICE_SERVICES, VOICE_TYPES, ELEVENLABS_VOICES, DEFAULT_VOICE_SETTINGS } from "@/config/voice";
+import { PERSONALITY_PROMPTS, generateFullPrompt } from "@/config/prompts";
+
+// Define personality types from our prompts configuration
+const PERSONALITY_TYPES = Object.keys(PERSONALITY_PROMPTS).map(key => ({
+  value: key,
+  label: key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')
+}));
+
 interface LLMConfig {
   id: string;
   llm_provider?: string;
@@ -19,69 +30,22 @@ interface LLMConfig {
   enable_ai?: boolean;
   assistant_name?: string;
   personality_type?: string;
-  voice_type?: string;
+  voice_gender?: string;
+  voice_service?: string;
+  elevenlabs_voice?: string;
+  elevenlabs_api_key?: string;
 }
-
-const AI_MODELS = [
-  { value: "anthropic/claude-3-opus:beta", label: "Claude 3 Opus (Most capable)" },
-  { value: "anthropic/claude-3-sonnet:beta", label: "Claude 3 Sonnet (Fast & balanced)" },
-  { value: "anthropic/claude-3-haiku:beta", label: "Claude 3 Haiku (Fastest response)" },
-  { value: "google/gemini-pro", label: "Google Gemini Pro" },
-  { value: "gpt-4o", label: "GPT-4o" },
-];
-
-const PERSONALITY_TYPES = [
-  { value: "direct", label: "Direct and forthright" },
-  { value: "gentle", label: "Gentle and understanding" },
-  { value: "sarcastic", label: "Slightly sarcastic but to the point" },
-  { value: "no_prisoners", label: "Take no prisoners" },
-];
-
-const VOICE_TYPES = [
-  { value: "female", label: "Female" },
-  { value: "male", label: "Male" },
-  { value: "neutral", label: "Neutral" },
-];
-
-const VOICE_SERVICES = [
-  { value: "browser", label: "Browser Default (Free)" },
-  { value: "elevenlabs", label: "ElevenLabs (Premium)" },
-];
-
-const ELEVENLABS_VOICES = [
-  { value: "rachel", label: "Rachel (Female)" },
-  { value: "domi", label: "Domi (Female)" },
-  { value: "bella", label: "Bella (Female)" },
-  { value: "antoni", label: "Antoni (Male)" },
-  { value: "josh", label: "Josh (Male)" },
-  { value: "elli", label: "Elli (Child)" },
-];
-
-const getPersonalityPrompt = (personalityType: string): string => {
-  switch (personalityType) {
-    case "direct":
-      return "Be direct, clear, and straightforward in your responses. Focus on facts and actionable advice without unnecessary elaboration.";
-    case "gentle":
-      return "Be gentle, supportive, and understanding. Use encouraging language and show empathy when the user faces challenges.";
-    case "sarcastic":
-      return "Be slightly sarcastic but helpful. Add a touch of wit and humor to your responses while still providing valuable information.";
-    case "no_prisoners":
-      return "Be incredibly direct, no-nonsense, and brutally honest. Cut through excuses and push the user to achieve their goals.";
-    default:
-      return "Be helpful and supportive.";
-  }
-};
 
 const AISettings = () => {
   const { user } = useAuth();
-  const [selectedModel, setSelectedModel] = useState<string>(AI_MODELS[0].value);
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_AI_MODEL);
   const [isSaving, setIsSaving] = useState(false);
   const [enableAI, setEnableAI] = useState(true);
   const [assistantName, setAssistantName] = useState("M8");
   const [personalityType, setPersonalityType] = useState<string>("gentle");
-  const [voiceType, setVoiceType] = useState<string>("female");
-  const [voiceService, setVoiceService] = useState<string>("browser");
-  const [elevenlabsVoice, setElevenlabsVoice] = useState<string>("rachel");
+  const [voiceType, setVoiceType] = useState<string>(DEFAULT_VOICE_SETTINGS.voiceType);
+  const [voiceService, setVoiceService] = useState<string>(DEFAULT_VOICE_SETTINGS.voiceService);
+  const [elevenlabsVoice, setElevenlabsVoice] = useState<string>(DEFAULT_VOICE_SETTINGS.elevenlabsVoice);
   const [elevenlabsApiKey, setElevenlabsApiKey] = useState<string>("");
   const openRouterApiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
 
@@ -100,7 +64,7 @@ const AISettings = () => {
         }
 
         // Parse the JSON data
-        const config = data as Record<string, any>;
+        const config = data as unknown as LLMConfig;
         if (config) {
           if (config.llm_provider) {
             setSelectedModel(config.llm_provider);
@@ -120,8 +84,8 @@ const AISettings = () => {
           }
 
           // Set voice type if available
-          if (config.voice_type) {
-            setVoiceType(config.voice_type);
+          if (config.voice_gender) {
+            setVoiceType(config.voice_gender);
           }
           
           // Set voice service if available
@@ -160,10 +124,8 @@ const AISettings = () => {
 
     setIsSaving(true);
 
-    // Create pre-prompt based on personality type and assistant name
-    const basePrompt = `You are a helpful AI assistant for a goal-tracking application. Your name is ${assistantName || "M8"}. Your job is to help users manage their goals and actions, provide encouragement, and answer questions.`;
-    const personalityPrompt = getPersonalityPrompt(personalityType);
-    const fullPrompt = `${basePrompt} ${personalityPrompt}`;
+    // Use the helper function from prompts.ts to generate the full prompt
+    const fullPrompt = generateFullPrompt(assistantName, personalityType);
 
     try {
       // Use the manage_user_llm_config function instead of direct table access
@@ -361,19 +323,20 @@ const AISettings = () => {
                         placeholder="Enter your ElevenLabs API key"
                       />
                       <p className="text-sm text-muted-foreground">
-                        Your ElevenLabs API key is stored securely
+                        Get your API key from <a href="https://elevenlabs.io/app/api-key" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">ElevenLabs</a>
                       </p>
                     </div>
                   </>
                 )}
               </div>
               
+              {/* AI Model section */}
               <div className="pt-4 border-t border-border">
-                <h3 className="text-lg font-medium mb-4">AI Model Selection</h3>
+                <h3 className="text-lg font-medium mb-4">AI Model Settings</h3>
                 
-                <div className="space-y-2">
+                <div className="space-y-2 mb-4">
                   <Label htmlFor="model-select" className="text-base font-medium">
-                    AI Model
+                    Select AI Model
                   </Label>
                   <Select value={selectedModel} onValueChange={setSelectedModel}>
                     <SelectTrigger id="model-select" className="w-full">
@@ -388,27 +351,22 @@ const AISettings = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-muted-foreground">
-                    Choose which AI model to use for your assistant. More capable models may cost more credits.
+                    {AI_MODELS.find(m => m.value === selectedModel)?.description || "Select an AI model to use"}
                   </p>
                 </div>
               </div>
             </>
           )}
-
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="w-full sm:w-auto"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              "Save Settings"
-            )}
-          </Button>
+          
+          <div className="pt-4 flex justify-end">
+            <Button 
+              type="button" 
+              onClick={handleSave} 
+              disabled={isSaving}
+            >
+              {isSaving ? "Saving..." : "Save Settings"}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

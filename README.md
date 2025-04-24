@@ -1,149 +1,85 @@
-# My M8 - Goal Tracking Application
+# MyM8 - Personal Goal Tracking and AI Assistant
 
-## Project Status
+A modern goal tracking application with AI assistant capabilities, designed to help you achieve your goals.
 
-**Current Status**: Beta version with core functionality implemented.
+## Features
 
-This application helps users track their personal goals and daily/weekly/monthly actions, with the ability to monitor progress and view activity history.
-
-## Features Implemented
-
-- **User Authentication**: Sign-up, login, and secure user sessions
-- **Goal Management**: Create, edit, view, and manage personal goals with descriptions
-- **Action Management**: Add actions to goals with different frequencies (morning, afternoon, evening, daily, weekly, monthly)
-- **Progress Tracking**: Dashboard with progress bars showing completion rates for daily, weekly and monthly actions
-- **Activity Log**: View history of completed actions with filtering capabilities
-- **AI Assistant**: Interact with an AI to manage goals, add actions, and get motivation through natural language
-- **Dark/Light Mode**: Support for both dark and light themes
-- **Responsive Design**: Works on both desktop and mobile devices
-
-## Technical Implementation
-
-- **Frontend**: React with TypeScript, Vite for build tooling
-- **UI Framework**: shadcn-ui components with Tailwind CSS for styling
-- **Database**: Supabase for real-time PostgreSQL database
-- **Authentication**: Supabase Auth for user management
-- **State Management**: React Context and React Query for data fetching
-- **AI Integration**: OpenRouter API for AI assistant capabilities
-
-## What's Left to Do
-
-- **Notifications**: Add reminders for incomplete actions
-- **Streak Tracking**: Track consecutive days of task completion
-- **Action Recurrence**: Set up automatic action resetting for daily/weekly/monthly tasks
-- **Sharing & Social**: Allow sharing goals or progress with friends or a community
-- **Export/Import**: Implement data export/import functionality
-- **Advanced Analytics**: More detailed statistics on action completion patterns
-- **Mobile App**: Convert to native mobile application
-- **Performance Optimizations**: Improve loading times and reduce API calls
-- **User Settings**: Additional user customization options
+- **Goal Management:** Create and track your personal goals
+- **Task Management:** Add actions to your goals with frequency settings (daily, weekly, monthly)
+- **AI Assistant:** Chat with an AI assistant that can help manage your goals and tasks
+- **Voice Integration:** Text-to-speech with browser voices or premium ElevenLabs voices
+- **Activity Logs:** Track your completed actions and see your progress
+- **Customizable:** Configure the AI assistant's personality, voice, and more
 
 ## Getting Started
 
-Follow these steps to set up the project locally:
+1. Clone the repository
+2. Install dependencies with `npm install`
+3. Set up your environment variables in `.env`:
+   ```
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   VITE_OPENROUTER_API_KEY=your_openrouter_api_key
+   ```
+4. Run the development server with `npm run dev`
 
-```sh
-# Clone the repository
-git clone <YOUR_GIT_URL>
+## Configuration System
 
-# Navigate to the project directory
-cd mym8
+MyM8 includes a centralized configuration system that makes it easy to customize various aspects of the application.
 
-# Install dependencies
-npm i
+### Configuration Files
 
-# Start the development server
-npm run dev
+All configuration files are located in the `src/config` directory:
+
+- **`prompts.ts`**: AI assistant prompts and personalities
+- **`voice.ts`**: Voice service settings and options
+- **`ai.ts`**: AI model configurations and tools
+- **`frequency.ts`**: Task frequency types and display settings
+
+### How to Edit Configurations
+
+For more detailed information about the configuration system, see [Configuration Guide](docs/configuration.md).
+
+### Examples
+
+To modify the assistant's base prompt:
+```typescript
+// Edit src/config/prompts.ts
+export const BASE_PROMPT = `You are a motivational coach for a goal-tracking application...`;
 ```
 
-## Database Setup
-
-The application uses Supabase as the backend. You'll need to:
-
-1. Create a Supabase project
-2. Run the migration scripts in the `supabase/migrations` directory
-3. Update the environment variables with your Supabase URL and anon key
-
-## Project Structure
-
-- `/src` - Application source code
-  - `/components` - Reusable UI components
-  - `/contexts` - React Context providers
-  - `/hooks` - Custom React hooks
-  - `/lib` - Utility functions and libraries
-  - `/pages` - Main application pages
-  - `/integrations` - Third-party integrations
-- `/public` - Static assets
-- `/supabase` - Supabase configuration and migrations
-
-## Technologies Used
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-- Supabase
-- React Query
-
-## Project info
-
-**URL**: https://lovable.dev/projects/66b114b3-f95b-46fd-b026-55e2bd9b9853
-
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/66b114b3-f95b-46fd-b026-55e2bd9b9853) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+To add a new voice:
+```typescript
+// Edit src/config/voice.ts
+export const ELEVENLABS_VOICES = [
+  // existing voices...
+  { value: "adam", label: "Adam (Male)" },
+];
 ```
 
-**Edit a file directly in GitHub**
+## Database Tables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Users and Profiles
 
-**Use GitHub Codespaces**
+- **auth.users**: Supabase authentication users
+- **profiles**: User profile information and preferences
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Core Application Tables
 
-## How can I deploy this project?
+- **goals**: User's goals
+- **tasks**: Actions associated with goals
+- **activity_logs**: Tracking completed actions
+- **llm_configs**: AI assistant configurations
 
-Simply open [Lovable](https://lovable.dev/projects/66b114b3-f95b-46fd-b026-55e2bd9b9853) and click on Share -> Publish.
+### AI Assistant Tables
 
-## Can I connect a custom domain to my Lovable project?
+- **conversations**: Chat conversations with the AI
+- **chat_messages**: Individual messages in conversations
 
-Yes, you can!
+## Contributing
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
