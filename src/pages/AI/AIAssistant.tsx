@@ -612,10 +612,10 @@ const AIAssistant = () => {
     }
   };
 
-  // Fix the messagesEndRef scrolling behavior
+  // Scroll to bottom when new messages arrive
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
@@ -1424,8 +1424,8 @@ Only use these formats for those specific intents. Otherwise, respond conversati
               </DropdownMenu>
             </CardHeader>
             
-            <div className="flex-1 overflow-y-auto no-scrollbar">
-              <div className="p-2 sm:p-4 space-y-3 sm:space-y-4 pb-40">
+            <div className="flex-1 overflow-y-auto no-scrollbar pb-[80px] sm:pb-[100px]">
+              <div className="p-2 sm:p-4 space-y-3 sm:space-y-4">
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -1457,7 +1457,7 @@ Only use these formats for those specific intents. Otherwise, respond conversati
               </div>
             </div>
             
-            <div className="absolute bottom-0 left-0 right-0 bg-card border-t p-2 sm:p-3 shadow-md">
+            <div className="absolute bottom-0 left-0 right-0 bg-card border-t p-2 sm:p-3 shadow-md z-10">
               <form onSubmit={handleSubmit} className="w-full flex flex-col space-y-2">
                 <div className="flex gap-2">
                   <Textarea
