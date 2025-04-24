@@ -37,46 +37,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const loadProfile = async (userId: string) => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .single();
 
-      if (error) {
-        console.error("Error loading profile:", error);
-        return;
+        if (error) {
+          console.error("Error loading profile:", error);
+          return;
+        }
+
+        setProfile(data);
+      } catch (err) {
+        console.error("Error in loadProfile:", err);
       }
-
-      setProfile(data);
     };
 
     // Get session from Supabase
     const getSession = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error("Error fetching session:", error);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error("Error fetching session:", error);
+        }
+        setSession(session);
+        setUser(session?.user || null);
+        if (session?.user) {
+          await loadProfile(session.user.id);
+        }
+        setLoading(false);
+      } catch (err) {
+        console.error("Error in getSession:", err);
+        setLoading(false);
       }
-      setSession(session);
-      setUser(session?.user || null);
-      if (session?.user) {
-        await loadProfile(session.user.id);
-      }
-      setLoading(false);
     };
 
     getSession();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user || null);
-      if (session?.user) {
-        await loadProfile(session.user.id);
-      } else {
-        setProfile(null);
+      try {
+        setSession(session);
+        setUser(session?.user || null);
+        if (session?.user) {
+          await loadProfile(session.user.id);
+        } else {
+          setProfile(null);
+        }
+        setLoading(false);
+      } catch (err) {
+        console.error("Error in auth state change:", err);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => {

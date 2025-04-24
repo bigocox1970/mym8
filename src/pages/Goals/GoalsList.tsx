@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ListPlus } from "lucide-react";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { Layout } from "@/components/Layout";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Goal = {
   id: string;
@@ -18,10 +19,13 @@ type Goal = {
 
 const GoalsList = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const { data: goals, isLoading, isError, refetch } = useQuery({
-    queryKey: ['goals'],
+    queryKey: ['goals', user?.id],
     queryFn: async () => {
+      if (!user) throw new Error("User not authenticated");
+      
       const { data, error } = await supabase
         .from('goals')
         .select('*')
@@ -38,6 +42,7 @@ const GoalsList = () => {
 
       return data as Goal[];
     },
+    enabled: !!user, // Only run query if user is authenticated
   });
 
   return (

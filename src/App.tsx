@@ -20,8 +20,16 @@ import NotFound from "./pages/NotFound";
 import GoalDetail from "./pages/Goals/GoalDetail";
 import UserSettings from "./pages/Settings/UserSettings";
 import GoalsList from "./pages/Goals/GoalsList";
+import NewGoal from "./pages/Goals/NewGoal";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -80,6 +88,7 @@ const App = () => (
             
             {/* Goals routes */}
             <Route path="/goals" element={<ProtectedRoute><GoalsList /></ProtectedRoute>} />
+            <Route path="/goals/new" element={<ProtectedRoute><NewGoal /></ProtectedRoute>} />
             <Route path="/goals/:id" element={<ProtectedRoute><GoalDetail /></ProtectedRoute>} />
             
             {/* Catch-all route */}
