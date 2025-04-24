@@ -8,20 +8,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "@/components/ui/sonner";
 import { Loader } from "lucide-react";
+import { User } from "@supabase/supabase-js";
 
 interface ProfileSettingsProps {
-  user: any;
+  user: User | null;
   profile: {
     nickname: string | null;
     avatar_url: string | null;
-  };
+  } | null;
   onProfileUpdate: () => Promise<void>;
 }
 
 export const ProfileSettings = ({ user, profile, onProfileUpdate }: ProfileSettingsProps) => {
   const [isSaving, setIsSaving] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(profile.avatar_url);
-  const [nickname, setNickname] = useState(profile.nickname || "");
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(profile?.avatar_url || null);
+  const [nickname, setNickname] = useState(profile?.nickname || "");
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -58,7 +59,7 @@ export const ProfileSettings = ({ user, profile, onProfileUpdate }: ProfileSetti
     } catch (error) {
       console.error("Error uploading avatar:", error);
       toast.error("Failed to upload avatar");
-      setAvatarPreview(profile.avatar_url);
+      setAvatarPreview(profile?.avatar_url || null);
     } finally {
       setIsSaving(false);
     }
@@ -67,6 +68,8 @@ export const ProfileSettings = ({ user, profile, onProfileUpdate }: ProfileSetti
   const handleNicknameUpdate = async () => {
     try {
       setIsSaving(true);
+      if (!user) return;
+      
       const { error } = await supabase
         .from("profiles")
         .update({ nickname })

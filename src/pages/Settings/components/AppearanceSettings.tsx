@@ -6,9 +6,10 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
 import { Loader } from "lucide-react";
+import { User } from "@supabase/supabase-js";
 
 interface AppearanceSettingsProps {
-  user: any;
+  user: User | null;
   darkMode: boolean;
   onAppearanceUpdate: () => Promise<void>;
 }
@@ -18,6 +19,8 @@ export const AppearanceSettings = ({ user, darkMode, onAppearanceUpdate }: Appea
 
   const toggleDarkMode = async () => {
     try {
+      if (!user) return;
+      
       setIsSaving(true);
       const newDarkMode = !darkMode;
       
