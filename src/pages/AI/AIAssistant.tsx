@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
-import { Bot, Send, User, Loader2, Mic, MicOff, Trash2, Plus, MoreVertical, Menu, History, ArrowLeft } from "lucide-react";
+import { Bot, Send, User, Loader2, Mic, MicOff, Trash2, Plus, MoreVertical, Menu, History, ArrowLeft, Volume2, VolumeX, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -37,6 +37,7 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { v4 as uuidv4 } from 'uuid';
 
 // Add SpeechRecognition type definitions
 interface SpeechRecognitionEvent extends Event {
@@ -74,6 +75,8 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  conversation_id?: string;
+  created_at?: string;
 }
 
 interface Goal {
@@ -105,6 +108,8 @@ const AIAssistant = () => {
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [showNewConversationDialog, setShowNewConversationDialog] = useState(false);
@@ -179,7 +184,7 @@ const AIAssistant = () => {
         // If no current conversation is selected and there are conversations, select the most recent one
         if (!currentConversationId && data && data.length > 0) {
           setCurrentConversationId(data[0].id);
-          loadMessages(data[0].id);
+          loadMessages();
         } else if (!currentConversationId) {
           // If no conversations exist, create a new one
           createNewConversation("New Conversation");
@@ -192,65 +197,134 @@ const AIAssistant = () => {
     fetchConversations();
   }, [user, currentConversationId]);
 
-  // Load messages for a conversation
-  const loadMessages = async (conversationId: string) => {
+  // Extract fetchConversations to be used elsewhere in the component
+  const fetchConversations = async () => {
     if (!user) return;
     
     try {
       const { data, error } = await supabase
-        .from('chat_messages')
+        .from('conversations')
         .select('*')
-        .eq('conversation_id', conversationId)
         .eq('user_id', user.id)
-        .order('timestamp', { ascending: true });
+        .order('last_message_at', { ascending: false });
         
       if (error) {
-        console.error('Error fetching messages:', error);
+        console.error('Error fetching conversations:', error);
         return;
       }
       
-      if (data && data.length > 0) {
-        const loadedMessages: Message[] = data.map(msg => ({
-          id: msg.id,
-          role: msg.role as "user" | "assistant",
-          content: msg.content,
-          timestamp: new Date(msg.timestamp)
-        }));
+      setConversations(data || []);
+    } catch (error) {
+      console.error('Error in fetchConversations:', error);
+    }
+  };
+
+  // Load messages for a conversation
+  const loadMessages = async () => {
+    if (!user || !currentConversationId) return;
+
+    setIsProcessing(true);
+    try {
+      // Fetch messages for the current conversation
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('conversation_id', currentConversationId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error loading messages:', error);
+        return;
+      }
+
+      // If no messages, add a welcome message
+      if (data.length === 0) {
+        // Fetch assistant config to get name and personality
+        const { data: configData, error: configError } = await supabase
+          .from('llm_configs')
+          .select('assistant_name, personality_type')
+          .eq('user_id', user.id)
+          .single();
+
+        if (configError && configError.code !== 'PGRST116') {
+          console.error('Error fetching assistant config:', configError);
+        }
         
-        setMessages(loadedMessages);
-      } else {
-        // If no messages, add a welcome message
-        const welcomeMessage: Message = {
-          id: "welcome",
-          role: "assistant",
-          content: "Hi there! I'm your M8 AI assistant. How can I help you today? You can ask me about your tasks, add new goals, or get encouragement to achieve your objectives.",
-          timestamp: new Date(),
-        };
+        // Default values if no config found
+        const assistantName = configData?.assistant_name || 'M8';
+        const personalityType = configData?.personality_type || 'direct';
         
-        setMessages([welcomeMessage]);
+        // Create personalized welcome message based on personality
+        let welcomeMessage = '';
         
+        switch (personalityType) {
+          case 'direct':
+            welcomeMessage = `Hi there, I'm ${assistantName}. How can I help you today?`;
+            break;
+          case 'gentle':
+            welcomeMessage = `Hello! I'm ${assistantName}, your friendly assistant. I'm here to support you with whatever you need. How are you feeling today?`;
+            break;
+          case 'sarcastic':
+            welcomeMessage = `Hey, I'm ${assistantName}. What brilliance can I assist you with today? I'm all digital ears.`;
+            break;
+          case 'no_prisoners':
+            welcomeMessage = `I'm ${assistantName}. Let's get straight to business. What do you need help with?`;
+            break;
+          default:
+            welcomeMessage = `Hi there, I'm ${assistantName}. How can I help you today?`;
+        }
+
         // Save welcome message to database
-        await supabase
+        const { error: insertError } = await supabase
           .from('chat_messages')
           .insert({
-            id: welcomeMessage.id,
+            conversation_id: currentConversationId,
             user_id: user.id,
-            role: welcomeMessage.role,
-            content: welcomeMessage.content,
-            timestamp: welcomeMessage.timestamp.toISOString(),
-            conversation_id: conversationId
+            role: 'assistant',
+            content: welcomeMessage,
+            created_at: new Date().toISOString()
           });
+
+        if (insertError) {
+          console.error('Error inserting welcome message:', insertError);
+        } else {
+          // Add welcome message to local state
+          data.push({
+            id: uuidv4(),
+            conversation_id: currentConversationId,
+            user_id: user.id,
+            role: 'assistant',
+            content: welcomeMessage,
+            created_at: new Date().toISOString(),
+            timestamp: new Date().toISOString()
+          });
+        }
       }
-    } catch (error) {
-      console.error('Error in loadMessages:', error);
+
+      // Convert database records to Message format
+      const formattedMessages = data.map(msg => ({
+        id: msg.id,
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+        timestamp: new Date(msg.created_at),
+        conversation_id: msg.conversation_id,
+        created_at: msg.created_at
+      }));
+
+      setMessages(formattedMessages);
+    } catch (err) {
+      console.error('Error in loadMessages:', err);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   // Create a new conversation
-  const createNewConversation = async (title: string = "New Conversation") => {
+  const createNewConversation = async (title: string) => {
     if (!user) return;
-    
+
     try {
+      // Create new conversation
       const { data, error } = await supabase
         .from('conversations')
         .insert({
@@ -258,42 +332,80 @@ const AIAssistant = () => {
           title: title,
           last_message_at: new Date().toISOString()
         })
-        .select('*')
+        .select()
         .single();
-        
+
       if (error) {
         console.error('Error creating conversation:', error);
         return;
       }
-      
-      setConversations(prev => [data, ...prev]);
+
+      // Update local state
       setCurrentConversationId(data.id);
-      setMessages([]);
-      setShowNewConversationDialog(false);
-      setNewConversationTitle("");
       
+      // Fetch assistant config to get name and personality
+      const { data: configData, error: configError } = await supabase
+        .from('llm_configs')
+        .select('assistant_name, personality_type')
+        .eq('user_id', user.id)
+        .single();
+
+      if (configError && configError.code !== 'PGRST116') {
+        console.error('Error fetching assistant config:', configError);
+      }
+      
+      // Default values if no config found
+      const assistantName = configData?.assistant_name || 'M8';
+      const personalityType = configData?.personality_type || 'direct';
+      
+      // Create personalized welcome message based on personality
+      let welcomeMessage = '';
+      
+      switch (personalityType) {
+        case 'direct':
+          welcomeMessage = `Hi there, I'm ${assistantName}. How can I help you today?`;
+          break;
+        case 'gentle':
+          welcomeMessage = `Hello! I'm ${assistantName}, your friendly assistant. I'm here to support you with whatever you need. How are you feeling today?`;
+          break;
+        case 'sarcastic':
+          welcomeMessage = `Hey, I'm ${assistantName}. What brilliance can I assist you with today? I'm all digital ears.`;
+          break;
+        case 'no_prisoners':
+          welcomeMessage = `I'm ${assistantName}. Let's get straight to business. What do you need help with?`;
+          break;
+        default:
+          welcomeMessage = `Hi there, I'm ${assistantName}. How can I help you today?`;
+      }
+
       // Add welcome message
-      const welcomeMessage: Message = {
-        id: "welcome-" + Date.now().toString(),
-        role: "assistant",
-        content: "Hi there! I'm your M8 AI assistant. How can I help you today? You can ask me about your tasks, add new goals, or get encouragement to achieve your objectives.",
-        timestamp: new Date(),
-      };
-      
-      setMessages([welcomeMessage]);
-      
-      // Save welcome message to database
-      await supabase
+      const { error: messageError } = await supabase
         .from('chat_messages')
         .insert({
+          conversation_id: data.id,
           user_id: user.id,
-          role: welcomeMessage.role,
-          content: welcomeMessage.content,
-          timestamp: welcomeMessage.timestamp.toISOString(),
-          conversation_id: data.id
+          role: 'assistant',
+          content: welcomeMessage,
+          created_at: new Date().toISOString()
         });
-    } catch (error) {
-      console.error('Error in createNewConversation:', error);
+
+      if (messageError) {
+        console.error('Error adding welcome message:', messageError);
+      }
+
+      // Refresh conversations list
+      fetchConversations();
+      
+      // Load messages for the new conversation
+      setMessages([{
+        id: uuidv4(),
+        role: 'assistant' as "user" | "assistant",
+        content: welcomeMessage,
+        timestamp: new Date(),
+        conversation_id: data.id
+      }]);
+    } catch (err) {
+      console.error('Error in createNewConversation:', err);
     }
   };
 
@@ -332,7 +444,7 @@ const AIAssistant = () => {
         const nextConversation = conversations.find(conv => conv.id !== currentConversationId);
         if (nextConversation) {
           setCurrentConversationId(nextConversation.id);
-          loadMessages(nextConversation.id);
+          loadMessages();
         }
       } else {
         createNewConversation("New Conversation");
@@ -366,11 +478,42 @@ const AIAssistant = () => {
       // Reset UI
       setMessages([]);
       
-      // Add new welcome message
+      // Fetch assistant configuration
+      const { data: config } = await supabase
+        .from('llm_configs')
+        .select('*')
+        .eq('function_name', 'openrouter')
+        .single();
+      
+      const assistantName = config?.assistant_name || "M8";
+      const personalityType = config?.personality_type || "gentle";
+      
+      // Create personalized welcome message
+      let welcomeContent = `I've cleared our conversation. I'm ${assistantName}, `;
+      
+      // Add personality-specific content
+      switch (personalityType) {
+        case "direct":
+          welcomeContent += "what do you need help with now?";
+          break;
+        case "gentle":
+          welcomeContent += "how else can I support you today?";
+          break;
+        case "sarcastic":
+          welcomeContent += "ready for a fresh start or just hiding the evidence?";
+          break;
+        case "no_prisoners":
+          welcomeContent += "now let's get back to what matters. What's next?";
+          break;
+        default:
+          welcomeContent += "how can I help you now?";
+      }
+      
+      // Add new welcome message with personalized content
       const welcomeMessage: Message = {
         id: "welcome-" + Date.now().toString(),
         role: "assistant",
-        content: "I've cleared our conversation. How can I help you now?",
+        content: welcomeContent,
         timestamp: new Date(),
       };
       
@@ -476,6 +619,85 @@ const AIAssistant = () => {
     }
   }, [messages]);
 
+  // Text-to-speech functionality
+  const speakText = (text: string) => {
+    if (!voiceEnabled) return;
+    
+    // Stop any ongoing speech
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+    }
+    
+    setIsSpeaking(true);
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Get available voices and select a suitable one
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(voice => 
+      voice.lang === 'en-US' && voice.name.includes('Female')
+    );
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+    
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    
+    utterance.onend = () => {
+      setIsSpeaking(false);
+    };
+    
+    window.speechSynthesis.speak(utterance);
+  };
+  
+  // Stop speaking
+  const stopSpeaking = () => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+  
+  // Toggle voice response mode
+  const toggleVoiceMode = () => {
+    setVoiceEnabled(prev => !prev);
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+  
+  // Initialize voices when component loads
+  useEffect(() => {
+    // Load voices - sometimes they're not immediately available
+    const loadVoices = () => {
+      window.speechSynthesis.getVoices();
+    };
+    
+    loadVoices();
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+    
+    // Clean up
+    return () => {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+  
+  // Speak new assistant messages if voice is enabled
+  useEffect(() => {
+    if (voiceEnabled && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === 'assistant') {
+        speakText(lastMessage.content);
+      }
+    }
+  }, [messages, voiceEnabled]);
+
   // Speech recognition setup
   useEffect(() => {
     let recognition: SpeechRecognition | null = null;
@@ -509,36 +731,45 @@ const AIAssistant = () => {
     };
   }, []);
 
-  const toggleListening = () => {
-    if (!isListening) {
-      if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        recognition.start();
-        setIsListening(true);
-        
-        recognition.onresult = (event) => {
-          const transcript = Array.from(event.results)
-            .map(result => result[0])
-            .map(result => result.transcript)
-            .join('');
-            
-          setInput(transcript);
-        };
-        
-        recognition.onend = () => {
-          setIsListening(false);
-        };
-      } else {
-        toast.error("Speech recognition is not supported in your browser.");
-      }
-    } else {
-      if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        recognition.stop();
+  // Add these functions before toggleListening
+  const startListening = () => {
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.start();
+      setIsListening(true);
+      
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0])
+          .map(result => result.transcript)
+          .join('');
+          
+        setInput(transcript);
+      };
+      
+      recognition.onend = () => {
         setIsListening(false);
-      }
+      };
+    } else {
+      toast.error("Speech recognition is not supported in your browser.");
+    }
+  };
+
+  const stopListening = () => {
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.stop();
+      setIsListening(false);
+    }
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
     }
   };
 
@@ -1020,25 +1251,83 @@ Only use these formats for those specific intents. Otherwise, respond conversati
             </CardHeader>
             <div className="overflow-y-auto no-scrollbar h-[calc(100vh-14rem)]">
               {conversations.length > 0 ? (
-                conversations.map((conversation) => (
-                  <div 
-                    key={conversation.id}
-                    className={cn(
-                      "flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors",
-                      currentConversationId === conversation.id ? "bg-gray-100 dark:bg-gray-800" : ""
-                    )}
-                    onClick={() => {
-                      setCurrentConversationId(conversation.id);
-                      loadMessages(conversation.id);
-                      setShowChatHistory(false);
-                    }}
-                  >
-                    <div className="flex items-center space-x-2 truncate w-full">
-                      <Bot className="h-4 w-4 flex-shrink-0" />
-                      <span className="truncate">{conversation.title || "Untitled Conversation"}</span>
-                    </div>
-                  </div>
-                ))
+                <>
+                  {/* Group conversations by date */}
+                  {(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    
+                    const yesterday = new Date(today);
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    
+                    const lastWeekStart = new Date(today);
+                    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+                    
+                    const thisMonth = new Date(today);
+                    thisMonth.setDate(1);
+                    
+                    // Create date groups
+                    const todayConvos = conversations.filter(c => {
+                      const date = new Date(c.last_message_at);
+                      return date >= today;
+                    });
+                    
+                    const yesterdayConvos = conversations.filter(c => {
+                      const date = new Date(c.last_message_at);
+                      return date >= yesterday && date < today;
+                    });
+                    
+                    const lastWeekConvos = conversations.filter(c => {
+                      const date = new Date(c.last_message_at);
+                      return date >= lastWeekStart && date < yesterday;
+                    });
+                    
+                    const olderConvos = conversations.filter(c => {
+                      const date = new Date(c.last_message_at);
+                      return date < lastWeekStart;
+                    });
+                    
+                    // Helper function to render a group
+                    const renderGroup = (title: string, convos: Conversation[]) => {
+                      if (convos.length === 0) return null;
+                      return (
+                        <div key={title}>
+                          <div className="px-3 py-1 text-xs text-muted-foreground font-medium bg-muted/50">
+                            {title}
+                          </div>
+                          {convos.map((conversation) => (
+                            <div 
+                              key={conversation.id}
+                              className={cn(
+                                "flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors",
+                                currentConversationId === conversation.id ? "bg-gray-100 dark:bg-gray-800" : ""
+                              )}
+                              onClick={() => {
+                                setCurrentConversationId(conversation.id);
+                                loadMessages();
+                                setShowChatHistory(false);
+                              }}
+                            >
+                              <div className="flex items-center space-x-2 truncate w-full">
+                                <Bot className="h-4 w-4 flex-shrink-0" />
+                                <span className="truncate">{conversation.title || "Untitled Conversation"}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    };
+                    
+                    return (
+                      <>
+                        {renderGroup("Today", todayConvos)}
+                        {renderGroup("Yesterday", yesterdayConvos)}
+                        {renderGroup("Last 7 Days", lastWeekConvos)}
+                        {renderGroup("Older", olderConvos)}
+                      </>
+                    );
+                  })()}
+                </>
               ) : (
                 <div className="px-3 py-6 text-center text-muted-foreground">
                   <p>No conversations yet</p>
@@ -1072,7 +1361,7 @@ Only use these formats for those specific intents. Otherwise, respond conversati
                           setShowNewConversationDialog(true);
                         } else if (value) {
                           setCurrentConversationId(value);
-                          loadMessages(value);
+                          loadMessages();
                         }
                       }}
                     >
@@ -1188,13 +1477,29 @@ Only use these formats for those specific intents. Otherwise, respond conversati
                 
                 <div className="flex justify-between">
                   <Button
-                    type="button"
                     variant="outline"
                     size="icon"
+                    onClick={toggleVoiceMode}
+                    title={voiceEnabled ? "Disable voice responses" : "Enable voice responses"}
+                    className={`${voiceEnabled ? 'bg-primary/10' : ''}`}
+                  >
+                    {voiceEnabled ? (
+                      <Volume2 className="h-4 w-4" />
+                    ) : (
+                      <VolumeX className="h-4 w-4" />
+                    )}
+                  </Button>
+                  
+                  <Button
+                    variant="outline" 
+                    size="icon"
                     onClick={toggleListening}
+                    disabled={isProcessing}
+                    title={isListening ? "Stop listening" : "Start listening"}
+                    className={`${isListening ? 'bg-red-100 dark:bg-red-900/20' : ''}`}
                   >
                     {isListening ? (
-                      <MicOff className="h-4 w-4 text-red-500" />
+                      <MicOff className="h-4 w-4" />
                     ) : (
                       <Mic className="h-4 w-4" />
                     )}
@@ -1202,16 +1507,9 @@ Only use these formats for those specific intents. Otherwise, respond conversati
                   
                   <Button type="submit" disabled={isProcessing || !input.trim()} className="px-3 sm:px-4">
                     {isProcessing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        <span className="hidden sm:inline">Processing...</span>
-                        <span className="sm:hidden">Wait</span>
-                      </>
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <>
-                        <Send className="mr-2 h-4 w-4" />
-                        <span className="hidden sm:inline">Send</span>
-                      </>
+                      <Send className="h-4 w-4" />
                     )}
                   </Button>
                 </div>
@@ -1268,6 +1566,22 @@ Only use these formats for those specific intents. Otherwise, respond conversati
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Add a speaking indicator if needed */}
+      {isSpeaking && (
+        <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm flex items-center gap-1 shadow-md">
+          <Volume2 className="h-4 w-4 animate-pulse" />
+          <span>Speaking...</span>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-6 w-6 p-0 ml-1" 
+            onClick={stopSpeaking}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
     </Layout>
   );
 };
