@@ -1,38 +1,44 @@
--- First create the llm_config table if it doesn't exist
-CREATE TABLE IF NOT EXISTS "llm_config" (
-  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "user_id" UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  "function_name" TEXT NOT NULL,
-  "assistant_name" TEXT,
-  "personality_type" TEXT,
-  "pre_prompt" TEXT,
-  "voice_gender" TEXT,
-  "llm_provider" TEXT,
-  "voice_service" TEXT,
-  "elevenlabs_voice" TEXT,
-  "elevenlabs_api_key" TEXT,
-  "api_key" TEXT,
-  "enable_ai" BOOLEAN DEFAULT TRUE,
-  "created_at" TIMESTAMPTZ DEFAULT now(),
-  "updated_at" TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(user_id, function_name)
-);
+-- First, let's check if we need to create the table
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'llm_configs') THEN
+        CREATE TABLE public.llm_configs (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+            function_name TEXT NOT NULL,
+            assistant_name TEXT,
+            personality_type TEXT,
+            pre_prompt TEXT,
+            voice_gender TEXT,
+            llm_provider TEXT,
+            voice_service TEXT,
+            elevenlabs_voice TEXT,
+            elevenlabs_api_key TEXT,
+            api_key TEXT,
+            enable_ai BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMPTZ DEFAULT now(),
+            updated_at TIMESTAMPTZ DEFAULT now(),
+            UNIQUE(function_name)
+        );
+    END IF;
+END $$;
 
--- Add new voice settings columns to llm_config table
-ALTER TABLE IF EXISTS "llm_config" 
-ADD COLUMN IF NOT EXISTS "google_voice" TEXT,
-ADD COLUMN IF NOT EXISTS "google_api_key" TEXT,
-ADD COLUMN IF NOT EXISTS "azure_voice" TEXT,
-ADD COLUMN IF NOT EXISTS "azure_api_key" TEXT,
-ADD COLUMN IF NOT EXISTS "amazon_voice" TEXT,
-ADD COLUMN IF NOT EXISTS "amazon_api_key" TEXT,
-ADD COLUMN IF NOT EXISTS "openai_voice" TEXT,
-ADD COLUMN IF NOT EXISTS "openai_api_key" TEXT;
+-- Add new voice settings columns to llm_configs table
+ALTER TABLE IF EXISTS public.llm_configs 
+ADD COLUMN IF NOT EXISTS google_voice TEXT,
+ADD COLUMN IF NOT EXISTS google_api_key TEXT,
+ADD COLUMN IF NOT EXISTS azure_voice TEXT,
+ADD COLUMN IF NOT EXISTS azure_api_key TEXT,
+ADD COLUMN IF NOT EXISTS amazon_voice TEXT,
+ADD COLUMN IF NOT EXISTS amazon_api_key TEXT,
+ADD COLUMN IF NOT EXISTS openai_voice TEXT,
+ADD COLUMN IF NOT EXISTS openai_api_key TEXT;
 
 -- Drop existing functions first to avoid conflicts
 DROP FUNCTION IF EXISTS manage_user_llm_config(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT);
 DROP FUNCTION IF EXISTS manage_user_llm_config(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT);
 DROP FUNCTION IF EXISTS get_user_llm_config();
+DROP FUNCTION IF EXISTS get_user_llm_config(TEXT);
 
 -- Update RPC function to support new voice settings
 CREATE OR REPLACE FUNCTION manage_user_llm_config(
@@ -65,12 +71,12 @@ BEGIN
   
   -- Check if the user has a configuration entry
   SELECT id INTO v_config_id
-  FROM llm_config
-  WHERE user_id = v_user_id AND function_name = p_function_name;
+  FROM public.llm_configs
+  WHERE function_name = p_function_name;
   
   -- If a config already exists, update it
   IF v_config_id IS NOT NULL THEN
-    UPDATE llm_config
+    UPDATE public.llm_configs
     SET 
       assistant_name = COALESCE(p_assistant_name, assistant_name),
       personality_type = COALESCE(p_personality_type, personality_type),
@@ -91,11 +97,10 @@ BEGIN
       api_key = COALESCE(p_api_key, api_key),
       updated_at = now()
     WHERE id = v_config_id
-    RETURNING to_jsonb(llm_config.*) INTO v_result;
+    RETURNING to_jsonb(llm_configs.*) INTO v_result;
   -- Otherwise, create a new config
   ELSE
-    INSERT INTO llm_config (
-      user_id, 
+    INSERT INTO public.llm_configs (
       function_name, 
       assistant_name,
       personality_type,
@@ -113,10 +118,10 @@ BEGIN
       amazon_api_key,
       openai_voice,
       openai_api_key,
-      api_key
+      api_key,
+      user_id
     )
     VALUES (
-      v_user_id, 
       p_function_name, 
       p_assistant_name,
       p_personality_type,
@@ -134,31 +139,45 @@ BEGIN
       p_amazon_api_key,
       p_openai_voice,
       p_openai_api_key,
-      p_api_key
+      p_api_key,
+      v_user_id
     )
-    RETURNING to_jsonb(llm_config.*) INTO v_result;
+    RETURNING to_jsonb(llm_configs.*) INTO v_result;
   END IF;
   
   RETURN v_result;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create a simplified version for backward compatibility
+-- Create a function to get user's LLM config
 CREATE OR REPLACE FUNCTION get_user_llm_config() 
-RETURNS SETOF llm_config AS $$
+RETURNS JSONB AS $$
+DECLARE
+  v_user_id UUID;
+  v_result JSONB;
 BEGIN
-  RETURN QUERY
-  SELECT *
-  FROM llm_config
-  WHERE user_id = auth.uid();
+  -- Get the current user ID
+  v_user_id := auth.uid();
+  
+  -- Get the configuration for the default function name ('openrouter')
+  SELECT to_jsonb(c.*) INTO v_result
+  FROM public.llm_configs c
+  WHERE c.function_name = 'openrouter';
+  
+  -- If no config found, return empty JSON
+  IF v_result IS NULL THEN
+    RETURN '{}'::JSONB;
+  END IF;
+  
+  RETURN v_result;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-COMMENT ON COLUMN llm_config.google_voice IS 'The Google Cloud TTS voice ID selected by the user';
-COMMENT ON COLUMN llm_config.google_api_key IS 'The user''s Google Cloud API key for text-to-speech';
-COMMENT ON COLUMN llm_config.azure_voice IS 'The Microsoft Azure TTS voice ID selected by the user';
-COMMENT ON COLUMN llm_config.azure_api_key IS 'The user''s Azure Speech Services API key';
-COMMENT ON COLUMN llm_config.amazon_voice IS 'The Amazon Polly voice ID selected by the user';
-COMMENT ON COLUMN llm_config.amazon_api_key IS 'The user''s AWS access key for Polly TTS';
-COMMENT ON COLUMN llm_config.openai_voice IS 'The OpenAI TTS voice ID selected by the user';
-COMMENT ON COLUMN llm_config.openai_api_key IS 'The user''s OpenAI API key for TTS'; 
+COMMENT ON COLUMN public.llm_configs.google_voice IS 'The Google Cloud TTS voice ID selected by the user';
+COMMENT ON COLUMN public.llm_configs.google_api_key IS 'The user''s Google Cloud API key for text-to-speech';
+COMMENT ON COLUMN public.llm_configs.azure_voice IS 'The Microsoft Azure TTS voice ID selected by the user';
+COMMENT ON COLUMN public.llm_configs.azure_api_key IS 'The user''s Azure Speech Services API key';
+COMMENT ON COLUMN public.llm_configs.amazon_voice IS 'The Amazon Polly voice ID selected by the user';
+COMMENT ON COLUMN public.llm_configs.amazon_api_key IS 'The user''s AWS access key for Polly TTS';
+COMMENT ON COLUMN public.llm_configs.openai_voice IS 'The OpenAI TTS voice ID selected by the user';
+COMMENT ON COLUMN public.llm_configs.openai_api_key IS 'The user''s OpenAI API key for TTS'; 

@@ -88,6 +88,8 @@ const AISettings = () => {
           return;
         }
 
+        console.log("Loaded config from database:", data);
+        
         // Parse the JSON data
         const config = data as unknown as LLMConfig;
         if (config) {
@@ -115,16 +117,19 @@ const AISettings = () => {
           
           // Set voice service if available
           if (config.voice_service) {
+            console.log("Setting voice service from database:", config.voice_service);
             setVoiceService(config.voice_service);
           }
           
           // Set ElevenLabs voice if available
           if (config.elevenlabs_voice) {
+            console.log("Setting ElevenLabs voice from database:", config.elevenlabs_voice);
             setElevenlabsVoice(config.elevenlabs_voice);
           }
           
           // Set ElevenLabs API key if available
           if (config.elevenlabs_api_key) {
+            console.log("Found ElevenLabs API key in database");
             setElevenlabsApiKey(config.elevenlabs_api_key);
           }
 
@@ -192,6 +197,21 @@ const AISettings = () => {
     // Use the helper function from prompts.ts to generate the full prompt
     const fullPrompt = generateFullPrompt(assistantName, personalityType);
 
+    // Debug log what we're about to save
+    console.log("Saving voice settings:", {
+      voiceService,
+      elevenlabsVoice,
+      hasElevenLabsApiKey: !!elevenlabsApiKey,
+      googleVoice,
+      hasGoogleApiKey: !!googleApiKey,
+      azureVoice,
+      hasAzureApiKey: !!azureApiKey,
+      amazonVoice,
+      hasAmazonApiKey: !!amazonApiKey,
+      openaiVoice,
+      hasOpenAIApiKey: !!openaiApiKey
+    });
+
     try {
       // Use the manage_user_llm_config function instead of direct table access
       const { data, error } = await supabase.rpc('manage_user_llm_config', {
@@ -216,9 +236,11 @@ const AISettings = () => {
       });
 
       if (error) {
+        console.error("Error details from Supabase:", error);
         throw error;
       }
 
+      console.log("Successfully saved settings, response:", data);
       toast.success("AI settings saved successfully");
     } catch (error) {
       console.error("Error saving AI settings:", error);
