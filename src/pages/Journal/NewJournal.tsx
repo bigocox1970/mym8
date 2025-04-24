@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,7 +5,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
-import { Mic, MicOff, Play, Stop, Save } from "lucide-react";
+import { Mic, Square, Play, Save } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 const NewJournal = () => {
@@ -19,12 +18,8 @@ const NewJournal = () => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // This is a mock function for transcription
-  // In a real application, you would use a transcription service API
   const mockTranscribe = async (audioBlob: Blob): Promise<string> => {
-    // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 1500));
-    // Return mock transcription
     return "This is a simulated transcription of your audio recording. In a real application, this would be the actual text from your voice recording, transcribed by a service like OpenAI Whisper API, Google Speech-to-Text, or similar.";
   };
 
@@ -43,7 +38,6 @@ const NewJournal = () => {
       
       recorder.onstop = async () => {
         setAudioChunks(chunks);
-        // Start transcription when recording stops
         const audioBlob = new Blob(chunks, { type: 'audio/webm' });
         transcribeAudio(audioBlob);
       };
@@ -61,7 +55,6 @@ const NewJournal = () => {
     if (mediaRecorder && isRecording) {
       mediaRecorder.stop();
       setIsRecording(false);
-      // Stop all tracks in all streams
       mediaRecorder.stream.getTracks().forEach(track => track.stop());
       toast.info("Recording stopped");
     }
@@ -70,10 +63,8 @@ const NewJournal = () => {
   const transcribeAudio = async (audioBlob: Blob) => {
     setIsTranscribing(true);
     try {
-      // In a real app, send this blob to your transcription service
       const transcription = await mockTranscribe(audioBlob);
       
-      // Append transcription to existing content
       setContent(prev => {
         if (prev.trim()) {
           return `${prev}\n\n${transcription}`;
@@ -137,7 +128,7 @@ const NewJournal = () => {
             >
               {isRecording ? (
                 <>
-                  <Stop className="mr-2 h-4 w-4" />
+                  <Square className="mr-2 h-4 w-4" />
                   Stop Recording
                 </>
               ) : (
