@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +19,10 @@ import NotFound from "./pages/NotFound";
 import GoalDetail from "./pages/Goals/GoalDetail";
 import UserSettings from "./pages/Settings/UserSettings";
 import GoalsList from "./pages/Goals/GoalsList";
+import NewGoal from "./pages/Goals/NewGoal";
+import EditGoal from "./pages/Goals/EditGoal";
+import ActionsList from "./pages/Actions/ActionsList";
+import ActivityLog from "./pages/Logs/ActivityLog";
 
 const queryClient = new QueryClient();
 
@@ -80,7 +83,15 @@ const App = () => (
             
             {/* Goals routes */}
             <Route path="/goals" element={<ProtectedRoute><GoalsList /></ProtectedRoute>} />
+            <Route path="/goals/new" element={<ProtectedRoute><NewGoal /></ProtectedRoute>} />
             <Route path="/goals/:id" element={<ProtectedRoute><GoalDetail /></ProtectedRoute>} />
+            <Route path="/goals/:id/edit" element={<ProtectedRoute><EditGoal /></ProtectedRoute>} />
+            
+            {/* Actions routes */}
+            <Route path="/actions" element={<ProtectedRoute><ActionsList /></ProtectedRoute>} />
+            
+            {/* Log routes */}
+            <Route path="/logs" element={<ProtectedRoute><ActivityLog /></ProtectedRoute>} />
             
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />

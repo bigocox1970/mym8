@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ListPlus } from "lucide-react";
+import { ListPlus, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,7 @@ import { Layout, MenuToggleButton } from "@/components/Layout";
 type Goal = {
   id: string;
   goal_text: string;
+  description: string | null;
   created_at: string;
   user_id: string;
 };
@@ -41,7 +42,7 @@ const GoalsList = () => {
 
   return (
     <Layout>
-      <div className="w-full py-6">
+      <div className="w-full">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Your Goals</h1>
@@ -76,9 +77,19 @@ const GoalsList = () => {
                     Created on {new Date(goal.created_at).toLocaleDateString()}
                   </CardDescription>
                 </CardHeader>
+                <CardContent>
+                  {goal.description && (
+                    <p className="text-sm text-slate-700 dark:text-white">{goal.description}</p>
+                  )}
+                </CardContent>
                 <CardFooter className="flex justify-between">
                   <Link to={`/goals/${goal.id}`}>
                     <Button variant="outline">View Details</Button>
+                  </Link>
+                  <Link to={`/goals/${goal.id}/edit`}>
+                    <Button variant="ghost" size="icon">
+                      <Edit className="h-4 w-4" />
+                    </Button>
                   </Link>
                 </CardFooter>
               </Card>

@@ -103,6 +103,6 @@
   .dark input[type="password"],
   .dark input[type="email"],
   .dark textarea {
-    @apply text-gray-900;
+    @apply text-white;
   }
 }

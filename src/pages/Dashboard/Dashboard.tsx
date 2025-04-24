@@ -5,18 +5,41 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/lib/supabase";
-import { BarChart, ListTodo, Plus } from "lucide-react";
+import { BarChart, ListTodo, Plus, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
+
+interface Goal {
+  id: string;
+  goal_text: string;
+  created_at: string;
+}
+
+interface Action {
+  id: string;
+  completed: boolean;
+  skipped: boolean;
+  frequency: string;
+}
+
+interface ActionSummary {
+  total: number;
+  completed: number;
+  percentage: number;
+}
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [goals, setGoals] = useState([]);
-  const [progress, setProgress] = useState({
-    daily: 0,
-    weekly: 0,
-    monthly: 0
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [actionSummary, setActionSummary] = useState<{
+    daily: ActionSummary;
+    weekly: ActionSummary;
+    monthly: ActionSummary;
+  }>({
+    daily: { total: 0, completed: 0, percentage: 0 },
+    weekly: { total: 0, completed: 0, percentage: 0 },
+    monthly: { total: 0, completed: 0, percentage: 0 }
   });
 
   useEffect(() => {
@@ -47,34 +70,59 @@ const Dashboard = () => {
     const calculateProgress = async () => {
       if (!user) return;
 
-      const now = new Date();
-      const startOfDay = new Date(now.setHours(0,0,0,0));
-      const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
       try {
-        const { data: dailyEntries } = await supabase
-          .from("journal_entries")
-          .select("created_at")
-          .eq("user_id", user.id)
-          .gte("created_at", startOfDay.toISOString());
+        // Fetch all tasks
+        const { data: actions, error } = await supabase
+          .from("tasks")
+          .select("id, completed, skipped, frequency")
+          .eq("user_id", user.id);
 
-        const { data: weeklyEntries } = await supabase
-          .from("journal_entries")
-          .select("created_at")
-          .eq("user_id", user.id)
-          .gte("created_at", startOfWeek.toISOString());
-
-        const { data: monthlyEntries } = await supabase
-          .from("journal_entries")
-          .select("created_at")
-          .eq("user_id", user.id)
-          .gte("created_at", startOfMonth.toISOString());
-
-        setProgress({
-          daily: Math.min((dailyEntries?.length || 0) * 25, 100),
-          weekly: Math.min((weeklyEntries?.length || 0) * 15, 100),
-          monthly: Math.min((monthlyEntries?.length || 0) * 5, 100)
+        if (error) throw error;
+        
+        if (!actions || actions.length === 0) {
+          setActionSummary({
+            daily: { total: 0, completed: 0, percentage: 0 },
+            weekly: { total: 0, completed: 0, percentage: 0 },
+            monthly: { total: 0, completed: 0, percentage: 0 }
+          });
+          setLoading(false);
+          return;
+        }
+        
+        // Group actions by frequency
+        const dailyActions = actions.filter(action => 
+          action.frequency === "morning" || 
+          action.frequency === "afternoon" || 
+          action.frequency === "evening" || 
+          action.frequency === "daily"
+        );
+        
+        const weeklyActions = actions.filter(action => 
+          action.frequency === "weekly"
+        );
+        
+        const monthlyActions = actions.filter(action => 
+          action.frequency === "monthly"
+        );
+        
+        // Calculate completion percentages
+        const calculateSummary = (actionList: Action[]): ActionSummary => {
+          if (actionList.length === 0) return { total: 0, completed: 0, percentage: 0 };
+          
+          const completedCount = actionList.filter(action => action.completed).length;
+          const percentage = Math.round((completedCount / actionList.length) * 100);
+          
+          return {
+            total: actionList.length,
+            completed: completedCount,
+            percentage
+          };
+        };
+        
+        setActionSummary({
+          daily: calculateSummary(dailyActions),
+          weekly: calculateSummary(weeklyActions),
+          monthly: calculateSummary(monthlyActions)
         });
       } catch (error) {
         console.error("Error calculating progress:", error);
@@ -94,12 +142,6 @@ const Dashboard = () => {
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <div className="flex items-center gap-2">
-            <Link to="/goals/new">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                New Goal
-              </Button>
-            </Link>
             <MenuToggleButton />
           </div>
         </div>
@@ -112,43 +154,75 @@ const Dashboard = () => {
                 <BarChart className="h-5 w-5" />
                 Track Your Progress
               </CardTitle>
-              <CardDescription>See how you're doing with your goals</CardDescription>
+              <CardDescription>Completion rate of your actions</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <div className="space-y-2">
-                <div className="flex justify-between text-sm text-foreground">
-                  <span>Daily Progress</span>
-                  <span>{progress.daily}%</span>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-sm font-medium">Daily Actions</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {actionSummary.daily.completed} of {actionSummary.daily.total} completed
+                    </p>
+                  </div>
+                  <span className="text-sm font-medium">{actionSummary.daily.percentage}%</span>
                 </div>
-                <Progress value={progress.daily} />
+                <Progress value={actionSummary.daily.percentage} className="h-2" />
               </div>
               
               <div className="space-y-2">
-                <div className="flex justify-between text-sm text-foreground">
-                  <span>Weekly Progress</span>
-                  <span>{progress.weekly}%</span>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-sm font-medium">Weekly Actions</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {actionSummary.weekly.completed} of {actionSummary.weekly.total} completed
+                    </p>
+                  </div>
+                  <span className="text-sm font-medium">{actionSummary.weekly.percentage}%</span>
                 </div>
-                <Progress value={progress.weekly} />
+                <Progress value={actionSummary.weekly.percentage} className="h-2" />
               </div>
               
               <div className="space-y-2">
-                <div className="flex justify-between text-sm text-foreground">
-                  <span>Monthly Progress</span>
-                  <span>{progress.monthly}%</span>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-sm font-medium">Monthly Actions</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {actionSummary.monthly.completed} of {actionSummary.monthly.total} completed
+                    </p>
+                  </div>
+                  <span className="text-sm font-medium">{actionSummary.monthly.percentage}%</span>
                 </div>
-                <Progress value={progress.monthly} />
+                <Progress value={actionSummary.monthly.percentage} className="h-2" />
+              </div>
+              
+              <div className="flex justify-end mt-2">
+                <Link to="/actions">
+                  <Button variant="outline" size="sm" className="text-xs">
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                    View All Actions
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
 
           {/* Goals Section */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ListTodo className="h-5 w-5" />
-                Your Goals
-              </CardTitle>
-              <CardDescription>Recent goals you've set</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <ListTodo className="h-5 w-5" />
+                  Your Goals
+                </CardTitle>
+                <CardDescription>Recent goals you've set</CardDescription>
+              </div>
+              <Link to="/goals/new">
+                <Button size="sm">
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Goal
+                </Button>
+              </Link>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -173,6 +247,17 @@ const Dashboard = () => {
                     <Button size="sm" variant="outline">
                       <Plus className="mr-2 h-4 w-4" />
                       Add Your First Goal
+                    </Button>
+                  </Link>
+                </div>
+              )}
+              
+              {goals.length > 0 && (
+                <div className="flex justify-end mt-4">
+                  <Link to="/goals">
+                    <Button variant="outline" size="sm" className="text-xs">
+                      <ListTodo className="mr-1 h-3 w-3" />
+                      View All Goals
                     </Button>
                   </Link>
                 </div>

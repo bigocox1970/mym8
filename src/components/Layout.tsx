@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Home, FileText, Settings, LogOut, ListTodo, Menu, X } from "lucide-react";
+import { Home, FileText, Settings, LogOut, ListTodo, Menu, X, CheckSquare, ClipboardList } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 // No need to import logo - will use direct path
@@ -121,6 +121,26 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                   >
                     <ListTodo className="mr-2 h-4 w-4" />
                     <span>Goals</span>
+                  </Button>
+                </Link>
+                <Link to="/actions">
+                  <Button 
+                    variant={isActive("/actions") ? "default" : "ghost"} 
+                    className="w-full justify-start"
+                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
+                  >
+                    <CheckSquare className="mr-2 h-4 w-4" />
+                    <span>Actions</span>
+                  </Button>
+                </Link>
+                <Link to="/logs">
+                  <Button 
+                    variant={isActive("/logs") ? "default" : "ghost"} 
+                    className="w-full justify-start"
+                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
+                  >
+                    <ClipboardList className="mr-2 h-4 w-4" />
+                    <span>Activity Log</span>
                   </Button>
                 </Link>
                 <Link to="/journal">

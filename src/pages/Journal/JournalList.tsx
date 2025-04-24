@@ -1,7 +1,6 @@
-
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Layout } from "@/components/Layout";
+import { Layout, MenuToggleButton } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
@@ -71,12 +70,15 @@ const JournalList = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Journal Entries</h1>
-          <Link to="/journal/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Entry
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/journal/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Entry
+              </Button>
+            </Link>
+            <MenuToggleButton />
+          </div>
         </div>
 
         <div className="relative">

@@ -1,36 +1,77 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Layout } from "@/components/Layout";
+import { Layout, MenuToggleButton } from "@/components/Layout";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/sonner";
-import { Plus } from "lucide-react";
+import { Plus, Edit, Save } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 interface Goal {
   id: string;
   goal_text: string;
+  description: string | null;
   created_at: string;
   user_id: string;
 }
 
-interface Task {
+interface Action {
   id: string;
-  task_text: string;
+  title: string;
+  description: string | null;
   completed: boolean;
+  skipped: boolean;
   goal_id: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+  frequency: "morning" | "afternoon" | "evening" | "daily" | "weekly" | "monthly";
+}
+
+interface EditingAction {
+  id: string;
+  title: string;
+  description: string;
+  frequency: Action["frequency"];
 }
 
 const GoalDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [goal, setGoal] = useState<Goal | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [newTaskText, setNewTaskText] = useState("");
+  const [actions, setActions] = useState<Action[]>([]);
+  const [newActionText, setNewActionText] = useState("");
   const [loading, setLoading] = useState(true);
+  const [frequencyFilter, setFrequencyFilter] = useState<"all" | Action["frequency"]>("all");
+  const [selectedFrequency, setSelectedFrequency] = useState<Action["frequency"]>("daily");
+  const [newActionDescription, setNewActionDescription] = useState("");
+  const [showDescriptionInput, setShowDescriptionInput] = useState(false);
+  const [editingAction, setEditingAction] = useState<EditingAction | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   useEffect(() => {
-    const fetchGoalAndTasks = async () => {
+    const fetchGoalAndActions = async () => {
       try {
         if (!id) throw new Error("Goal ID is required");
 
@@ -44,68 +85,192 @@ const GoalDetail = () => {
         if (goalError) throw goalError;
         setGoal(goalData as Goal);
 
-        // Fetch tasks related to the goal
-        const { data: tasksData, error: tasksError } = await supabase
+        // Fetch actions related to the goal
+        const { data: actionsData, error: actionsError } = await supabase
           .from("tasks")
           .select("*")
           .eq("goal_id", id)
           .order("created_at", { ascending: false });
 
-        if (tasksError) throw tasksError;
-        setTasks(tasksData as Task[]);
+        if (actionsError) throw actionsError;
+        setActions(actionsData as Action[]);
       } catch (error) {
-        console.error("Error fetching goal and tasks:", error);
+        console.error("Error fetching goal and actions:", error);
         toast.error("Failed to load goal details");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchGoalAndTasks();
+    fetchGoalAndActions();
   }, [id]);
 
-  const handleTaskComplete = async (taskId: string, completed: boolean) => {
+  const handleActionComplete = async (actionId: string, completed: boolean) => {
     try {
+      const currentTime = new Date().toISOString();
+      
+      if (!user) {
+        console.error("User not logged in or user ID not available");
+        toast.error("User authentication error");
+        return;
+      }
+      
+      // Update the task
       const { error } = await supabase
         .from("tasks")
-        .update({ completed: completed }) // Fixed: Ensuring completed is always boolean
-        .eq("id", taskId);
+        .update({ 
+          completed: completed,
+          skipped: false, // Reset skipped status when manually completed
+          updated_at: currentTime
+        })
+        .eq("id", actionId);
 
       if (error) throw error;
 
-      setTasks((prevTasks) =>
-        prevTasks.map((task) =>
-          task.id === taskId ? { ...task, completed: completed } : task
+      // Update local state
+      setActions((prevActions) =>
+        prevActions.map((action) =>
+          action.id === actionId ? { 
+            ...action, 
+            completed: completed,
+            skipped: false,
+            updated_at: currentTime
+          } : action
         )
       );
-      toast.success("Task updated successfully!");
+
+      // Log the activity
+      try {
+        console.log("Logging activity:", {
+          user_id: user.id, // Use user.id directly since we check above
+          task_id: actionId,
+          completed: completed,
+          timestamp: currentTime
+        });
+        
+        const { error: logError } = await supabase
+          .from('activity_logs')
+          .insert({
+            user_id: user.id, // Use user.id directly
+            task_id: actionId,
+            completed: completed,
+            timestamp: currentTime
+          });
+          
+        if (logError) {
+          console.error("Error logging activity:", logError);
+        } else {
+          console.log("Activity logged successfully");
+        }
+      } catch (error) {
+        console.error("Error logging activity:", error);
+      }
+      
+      toast.success("Action updated successfully!");
     } catch (error) {
-      console.error("Error updating task:", error);
-      toast.error("Failed to update task");
+      console.error("Error updating action:", error);
+      toast.error("Failed to update action");
     }
   };
 
-  const handleAddTask = async () => {
-    try {
-      if (!newTaskText.trim()) return;
-      if (!id) throw new Error("Goal ID is required to add a task.");
+  const handleEditAction = (action: Action) => {
+    setEditingAction({
+      id: action.id,
+      title: action.title,
+      description: action.description || '',
+      frequency: action.frequency
+    });
+    setShowEditDialog(true);
+  };
 
-      const { data: newTask, error } = await supabase
+  const handleSaveEdit = async () => {
+    if (!editingAction) return;
+
+    try {
+      const { error } = await supabase
         .from("tasks")
-        .insert([{ task_text: newTaskText, goal_id: id, completed: false }])
+        .update({
+          title: editingAction.title,
+          description: editingAction.description,
+          frequency: editingAction.frequency,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", editingAction.id);
+
+      if (error) throw error;
+
+      // Update the local state
+      setActions((prevActions) =>
+        prevActions.map((action) =>
+          action.id === editingAction.id 
+            ? { 
+                ...action, 
+                title: editingAction.title,
+                description: editingAction.description,
+                frequency: editingAction.frequency,
+                updated_at: new Date().toISOString()
+              } 
+            : action
+        )
+      );
+
+      setShowEditDialog(false);
+      setEditingAction(null);
+      toast.success("Action updated successfully!");
+    } catch (error) {
+      console.error("Error saving action:", error);
+      toast.error("Failed to save action");
+    }
+  };
+
+  const handleAddAction = async () => {
+    try {
+      if (!newActionText.trim()) return;
+      if (!id) throw new Error("Goal ID is required to add an action.");
+      if (!user) throw new Error("User must be logged in to add an action.");
+
+      const { data: newAction, error } = await supabase
+        .from("tasks")
+        .insert([{ 
+          title: newActionText, 
+          description: newActionDescription.trim() || null,
+          goal_id: id, 
+          completed: false,
+          frequency: selectedFrequency,
+          user_id: user.id
+        }])
         .select("*")
         .single();
 
       if (error) throw error;
 
-      setTasks((prevTasks) => [...prevTasks, newTask as Task]);
-      setNewTaskText("");
-      toast.success("Task added successfully!");
+      setActions((prevActions) => [...prevActions, newAction as unknown as Action]);
+      setNewActionText("");
+      setNewActionDescription("");
+      setShowDescriptionInput(false);
+      toast.success("Action added successfully!");
     } catch (error) {
-      console.error("Error adding task:", error);
-      toast.error("Failed to add task");
+      console.error("Error adding action:", error);
+      toast.error("Failed to add action");
     }
   };
+
+  const filteredActions = frequencyFilter === "all" 
+    ? actions.sort((a, b) => {
+        // Define priority order for frequencies
+        const frequencyOrder = {
+          'morning': 1,
+          'afternoon': 2,
+          'evening': 3,
+          'daily': 4,
+          'weekly': 5,
+          'monthly': 6
+        };
+        
+        // Sort by frequency first
+        return frequencyOrder[a.frequency] - frequencyOrder[b.frequency];
+      })
+    : actions.filter(action => action.frequency === frequencyFilter);
 
   if (loading) {
     return <Layout>Loading goal details...</Layout>;
@@ -125,58 +290,406 @@ const GoalDetail = () => {
 
   return (
     <Layout>
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>{goal.goal_text}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Created at: {new Date(goal.created_at).toLocaleDateString()}</p>
-          </CardContent>
-        </Card>
+      <div className="w-full">
+        {/* Title in its own row */}
+        <div className="mb-4">
+          <h1 className="text-3xl font-bold">{goal.goal_text}</h1>
+          {goal.description && (
+            <p className={`text-muted-foreground mt-2 ${!showFullDescription && goal.description.length > 100 ? 'line-clamp-2' : ''}`}>
+              {goal.description}
+            </p>
+          )}
+          {goal.description && goal.description.length > 100 && (
+            <Button 
+              variant="link" 
+              onClick={() => setShowFullDescription(!showFullDescription)}
+              className="p-0 h-auto mt-1"
+            >
+              {showFullDescription ? 'Show Less' : 'Show More'}
+            </Button>
+          )}
+        </div>
+
+        {/* Navigation row */}
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <Select
+              value={frequencyFilter}
+              onValueChange={(value) => setFrequencyFilter(value as "all" | Action["frequency"])}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Filter actions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Actions</SelectItem>
+                <SelectItem value="morning">Morning</SelectItem>
+                <SelectItem value="afternoon">Afternoon</SelectItem>
+                <SelectItem value="evening">Evening</SelectItem>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link to={`/goals/${id}/edit`}>
+              <Button>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Goal
+              </Button>
+            </Link>
+            <Link to="/goals">
+              <Button variant="outline">
+                Back to Goals
+              </Button>
+            </Link>
+            <MenuToggleButton />
+          </div>
+        </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Tasks</CardTitle>
+            <CardTitle>Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Daily Actions */}
             <div className="space-y-2">
-              {tasks.map((task) => (
-                <div key={task.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`task-${task.id}`}
-                    checked={task.completed}
-                    onCheckedChange={(checked) => handleTaskComplete(task.id, !!checked)}
-                  />
-                  <label
-                    htmlFor={`task-${task.id}`}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              <h3 className="text-md font-semibold mb-2">Daily Actions</h3>
+              {filteredActions.filter(action => 
+                action.frequency === "morning" || 
+                action.frequency === "afternoon" || 
+                action.frequency === "evening" || 
+                action.frequency === "daily"
+              ).length > 0 ? (
+                filteredActions.filter(action => 
+                  action.frequency === "morning" || 
+                  action.frequency === "afternoon" || 
+                  action.frequency === "evening" || 
+                  action.frequency === "daily"
+                ).map((action) => (
+                  <div 
+                    key={action.id} 
+                    className={`flex items-start space-x-2 p-3 border rounded-md transition-colors ${action.completed ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : ''}`}
                   >
-                    {task.task_text}
-                  </label>
+                    <Checkbox
+                      id={`action-${action.id}`}
+                      checked={action.completed}
+                      onCheckedChange={(checked) => handleActionComplete(action.id, !!checked)}
+                      className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
+                    />
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <label
+                            htmlFor={`action-${action.id}`}
+                            className={`text-sm font-medium leading-none ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
+                          >
+                            {action.title}
+                            {action.completed && (
+                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 font-medium">
+                                Completed
+                              </span>
+                            )}
+                            {action.skipped && (
+                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100 font-medium">
+                                Skipped
+                              </span>
+                            )}
+                          </label>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {action.frequency.charAt(0).toUpperCase() + action.frequency.slice(1)} action
+                          </p>
+                          {action.description && (
+                            <p className="mt-2 text-sm text-slate-700 dark:text-white">{action.description}</p>
+                          )}
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleEditAction(action)}
+                          className="h-8 w-8"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  {frequencyFilter === "all" 
+                    ? "No daily actions created yet" 
+                    : `No ${frequencyFilter} actions found`}
                 </div>
-              ))}
+              )}
+            </div>
+            
+            {/* Weekly Actions */}
+            <div className="space-y-2 mt-6 pt-6 border-t">
+              <h3 className="text-md font-semibold mb-2">Weekly Actions</h3>
+              {filteredActions.filter(action => action.frequency === "weekly").length > 0 ? (
+                filteredActions.filter(action => action.frequency === "weekly").map((action) => (
+                  <div 
+                    key={action.id} 
+                    className={`flex items-start space-x-2 p-3 border rounded-md transition-colors ${action.completed ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : ''}`}
+                  >
+                    <Checkbox
+                      id={`action-${action.id}`}
+                      checked={action.completed}
+                      onCheckedChange={(checked) => handleActionComplete(action.id, !!checked)}
+                      className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
+                    />
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <label
+                            htmlFor={`action-${action.id}`}
+                            className={`text-sm font-medium leading-none ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
+                          >
+                            {action.title}
+                            {action.completed && (
+                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 font-medium">
+                                Completed
+                              </span>
+                            )}
+                            {action.skipped && (
+                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100 font-medium">
+                                Skipped
+                              </span>
+                            )}
+                          </label>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Weekly action
+                          </p>
+                          {action.description && (
+                            <p className="mt-2 text-sm text-slate-700 dark:text-white">{action.description}</p>
+                          )}
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleEditAction(action)}
+                          className="h-8 w-8"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  No weekly actions created yet
+                </div>
+              )}
+            </div>
+            
+            {/* Monthly Actions */}
+            <div className="space-y-2 mt-6 pt-6 border-t">
+              <h3 className="text-md font-semibold mb-2">Monthly Actions</h3>
+              {filteredActions.filter(action => action.frequency === "monthly").length > 0 ? (
+                filteredActions.filter(action => action.frequency === "monthly").map((action) => (
+                  <div 
+                    key={action.id} 
+                    className={`flex items-start space-x-2 p-3 border rounded-md transition-colors ${action.completed ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : ''}`}
+                  >
+                    <Checkbox
+                      id={`action-${action.id}`}
+                      checked={action.completed}
+                      onCheckedChange={(checked) => handleActionComplete(action.id, !!checked)}
+                      className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
+                    />
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <label
+                            htmlFor={`action-${action.id}`}
+                            className={`text-sm font-medium leading-none ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
+                          >
+                            {action.title}
+                            {action.completed && (
+                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 font-medium">
+                                Completed
+                              </span>
+                            )}
+                            {action.skipped && (
+                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100 font-medium">
+                                Skipped
+                              </span>
+                            )}
+                          </label>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Monthly action
+                          </p>
+                          {action.description && (
+                            <p className="mt-2 text-sm text-slate-700 dark:text-white">{action.description}</p>
+                          )}
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleEditAction(action)}
+                          className="h-8 w-8"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  No monthly actions created yet
+                </div>
+              )}
             </div>
 
-            <div className="flex space-x-2">
-              <input
-                type="text"
-                placeholder="New Task"
-                value={newTaskText}
-                onChange={(e) => setNewTaskText(e.target.value)}
-                className="border p-2 rounded flex-1"
-              />
-              <Button onClick={handleAddTask}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Task
-              </Button>
+            <div className="pt-4 border-t">
+              <div className="flex flex-col space-y-2">
+                <h3 className="text-sm font-medium">Add New Action</h3>
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <Select
+                      value={selectedFrequency}
+                      onValueChange={(value) => setSelectedFrequency(value as Action["frequency"])}
+                    >
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="Frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="morning">Morning</SelectItem>
+                        <SelectItem value="afternoon">Afternoon</SelectItem>
+                        <SelectItem value="evening">Evening</SelectItem>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="flex flex-col gap-2 flex-1">
+                      <Input
+                        type="text"
+                        placeholder="Enter a new action"
+                        value={newActionText}
+                        onChange={(e) => setNewActionText(e.target.value)}
+                        className="flex-1"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            if (!showDescriptionInput) {
+                              setShowDescriptionInput(true);
+                            } else {
+                              handleAddAction();
+                            }
+                          }
+                        }}
+                      />
+                      {showDescriptionInput && (
+                        <Textarea
+                          placeholder="Add a description (optional)"
+                          value={newActionDescription}
+                          onChange={(e) => setNewActionDescription(e.target.value)}
+                          rows={2}
+                          className="resize-none"
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex justify-between">
+                    {!showDescriptionInput && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setShowDescriptionInput(true)}
+                      >
+                        Add Description
+                      </Button>
+                    )}
+                    <div className="flex-1"></div>
+                    <Button onClick={handleAddAction} disabled={!newActionText.trim()}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Action
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Link to="/dashboard">
-          <Button variant="secondary">Back to Dashboard</Button>
-        </Link>
+        {/* Edit Action Dialog */}
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent className="sm:max-w-md dark:bg-slate-900 dark:text-white">
+            <DialogHeader>
+              <DialogTitle className="text-foreground dark:text-white">Edit Action</DialogTitle>
+              <DialogDescription className="text-muted-foreground dark:text-slate-300">
+                Update your action details
+              </DialogDescription>
+            </DialogHeader>
+            
+            {editingAction && (
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label htmlFor="action-title" className="text-foreground">Title</Label>
+                  <Input 
+                    id="action-title"
+                    value={editingAction.title} 
+                    onChange={(e) => setEditingAction({...editingAction, title: e.target.value})} 
+                    placeholder="Action title"
+                    className="text-foreground dark:text-white bg-background dark:bg-slate-900 border-input"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="action-description" className="text-foreground">Description</Label>
+                  <Textarea 
+                    id="action-description"
+                    value={editingAction.description} 
+                    onChange={(e) => setEditingAction({...editingAction, description: e.target.value})}
+                    placeholder="Add details about this action"
+                    rows={3}
+                    className="text-foreground dark:text-white bg-background dark:bg-slate-900 border-input"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="action-frequency" className="text-foreground">Frequency</Label>
+                  <Select
+                    value={editingAction.frequency}
+                    onValueChange={(value) => setEditingAction({...editingAction, frequency: value as Action["frequency"]})}
+                  >
+                    <SelectTrigger id="action-frequency" className="text-foreground dark:text-white bg-background dark:bg-slate-900">
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="morning">Morning</SelectItem>
+                      <SelectItem value="afternoon">Afternoon</SelectItem>
+                      <SelectItem value="evening">Evening</SelectItem>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            
+            <DialogFooter className="flex justify-between sm:justify-between">
+              <Button variant="outline" onClick={() => setShowEditDialog(false)} className="dark:text-white dark:border-slate-500">
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdit} className="dark:bg-blue-600 dark:text-white">
+                <Save className="mr-2 h-4 w-4" />
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <div className="flex justify-between mt-6">
+          <Link to="/dashboard">
+            <Button variant="secondary">Back to Dashboard</Button>
+          </Link>
+        </div>
       </div>
     </Layout>
   );

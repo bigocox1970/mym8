@@ -13,18 +13,21 @@ export type Database = {
         Row: {
           created_at: string
           goal_text: string | null
+          description: string | null
           id: string
           user_id: string
         }
         Insert: {
           created_at?: string
           goal_text?: string | null
+          description?: string | null
           id?: string
           user_id: string
         }
         Update: {
           created_at?: string
           goal_text?: string | null
+          description?: string | null
           id?: string
           user_id?: string
         }
@@ -110,37 +113,40 @@ export type Database = {
       }
       tasks: {
         Row: {
-          completed: boolean
-          created_at: string
-          description: string | null
-          frequency: Database["public"]["Enums"]["task_frequency"]
-          goal_id: string
           id: string
           title: string
-          updated_at: string
+          description: string | null
+          completed: boolean
+          skipped: boolean
+          goal_id: string
           user_id: string
+          created_at: string
+          updated_at: string
+          frequency: string
         }
         Insert: {
-          completed?: boolean
-          created_at?: string
-          description?: string | null
-          frequency: Database["public"]["Enums"]["task_frequency"]
-          goal_id: string
           id?: string
           title: string
-          updated_at?: string
+          description?: string | null
+          completed?: boolean
+          skipped?: boolean
+          goal_id: string
           user_id: string
+          created_at?: string
+          updated_at?: string
+          frequency?: string
         }
         Update: {
-          completed?: boolean
-          created_at?: string
-          description?: string | null
-          frequency?: Database["public"]["Enums"]["task_frequency"]
-          goal_id?: string
           id?: string
           title?: string
-          updated_at?: string
+          description?: string | null
+          completed?: boolean
+          skipped?: boolean
+          goal_id?: string
           user_id?: string
+          created_at?: string
+          updated_at?: string
+          frequency?: string
         }
         Relationships: [
           {
@@ -150,6 +156,58 @@ export type Database = {
             referencedRelation: "goals"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "tasks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      activity_logs: {
+        Row: {
+          id: string
+          user_id: string
+          task_id: string
+          completed: boolean
+          skipped: boolean
+          timestamp: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          task_id: string
+          completed: boolean
+          skipped?: boolean
+          timestamp?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          task_id?: string
+          completed?: boolean
+          skipped?: boolean
+          timestamp?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          }
         ]
       }
     }
