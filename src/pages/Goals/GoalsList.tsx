@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ListPlus } from "lucide-react";
@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { Layout } from "@/components/Layout";
-import { useAuth } from "@/contexts/AuthContext";
 
 type Goal = {
   id: string;
@@ -19,17 +18,13 @@ type Goal = {
 
 const GoalsList = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
 
-  const { data: goals, isLoading, isError } = useQuery({
-    queryKey: ['goals', user?.id],
+  const { data: goals, isLoading, isError, refetch } = useQuery({
+    queryKey: ['goals'],
     queryFn: async () => {
-      if (!user) throw new Error("User not authenticated");
-      
       const { data, error } = await supabase
         .from('goals')
         .select('*')
-        .eq('user_id', user.id)  // Filter goals by user_id
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -43,7 +38,6 @@ const GoalsList = () => {
 
       return data as Goal[];
     },
-    enabled: !!user, // Only run query if user is authenticated
   });
 
   return (
@@ -71,11 +65,11 @@ const GoalsList = () => {
             Error loading goals. Please try again.
           </div>
         ) : goals && goals.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-6">
             {goals.map((goal) => (
-              <Card key={goal.id}>
+              <Card key={goal.id} className="w-full">
                 <CardHeader>
-                  <CardTitle className="text-xl truncate">{goal.goal_text}</CardTitle>
+                  <CardTitle className="text-xl">{goal.goal_text}</CardTitle>
                   <CardDescription>
                     Created on {new Date(goal.created_at).toLocaleDateString()}
                   </CardDescription>

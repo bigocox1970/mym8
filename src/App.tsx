@@ -20,16 +20,8 @@ import NotFound from "./pages/NotFound";
 import GoalDetail from "./pages/Goals/GoalDetail";
 import UserSettings from "./pages/Settings/UserSettings";
 import GoalsList from "./pages/Goals/GoalsList";
-import NewGoal from "./pages/Goals/NewGoal";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -48,13 +40,13 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 // Admin Route wrapper
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading, profile } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
 
-  if (!user || !profile?.is_admin) {
+  if (!user || user.email !== "admin@mym8.app") {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -88,7 +80,6 @@ const App = () => (
             
             {/* Goals routes */}
             <Route path="/goals" element={<ProtectedRoute><GoalsList /></ProtectedRoute>} />
-            <Route path="/goals/new" element={<ProtectedRoute><NewGoal /></ProtectedRoute>} />
             <Route path="/goals/:id" element={<ProtectedRoute><GoalDetail /></ProtectedRoute>} />
             
             {/* Catch-all route */}

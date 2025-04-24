@@ -51,40 +51,12 @@ export type Database = {
         }
         Relationships: []
       }
-      llm_configs: {
-        Row: {
-          api_key: string
-          created_at: string | null
-          function_name: string
-          id: string
-          llm_provider: string
-          pre_prompt: string
-        }
-        Insert: {
-          api_key: string
-          created_at?: string | null
-          function_name: string
-          id?: string
-          llm_provider: string
-          pre_prompt: string
-        }
-        Update: {
-          api_key?: string
-          created_at?: string | null
-          function_name?: string
-          id?: string
-          llm_provider?: string
-          pre_prompt?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           avatar_url: string | null
           created_at: string | null
           dark_mode: boolean | null
           id: string
-          is_admin: boolean
           nickname: string | null
           updated_at: string | null
         }
@@ -93,7 +65,6 @@ export type Database = {
           created_at?: string | null
           dark_mode?: boolean | null
           id: string
-          is_admin?: boolean
           nickname?: string | null
           updated_at?: string | null
         }
@@ -102,7 +73,6 @@ export type Database = {
           created_at?: string | null
           dark_mode?: boolean | null
           id?: string
-          is_admin?: boolean
           nickname?: string | null
           updated_at?: string | null
         }
