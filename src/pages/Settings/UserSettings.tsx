@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout, MenuToggleButton } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader } from "lucide-react";
+import { Loader, LogOut } from "lucide-react";
 import { ProfileSettings } from "./components/ProfileSettings";
 import { PasswordSettings } from "./components/PasswordSettings";
 import { AppearanceSettings } from "./components/AppearanceSettings";
@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 
 const UserSettings = () => {
-  const { user, loading: authLoading, profile, refreshProfile } = useAuth();
+  const { user, loading: authLoading, profile, refreshProfile, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -49,6 +49,20 @@ const UserSettings = () => {
     } catch (error) {
       console.error("Error refreshing profile:", error);
       toast.error("Failed to refresh profile");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      setIsLoading(true);
+      await signOut();
+      toast.success("Signed out successfully");
+      navigate("/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast.error("Failed to sign out");
     } finally {
       setIsLoading(false);
     }
@@ -124,6 +138,29 @@ const UserSettings = () => {
                 }}
               >
                 Run Wizard Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-red-500">Sign Out</CardTitle>
+            <CardDescription>Sign out of your account</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm">This will log you out of your account</p>
+              </div>
+              <Button 
+                variant="destructive" 
+                onClick={handleSignOut}
+                disabled={isLoading}
+                className="flex items-center gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign Out
               </Button>
             </div>
           </CardContent>

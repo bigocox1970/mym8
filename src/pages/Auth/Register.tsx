@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -9,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "@/components/ui/sonner";
+import { supabase } from "@/lib/supabase";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email" }),
@@ -25,6 +25,8 @@ const Register = () => {
   const { signUp } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState("");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -38,13 +40,23 @@ const Register = () => {
   const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
     try {
-      const { error } = await signUp(values.email, values.password);
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/verification-success`
+        }
+      });
+
       if (error) {
         toast.error(error.message || "Failed to sign up");
         return;
       }
-      toast.success("Account created successfully");
-      navigate("/onboarding");
+
+      setRegisteredEmail(values.email);
+      setEmailSent(true);
+      
+      toast.success("Verification email sent. Please check your inbox.");
     } catch (error) {
       toast.error("An unexpected error occurred");
       console.error(error);
@@ -52,6 +64,32 @@ const Register = () => {
       setIsLoading(false);
     }
   };
+
+  if (emailSent) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">
+        <div className="w-full max-w-md space-y-8 bg-white p-8 rounded-lg shadow-md">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold">Check Your Email</h1>
+            <p className="mt-4 text-gray-600">
+              We've sent a verification link to <strong>{registeredEmail}</strong>
+            </p>
+            <p className="mt-2 text-gray-600">
+              Please check your email and click the link to verify your account.
+            </p>
+            <div className="mt-6">
+              <Link
+                to="/login"
+                className="text-primary hover:underline font-medium"
+              >
+                Return to login
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">

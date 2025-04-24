@@ -170,7 +170,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             <div className="pt-4 pb-4 flex justify-center items-center">
               <Link to="/dashboard" className="flex justify-center w-full">
                 <img 
-                  src="mym8-logo1.png" 
+                  src="/mym8-logo1.png" 
                   alt="MyM8 Logo" 
                   className="w-4/5 max-w-40" 
                 />

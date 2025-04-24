@@ -1,14 +1,14 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "@/components/ui/sonner";
+import { supabase } from "@/lib/supabase";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email" }),
@@ -20,7 +20,24 @@ type FormValues = z.infer<typeof formSchema>;
 const Login = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Check if redirected from email verification
+  useEffect(() => {
+    // Parse the URL to detect verification confirmation
+    const hasEmailVerified = location.hash.includes('access_token=');
+    
+    if (hasEmailVerified) {
+      toast.success("Email verified! You can now log in.");
+    }
+    
+    // Also handle password reset confirmations
+    const isRecoveringPassword = new URLSearchParams(location.search).get('type') === 'recovery';
+    if (isRecoveringPassword) {
+      toast.success("Password reset successful! You can now log in with your new password.");
+    }
+  }, [location]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -35,6 +52,39 @@ const Login = () => {
     try {
       const { error } = await signIn(values.email, values.password);
       if (error) {
+        if (error.message?.toLowerCase().includes('email not confirmed')) {
+          toast.error("Email not verified. Please check your inbox for verification email.");
+          // Show a simpler toast with a button afterward
+          setTimeout(() => {
+            toast.info(
+              <div className="flex flex-col gap-2">
+                <span>Want to resend the verification email?</span>
+                <Button 
+                  size="sm" 
+                  onClick={() => {
+                    supabase.auth.resend({
+                      type: 'signup',
+                      email: values.email,
+                      options: {
+                        emailRedirectTo: `${window.location.origin}/verification-success`
+                      }
+                    }).then(({ error }) => {
+                      if (error) throw error;
+                      toast.success("Verification email resent! Please check your inbox.");
+                    }).catch(() => {
+                      toast.error("Failed to resend verification email");
+                    });
+                  }}
+                  className="w-full"
+                >
+                  Resend verification email
+                </Button>
+              </div>,
+              { duration: 10000 }
+            );
+          }, 1000);
+          return;
+        }
         toast.error(error.message || "Failed to sign in");
         return;
       }
