@@ -5,15 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/lib/supabase";
-import { FileText, Mic, Plus, BarChart } from "lucide-react";
+import { FileText, Plus, BarChart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
-
-interface Goal {
-  id: string;
-  goal_text: string;
-  created_at: string;
-}
 
 interface JournalEntry {
   id: string;
@@ -23,7 +17,6 @@ interface JournalEntry {
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const [goals, setGoals] = useState<Goal[]>([]);
   const [recentEntries, setRecentEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState({
@@ -37,15 +30,6 @@ const Dashboard = () => {
       if (!user) return;
 
       try {
-        const { data: goalsData, error: goalsError } = await supabase
-          .from("goals")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-
-        if (goalsError) throw goalsError;
-        setGoals(goalsData as Goal[]);
-
         const { data: entriesData, error: entriesError } = await supabase
           .from("journal_entries")
           .select("*")
@@ -138,7 +122,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-sm text-foreground">
                 <span>Daily Progress</span>
                 <span>{progress.daily}%</span>
               </div>
@@ -146,7 +130,7 @@ const Dashboard = () => {
             </div>
             
             <div className="space-y-2">
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-sm text-foreground">
                 <span>Weekly Progress</span>
                 <span>{progress.weekly}%</span>
               </div>
@@ -154,7 +138,7 @@ const Dashboard = () => {
             </div>
             
             <div className="space-y-2">
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-sm text-foreground">
                 <span>Monthly Progress</span>
                 <span>{progress.monthly}%</span>
               </div>
@@ -163,86 +147,49 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Your Goals</CardTitle>
-              <CardDescription>Personal goals you're working toward</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <p>Loading your goals...</p>
-              ) : goals.length > 0 ? (
-                <ul className="space-y-2">
-                  {goals.map((goal) => (
-                    <li key={goal.id}>
-                      <Link
-                        to={`/goals/${goal.id}`}
-                        className="p-3 block bg-gray-50 rounded-md hover:bg-gray-100 transition-colors"
-                      >
-                        {goal.goal_text}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-gray-500 mb-2">You haven't set any goals yet</p>
-                  <Link to="/onboarding">
-                    <Button variant="outline" size="sm">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Goals
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Journal Entries</CardTitle>
-              <CardDescription>Your most recent reflections</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <p>Loading journal entries...</p>
-              ) : recentEntries.length > 0 ? (
-                <ul className="space-y-2">
-                  {recentEntries.map((entry) => (
-                    <li key={entry.id}>
-                      <Link 
-                        to={`/journal/${entry.id}`}
-                        className="p-3 block bg-gray-50 rounded-md hover:bg-gray-100 transition-colors"
-                      >
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center">
-                            <FileText className="mr-2 h-4 w-4 text-gray-500" />
-                            <p className="truncate max-w-[200px]">
-                              {entry.content?.substring(0, 50)}
-                              {entry.content && entry.content.length > 50 ? "..." : ""}
-                            </p>
-                          </div>
-                          <span className="text-xs text-gray-500">{formatDate(entry.created_at)}</span>
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Journal Entries</CardTitle>
+            <CardDescription>Your most recent reflections</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <p className="text-foreground">Loading journal entries...</p>
+            ) : recentEntries.length > 0 ? (
+              <ul className="space-y-2">
+                {recentEntries.map((entry) => (
+                  <li key={entry.id}>
+                    <Link 
+                      to={`/journal/${entry.id}`}
+                      className="p-3 block bg-muted hover:bg-accent transition-colors rounded-md"
+                    >
+                      <div className="flex justify-between items-center text-foreground">
+                        <div className="flex items-center">
+                          <FileText className="mr-2 h-4 w-4 text-foreground" />
+                          <p className="truncate max-w-[200px]">
+                            {entry.content?.substring(0, 50)}
+                            {entry.content && entry.content.length > 50 ? "..." : ""}
+                          </p>
                         </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-gray-500 mb-2">No journal entries yet</p>
-                  <Link to="/journal/new">
-                    <Button variant="outline" size="sm">
-                      <Mic className="mr-2 h-4 w-4" />
-                      Create Entry
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                        <span className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</span>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-foreground mb-2">No journal entries yet</p>
+                <Link to="/journal/new">
+                  <Button variant="outline" size="sm">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Entry
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );
