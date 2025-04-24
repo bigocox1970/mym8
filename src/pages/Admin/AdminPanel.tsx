@@ -21,21 +21,28 @@ interface LLMConfig {
 }
 
 const AdminPanel = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [configs, setConfigs] = useState<LLMConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("journaling");
-  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const checkAdminStatus = async () => {
+    const checkAccess = async () => {
       if (!user) {
         toast.error("Please login to access this page");
         navigate("/login");
         return;
       }
 
+      // First check if profile is loaded from context
+      if (profile && !profile.is_admin) {
+        toast.error("Unauthorized: Admin access only");
+        navigate("/dashboard");
+        return;
+      }
+
+      // Double check with database query in case profile isn't loaded properly
       try {
         const { data, error } = await supabase
           .from("profiles")
@@ -43,27 +50,31 @@ const AdminPanel = () => {
           .eq("id", user.id)
           .single();
 
-        if (error) throw error;
-        
+        if (error) {
+          console.error("Error checking admin status:", error);
+          toast.error("An error occurred while checking admin status");
+          navigate("/dashboard");
+          return;
+        }
+
         if (!data || !data.is_admin) {
           toast.error("Unauthorized: Admin access only");
           navigate("/dashboard");
           return;
         }
-        
-        setIsAdmin(true);
+
         fetchConfigs();
       } catch (error) {
-        console.error("Error checking admin status:", error);
-        toast.error("An error occurred while checking admin status");
+        console.error("Error in admin access check:", error);
+        toast.error("An error occurred. Please try again later.");
         navigate("/dashboard");
       } finally {
         setLoading(false);
       }
     };
 
-    checkAdminStatus();
-  }, [user, navigate]);
+    checkAccess();
+  }, [user, navigate, profile]);
 
   const fetchConfigs = async () => {
     try {
@@ -73,7 +84,7 @@ const AdminPanel = () => {
         .order("function_name", { ascending: true });
 
       if (error) throw error;
-      setConfigs(data as LLMConfig[]);
+      setConfigs(data || []);
     } catch (error) {
       console.error("Error fetching LLM configs:", error);
       toast.error("Failed to load LLM configurations");
@@ -84,7 +95,6 @@ const AdminPanel = () => {
     return configs.find(config => config.function_name === functionName) || null;
   };
 
-  // If still loading or user not logged in, show loading state
   if (loading) {
     return (
       <Layout>
@@ -93,11 +103,6 @@ const AdminPanel = () => {
         </div>
       </Layout>
     );
-  }
-
-  // If not admin, this should be caught in the useEffect, but adding an extra check
-  if (!isAdmin) {
-    return null;
   }
 
   return (

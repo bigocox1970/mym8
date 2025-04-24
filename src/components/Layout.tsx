@@ -1,70 +1,21 @@
-import React, { useEffect, useState } from "react";
+
+import React, { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Home, FileText, Settings, LogOut, ListTodo } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user, signOut, profile } = useAuth();
   const location = useLocation();
-  const [loading, setLoading] = useState(true);
-  const [profileData, setProfileData] = useState<{
-    nickname: string | null;
-    avatar_url: string | null;
-    dark_mode: boolean;
-  } | null>(null);
 
   useEffect(() => {
-    if (user) {
-      const loadProfileData = async () => {
-        try {
-          setLoading(true);
-          console.log("Layout fetching profile for user ID:", user.id);
-          const { data, error } = await supabase
-            .from("profiles")
-            .select("dark_mode, nickname, avatar_url")
-            .eq("id", user.id)
-            .maybeSingle();
-            
-          if (error) {
-            console.error("Error loading profile:", error);
-            return;
-          }
-          
-          console.log("Layout loaded profile data:", data);
-          
-          if (data) {
-            setProfileData(data);
-            
-            if (data.dark_mode) {
-              document.documentElement.classList.add("dark");
-            } else {
-              document.documentElement.classList.remove("dark");
-            }
-          } else if (user) {
-            console.log("No profile found, creating default profile");
-            const { error: insertError } = await supabase
-              .from("profiles")
-              .insert({ 
-                id: user.id,
-                dark_mode: false
-              });
-              
-            if (insertError) {
-              console.error("Error creating profile:", insertError);
-            }
-          }
-        } catch (error) {
-          console.error("Error loading profile data:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      
-      loadProfileData();
+    if (profile?.dark_mode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
     }
-  }, [user, location.pathname]);
+  }, [profile]);
 
   const isActive = (path: string) => {
     return location.pathname === path;
