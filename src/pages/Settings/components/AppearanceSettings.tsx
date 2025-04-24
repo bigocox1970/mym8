@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +29,11 @@ export const AppearanceSettings = ({ user, darkMode, onAppearanceUpdate }: Appea
         .update({ dark_mode: newDarkMode })
         .eq("id", user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error toggling dark mode:", error);
+        toast.error("Failed to update theme");
+        return;
+      }
       
       if (newDarkMode) {
         document.documentElement.classList.add("dark");

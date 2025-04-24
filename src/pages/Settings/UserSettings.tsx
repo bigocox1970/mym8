@@ -7,11 +7,53 @@ import { Loader } from "lucide-react";
 import { ProfileSettings } from "./components/ProfileSettings";
 import { PasswordSettings } from "./components/PasswordSettings";
 import { AppearanceSettings } from "./components/AppearanceSettings";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/sonner";
 
 const UserSettings = () => {
-  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<{
+    nickname: string | null;
+    avatar_url: string | null;
+    dark_mode: boolean;
+  } | null>(null);
+
+  const fetchProfile = async () => {
+    try {
+      if (!user) return null;
+      
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("nickname, avatar_url, dark_mode")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching profile:", error);
+        toast.error("Failed to load profile data");
+        return null;
+      }
+
+      // Apply dark mode setting
+      if (data && data.dark_mode) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+
+      setProfile(data);
+      return data;
+    } catch (error) {
+      console.error("Error in fetchProfile:", error);
+      toast.error("An error occurred while loading profile data");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!user && !authLoading) {
@@ -19,10 +61,14 @@ const UserSettings = () => {
       return;
     }
 
-    if (!authLoading) {
-      setLoading(false);
+    if (!authLoading && user) {
+      fetchProfile();
     }
   }, [user, authLoading, navigate]);
+
+  const refreshProfile = async () => {
+    await fetchProfile();
+  };
 
   if (loading || authLoading) {
     return (

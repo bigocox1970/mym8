@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,11 +37,26 @@ export const ProfileSettings = ({ user, profile, onProfileUpdate }: ProfileSetti
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${Math.random()}.${fileExt}`;
 
+      // Check if the avatars bucket exists, if not create it
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const avatarBucketExists = buckets?.some(bucket => bucket.name === 'avatars');
+      
+      if (!avatarBucketExists) {
+        await supabase.storage.createBucket('avatars', {
+          public: true
+        });
+      }
+
       const { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(fileName, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Error uploading avatar:", uploadError);
+        toast.error("Failed to upload avatar");
+        setAvatarPreview(profile?.avatar_url || null);
+        return;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from("avatars")
@@ -52,7 +67,11 @@ export const ProfileSettings = ({ user, profile, onProfileUpdate }: ProfileSetti
         .update({ avatar_url: publicUrl })
         .eq("id", user.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("Error updating profile with avatar:", updateError);
+        toast.error("Failed to update profile with new avatar");
+        return;
+      }
 
       toast.success("Avatar updated successfully");
       await onProfileUpdate();
@@ -75,7 +94,11 @@ export const ProfileSettings = ({ user, profile, onProfileUpdate }: ProfileSetti
         .update({ nickname })
         .eq("id", user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error updating nickname:", error);
+        toast.error("Failed to update nickname");
+        return;
+      }
       
       toast.success("Nickname updated successfully");
       await onProfileUpdate();
