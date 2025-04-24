@@ -51,6 +51,33 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          dark_mode: boolean | null
+          id: string
+          nickname: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          dark_mode?: boolean | null
+          id: string
+          nickname?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          dark_mode?: boolean | null
+          id?: string
+          nickname?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           completed: boolean

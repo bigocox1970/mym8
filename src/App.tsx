@@ -17,6 +17,7 @@ import EditJournal from "./pages/Journal/EditJournal";
 import AdminPanel from "./pages/Admin/AdminPanel";
 import NotFound from "./pages/NotFound";
 import GoalDetail from "./pages/Goals/GoalDetail";
+import UserSettings from "./pages/Settings/UserSettings";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +71,7 @@ const App = () => (
             <Route path="/journal/new" element={<ProtectedRoute><NewJournal /></ProtectedRoute>} />
             <Route path="/journal/:id" element={<ProtectedRoute><JournalDetail /></ProtectedRoute>} />
             <Route path="/journal/edit/:id" element={<ProtectedRoute><EditJournal /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
             
             {/* Admin routes */}
             <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />

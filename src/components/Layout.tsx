@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -14,13 +13,13 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex dark:bg-gray-900">
       {user && (
-        <aside className="w-16 md:w-64 bg-white border-r shadow-sm">
+        <aside className="w-16 md:w-64 bg-white border-r shadow-sm dark:bg-gray-800 dark:border-gray-700">
           <div className="p-4 flex flex-col h-full">
             <div className="mb-8">
-              <h1 className="text-2xl font-bold text-center hidden md:block">MyM8.app</h1>
-              <h1 className="text-2xl font-bold text-center md:hidden">M8</h1>
+              <h1 className="text-2xl font-bold text-center hidden md:block dark:text-white">MyM8.app</h1>
+              <h1 className="text-2xl font-bold text-center md:hidden dark:text-white">M8</h1>
             </div>
             <nav className="space-y-2 flex-1">
               <Link to="/dashboard">
@@ -39,6 +38,15 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 >
                   <FileText className="mr-2 h-4 w-4" />
                   <span className="hidden md:inline">Journal</span>
+                </Button>
+              </Link>
+              <Link to="/settings">
+                <Button 
+                  variant={isActive("/settings") ? "default" : "ghost"} 
+                  className="w-full justify-start"
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span className="hidden md:inline">Settings</span>
                 </Button>
               </Link>
               {/* Admin link only visible to admin users */}
@@ -67,7 +75,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
           </div>
         </aside>
       )}
-      <main className="flex-1 p-4 md:p-8">{children}</main>
+      <main className="flex-1 p-4 md:p-8 dark:bg-gray-900 dark:text-white">{children}</main>
     </div>
   );
 };
