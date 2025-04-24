@@ -58,6 +58,7 @@ export const ProfileSettings = ({ user, profile, onProfileUpdate }: ProfileSetti
     } catch (error) {
       console.error("Error uploading avatar:", error);
       toast.error("Failed to upload avatar");
+      // Reset preview to original avatar if upload fails
       setAvatarPreview(profile.avatar_url);
     } finally {
       setIsSaving(false);
@@ -67,8 +68,6 @@ export const ProfileSettings = ({ user, profile, onProfileUpdate }: ProfileSetti
   const handleNicknameUpdate = async () => {
     try {
       setIsSaving(true);
-      
-      console.log("Updating nickname for user:", user.id, "to:", nickname);
       
       const { error } = await supabase
         .from("profiles")

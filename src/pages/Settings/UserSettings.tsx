@@ -40,42 +40,40 @@ const UserSettings = () => {
     
     try {
       setLoading(true);
-      console.log("Fetching profile for user ID:", user.id);
       
       const { data, error } = await supabase
         .from("profiles")
         .select("nickname, avatar_url, dark_mode")
         .eq("id", user.id)
-        .maybeSingle();
+        .single();
 
       if (error) {
         console.error("Error fetching profile:", error);
-        toast.error("Failed to load profile data");
+        
+        // Only create a new profile if error code indicates no profile found
+        if (error.code === "PGRST116") {
+          const { error: insertError } = await supabase
+            .from("profiles")
+            .insert({ 
+              id: user.id,
+              dark_mode: false,
+              nickname: ""
+            });
+            
+          if (insertError) {
+            console.error("Error creating profile:", insertError);
+            toast.error("Failed to create profile");
+          } else {
+            // Fetch again after creating
+            fetchProfile();
+          }
+        } else {
+          toast.error("Failed to load profile data");
+        }
         return;
       }
       
-      if (data) {
-        console.log("Fetched profile data:", data);
-        setProfile(data);
-      } else {
-        console.log("No profile found, creating one");
-        // Create a profile if it doesn't exist
-        const { error: insertError } = await supabase
-          .from("profiles")
-          .insert({ 
-            id: user.id,
-            dark_mode: false,
-            nickname: ""
-          });
-          
-        if (insertError) {
-          console.error("Error creating profile:", insertError);
-          toast.error("Failed to create profile");
-        } else {
-          // Fetch again after creating
-          fetchProfile();
-        }
-      }
+      setProfile(data);
     } catch (error) {
       console.error("Error in fetchProfile:", error);
       toast.error("An error occurred while loading your profile");
