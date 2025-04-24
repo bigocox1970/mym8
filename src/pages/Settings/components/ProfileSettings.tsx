@@ -67,12 +67,18 @@ export const ProfileSettings = ({ user, profile, onProfileUpdate }: ProfileSetti
   const handleNicknameUpdate = async () => {
     try {
       setIsSaving(true);
+      
+      console.log("Updating nickname for user:", user.id, "to:", nickname);
+      
       const { error } = await supabase
         .from("profiles")
         .update({ nickname })
         .eq("id", user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error updating nickname:", error);
+        throw error;
+      }
       
       toast.success("Nickname updated successfully");
       await onProfileUpdate();

@@ -8,6 +8,7 @@ import { Loader } from "lucide-react";
 import { ProfileSettings } from "./components/ProfileSettings";
 import { PasswordSettings } from "./components/PasswordSettings";
 import { AppearanceSettings } from "./components/AppearanceSettings";
+import { toast } from "@/components/ui/sonner";
 
 interface Profile {
   nickname: string | null;
@@ -49,15 +50,35 @@ const UserSettings = () => {
 
       if (error) {
         console.error("Error fetching profile:", error);
+        toast.error("Failed to load profile data");
         return;
       }
       
       if (data) {
         console.log("Fetched profile data:", data);
         setProfile(data);
+      } else {
+        console.log("No profile found, creating one");
+        // Create a profile if it doesn't exist
+        const { error: insertError } = await supabase
+          .from("profiles")
+          .insert({ 
+            id: user.id,
+            dark_mode: false,
+            nickname: ""
+          });
+          
+        if (insertError) {
+          console.error("Error creating profile:", insertError);
+          toast.error("Failed to create profile");
+        } else {
+          // Fetch again after creating
+          fetchProfile();
+        }
       }
     } catch (error) {
       console.error("Error in fetchProfile:", error);
+      toast.error("An error occurred while loading your profile");
     } finally {
       setLoading(false);
     }
