@@ -1001,15 +1001,20 @@ const AIAssistant = () => {
       
       // Prepare user info message
       const userGoalsContext = `Here are the user's current goals:\n${formattedGoals.map((goal, index) => 
-        `${index + 1}. ${goal.text}${goal.description ? ` - ${goal.description}` : ''}`
+        `${index + 1}. ${goal.text} (ID: ${goal.id})${goal.description ? ` - ${goal.description}` : ''}`
       ).join('\n')}`;
       
       const userActionsContext = `Here are the user's current actions:\n${formattedActions.map((action, index) => 
-        `${index + 1}. ${action.title} (Frequency: ${action.frequency}, Completed: ${action.completed ? 'Yes' : 'No'})`
+        `${index + 1}. ${action.title} (ID: ${action.id}, Frequency: ${action.frequency}, Completed: ${action.completed ? 'Yes' : 'No'})`
       ).join('\n')}`;
       
       // Combine contexts with instructions for the AI
-      const contextMessage = `${userGoalsContext}\n\n${userActionsContext}\n\nWhen displaying goals or actions to the user, present them in a clean, numbered list format without IDs or technical details. Don't use markdown formatting like bold (**) in your responses.`;
+      const contextMessage = `${userGoalsContext}\n\n${userActionsContext}\n\n
+IMPORTANT: When using functions like complete_action, add_action, or create_goal, always use the FULL UUID format for IDs.
+Example of correct usage: complete_action with actionId: "7bc1fdb5-fce8-49aa-8e9b-a63b2bc6a9fb"
+Example of INCORRECT usage: complete_action with actionId: "2"
+      
+When displaying goals or actions to the user, present them in a clean, numbered list format without IDs or technical details. Don't use markdown formatting like bold (**) in your responses.`;
       
       // Prepare the API request
       const endpoint = "https://openrouter.ai/api/v1/chat/completions";
@@ -1162,6 +1167,14 @@ const AIAssistant = () => {
             };
           } 
           else if (functionName === 'add_action') {
+            // Ensure goalId is a valid UUID
+            if (!functionArgs.goalId || !functionArgs.goalId.includes('-')) {
+              return {
+                message: "I couldn't add that action because I need a valid goal ID. Please try again with a specific goal.",
+                action: "Failed to add action: Invalid goal ID format",
+                refresh: false
+              };
+            }
             await handleAddAction(
               functionArgs.goalId,
               functionArgs.title,
@@ -1175,6 +1188,14 @@ const AIAssistant = () => {
             };
           }
           else if (functionName === 'complete_action') {
+            // Ensure actionId is a valid UUID
+            if (!functionArgs.actionId || !functionArgs.actionId.includes('-')) {
+              return {
+                message: "I couldn't mark that action as completed because I need a valid action ID. Please try again by specifying the exact action.",
+                action: "Failed to complete action: Invalid action ID format",
+                refresh: false
+              };
+            }
             await handleCompleteAction(functionArgs.actionId);
             return {
               message: "I've marked that action as completed. Great job!",
