@@ -21,22 +21,49 @@ interface LLMConfig {
 }
 
 const AdminPanel = () => {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [configs, setConfigs] = useState<LLMConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("journaling");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    // Check if user is admin
-    if (!profile?.is_admin) {
-      toast.error("Unauthorized: Admin access only");
-      navigate("/dashboard");
-      return;
-    }
+    const checkAdminStatus = async () => {
+      if (!user) {
+        toast.error("Please login to access this page");
+        navigate("/login");
+        return;
+      }
 
-    fetchConfigs();
-  }, [user, navigate, profile]);
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("is_admin")
+          .eq("id", user.id)
+          .single();
+
+        if (error) throw error;
+        
+        if (!data || !data.is_admin) {
+          toast.error("Unauthorized: Admin access only");
+          navigate("/dashboard");
+          return;
+        }
+        
+        setIsAdmin(true);
+        fetchConfigs();
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+        toast.error("An error occurred while checking admin status");
+        navigate("/dashboard");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [user, navigate]);
 
   const fetchConfigs = async () => {
     try {
@@ -50,8 +77,6 @@ const AdminPanel = () => {
     } catch (error) {
       console.error("Error fetching LLM configs:", error);
       toast.error("Failed to load LLM configurations");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -59,8 +84,8 @@ const AdminPanel = () => {
     return configs.find(config => config.function_name === functionName) || null;
   };
 
-  // If still loading or missing user/profile data, show loading state
-  if (loading || !user || !profile) {
+  // If still loading or user not logged in, show loading state
+  if (loading) {
     return (
       <Layout>
         <div className="flex justify-center items-center h-64">
@@ -68,6 +93,11 @@ const AdminPanel = () => {
         </div>
       </Layout>
     );
+  }
+
+  // If not admin, this should be caught in the useEffect, but adding an extra check
+  if (!isAdmin) {
+    return null;
   }
 
   return (
