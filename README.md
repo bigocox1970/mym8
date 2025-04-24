@@ -13,6 +13,7 @@ This application helps users track their personal goals and daily/weekly/monthly
 - **Action Management**: Add actions to goals with different frequencies (morning, afternoon, evening, daily, weekly, monthly)
 - **Progress Tracking**: Dashboard with progress bars showing completion rates for daily, weekly and monthly actions
 - **Activity Log**: View history of completed actions with filtering capabilities
+- **AI Assistant**: Interact with an AI to manage goals, add actions, and get motivation through natural language
 - **Dark/Light Mode**: Support for both dark and light themes
 - **Responsive Design**: Works on both desktop and mobile devices
 
@@ -23,6 +24,7 @@ This application helps users track their personal goals and daily/weekly/monthly
 - **Database**: Supabase for real-time PostgreSQL database
 - **Authentication**: Supabase Auth for user management
 - **State Management**: React Context and React Query for data fetching
+- **AI Integration**: OpenRouter API for AI assistant capabilities
 
 ## What's Left to Do
 

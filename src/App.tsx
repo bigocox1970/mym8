@@ -23,6 +23,7 @@ import NewGoal from "./pages/Goals/NewGoal";
 import EditGoal from "./pages/Goals/EditGoal";
 import ActionsList from "./pages/Actions/ActionsList";
 import ActivityLog from "./pages/Logs/ActivityLog";
+import AIAssistant from "./pages/AI/AIAssistant";
 
 const queryClient = new QueryClient();
 
@@ -92,6 +93,9 @@ const App = () => (
             
             {/* Log routes */}
             <Route path="/logs" element={<ProtectedRoute><ActivityLog /></ProtectedRoute>} />
+            
+            {/* AI Assistant */}
+            <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
             
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />

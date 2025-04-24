@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/lib/supabase";
-import { BarChart, ListTodo, Plus, CheckCircle2 } from "lucide-react";
+import { BarChart, ListTodo, Plus, CheckCircle2, Bot } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 
@@ -262,6 +262,41 @@ const Dashboard = () => {
                   </Link>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* AI Assistant Section */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="h-5 w-5" />
+                  AI Assistant
+                </CardTitle>
+                <CardDescription>Your personal goal coach</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                Chat with your AI assistant to help manage goals, track actions, or get motivation.
+              </p>
+              <div className="space-y-2">
+                <p className="text-sm">Try asking:</p>
+                <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                  <li>What actions do I need to complete today?</li>
+                  <li>Create a new goal for me to exercise more</li>
+                  <li>Add a weekly action to my sleep better goal</li>
+                  <li>Give me some motivation to stay on track</li>
+                </ul>
+              </div>
+              <div className="flex justify-end mt-4">
+                <Link to="/assistant">
+                  <Button className="flex items-center gap-2">
+                    <Bot className="h-4 w-4" />
+                    Talk to Assistant
+                  </Button>
+                </Link>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -6,6 +6,7 @@ import { Loader } from "lucide-react";
 import { ProfileSettings } from "./components/ProfileSettings";
 import { PasswordSettings } from "./components/PasswordSettings";
 import { AppearanceSettings } from "./components/AppearanceSettings";
+import AISettings from "./components/AISettings";
 import { toast } from "@/components/ui/sonner";
 
 const UserSettings = () => {
@@ -84,6 +85,8 @@ const UserSettings = () => {
           darkMode={profile?.dark_mode || false} 
           onAppearanceUpdate={handleProfileUpdate}
         />
+        
+        <AISettings />
       </div>
     </Layout>
   );
