@@ -1,0 +1,11 @@
+# Netlify configuration for a React SPA
+[build]
+  # Adjust these as needed based on your build setup
+  publish = "dist"
+  command = "npm run build"
+
+# This redirect is crucial for SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200 

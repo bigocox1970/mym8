@@ -3,6 +3,11 @@ import { supabase } from "@/lib/supabase";
 import { Session, User } from "@supabase/supabase-js";
 import { toast } from "@/components/ui/sonner";
 
+// Helper function to get the base URL
+const getBaseUrl = () => {
+  return `${window.location.protocol}//${window.location.host}`;
+};
+
 type ProfileType = {
   id: string;
   nickname: string | null;
@@ -74,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (window.location.pathname !== '/wizard') {
           console.log('New user detected, redirecting to wizard');
           setTimeout(() => {
-            window.location.href = '/wizard';
+            window.location.href = `${getBaseUrl()}/wizard`;
           }, 500);
         }
         
@@ -85,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data && data.wizard_completed === false && window.location.pathname !== '/wizard') {
         console.log('User has not completed wizard, redirecting');
         setTimeout(() => {
-          window.location.href = '/wizard';
+          window.location.href = `${getBaseUrl()}/wizard`;
         }, 500);
       }
       
