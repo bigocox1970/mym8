@@ -16,8 +16,22 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 
 // No need to import logo - will use direct path
+
+// Custom CSS styles for the no-scrollbar class 
+const styles = `
+  @layer utilities {
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  }
+`;
 
 // Context to share sidebar state with page components
 export const SidebarContext = React.createContext({
@@ -159,15 +173,18 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <SidebarContext.Provider value={contextValue}>
-      <div className="min-h-screen bg-gray-50 flex dark:bg-gray-900">
+      {/* Add the CSS styles */}
+      <style>{styles}</style>
+      
+      <div className="min-h-screen bg-gray-50 flex dark:bg-gray-900 overflow-hidden">
         {/* Sidebar */}
         {user && (
           <aside 
             className={`${
               sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-            } fixed md:static h-screen z-40 w-64 bg-white border-r shadow-sm dark:bg-gray-800 dark:border-gray-700 flex flex-col transition-transform duration-300 ease-in-out`}
+            } fixed md:static h-screen z-40 w-64 bg-white border-r shadow-sm dark:bg-gray-800 dark:border-gray-700 flex flex-col transition-transform duration-300 ease-in-out overflow-hidden`}
           >
-            <div className="pt-4 pb-4 flex justify-center items-center">
+            <div className="flex-shrink-0 pt-4 pb-4 flex justify-center items-center">
               <Link to="/dashboard" className="flex justify-center w-full">
                 <img 
                   src="/mym8-logo1.png" 
@@ -176,8 +193,8 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 />
               </Link>
             </div>
-            <div className="p-4 flex-1 flex flex-col">
-              <nav className="space-y-2 flex-1">
+            <div className="flex flex-col h-[calc(100vh-5rem)] overflow-hidden">
+              <nav className="flex-grow overflow-y-auto p-4 space-y-2 no-scrollbar">
                 <Link to="/dashboard">
                   <Button 
                     variant={isActive("/dashboard") ? "default" : "ghost"} 
@@ -290,7 +307,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                   </Link>
                 )}
               </nav>
-              <div>
+              <div className="flex-shrink-0 p-4 mt-auto border-t dark:border-gray-700 bg-white dark:bg-gray-800">
                 <Button 
                   variant="ghost" 
                   className="w-full justify-start" 
@@ -305,7 +322,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
           </aside>
         )}
         {/* Main content */}
-        <main className="flex-1 dark:bg-gray-900 dark:text-white">
+        <main className="flex-1 dark:bg-gray-900 dark:text-white w-full overflow-y-auto">
           <div className="p-4 md:p-8 w-full">
             {children}
           </div>
