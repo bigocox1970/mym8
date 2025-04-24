@@ -1,62 +1,73 @@
 
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/lib/supabase";
-import { Plus, Save, Settings } from "lucide-react";
-import LLMConfigForm from "./LLMConfigForm";
 
-interface LLMConfig {
+type Profile = {
   id: string;
-  function_name: string;
-  llm_provider: string;
-  api_key: string;
-  pre_prompt: string;
+  email: string;
+  is_admin: boolean;
   created_at: string;
-}
+};
 
 const AdminPanel = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [configs, setConfigs] = useState<LLMConfig[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("journaling");
 
   useEffect(() => {
-    // Check if user is admin
-    if (user?.email !== "admin@mym8.app") {
-      toast.error("Unauthorized: Admin access only");
-      navigate("/dashboard");
-      return;
-    }
+    const fetchUsers = async () => {
+      try {
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('*');
 
-    fetchConfigs();
-  }, [user, navigate]);
+        if (error) throw error;
 
-  const fetchConfigs = async () => {
+        // Fetch user emails from auth.users through the profiles
+        const { data: users, error: authError } = await supabase.auth.admin.listUsers();
+        
+        if (authError) throw authError;
+
+        const enrichedProfiles = profiles.map(profile => ({
+          ...profile,
+          email: users.users.find(u => u.id === profile.id)?.email || 'No email'
+        }));
+
+        setUsers(enrichedProfiles);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        toast.error('Failed to load users');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  const toggleAdminStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      const { data, error } = await supabase
-        .from("llm_configs")
-        .select("*")
-        .order("function_name", { ascending: true });
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_admin: !currentStatus })
+        .eq('id', userId);
 
       if (error) throw error;
-      setConfigs(data as LLMConfig[]);
-    } catch (error) {
-      console.error("Error fetching LLM configs:", error);
-      toast.error("Failed to load LLM configurations");
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const getConfigForFunction = (functionName: string) => {
-    return configs.find(config => config.function_name === functionName) || null;
+      setUsers(users.map(user => 
+        user.id === userId 
+          ? { ...user, is_admin: !currentStatus }
+          : user
+      ));
+
+      toast.success(`Admin status updated successfully`);
+    } catch (error) {
+      console.error('Error updating admin status:', error);
+      toast.error('Failed to update admin status');
+    }
   };
 
   return (
@@ -64,51 +75,45 @@ const AdminPanel = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Admin Panel</h1>
-          <Button onClick={fetchConfigs} variant="outline">
-            <Settings className="mr-2 h-4 w-4" />
-            Refresh Configs
-          </Button>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>AI Assistant Configuration</CardTitle>
-            <CardDescription>
-              Configure LLM providers and customize pre-prompts for different functions
-            </CardDescription>
+            <CardTitle>User Management</CardTitle>
+            <CardDescription>Manage users and their admin privileges</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="journaling" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="journaling">Journaling</TabsTrigger>
-                <TabsTrigger value="depression">Depression</TabsTrigger>
-                <TabsTrigger value="addiction">Addiction</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="journaling" className="mt-6">
-                <LLMConfigForm 
-                  functionName="journaling"
-                  existingConfig={getConfigForFunction("journaling")}
-                  onConfigSaved={fetchConfigs}
-                />
-              </TabsContent>
-
-              <TabsContent value="depression" className="mt-6">
-                <LLMConfigForm 
-                  functionName="depression"
-                  existingConfig={getConfigForFunction("depression")}
-                  onConfigSaved={fetchConfigs}
-                />
-              </TabsContent>
-
-              <TabsContent value="addiction" className="mt-6">
-                <LLMConfigForm 
-                  functionName="addiction"
-                  existingConfig={getConfigForFunction("addiction")}
-                  onConfigSaved={fetchConfigs}
-                />
-              </TabsContent>
-            </Tabs>
+            {loading ? (
+              <div className="text-center py-4">Loading users...</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Created At</TableHead>
+                    <TableHead>Admin Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>{user.is_admin ? 'Admin' : 'User'}</TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() => toggleAdminStatus(user.id, user.is_admin)}
+                          className="text-sm text-blue-600 hover:text-blue-800"
+                        >
+                          Toggle Admin
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>

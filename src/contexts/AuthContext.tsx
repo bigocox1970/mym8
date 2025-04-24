@@ -7,6 +7,7 @@ type AuthContextType = {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<{
     error: Error | null;
     data: any;
@@ -24,8 +25,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    const fetchAdminStatus = async (userId: string) => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        console.error("Error fetching admin status:", error);
+        return;
+      }
+      
+      setIsAdmin(data?.is_admin || false);
+    };
+
     // Get session from Supabase
     const getSession = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -34,15 +51,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setSession(session);
       setUser(session?.user || null);
+      if (session?.user) {
+        await fetchAdminStatus(session.user.id);
+      }
       setLoading(false);
     };
 
     getSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user || null);
+      if (session?.user) {
+        await fetchAdminStatus(session.user.id);
+      }
       setLoading(false);
     });
 
@@ -75,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     user,
     loading,
+    isAdmin,
     signIn,
     signUp,
     signOut,
