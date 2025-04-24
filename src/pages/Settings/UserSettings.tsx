@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
@@ -7,7 +8,6 @@ import { Loader } from "lucide-react";
 import { ProfileSettings } from "./components/ProfileSettings";
 import { PasswordSettings } from "./components/PasswordSettings";
 import { AppearanceSettings } from "./components/AppearanceSettings";
-import { toast } from "@/components/ui/sonner";
 
 interface Profile {
   nickname: string | null;
@@ -16,7 +16,7 @@ interface Profile {
 }
 
 const UserSettings = () => {
-  const { user, profile: authProfile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile>({
@@ -27,25 +27,12 @@ const UserSettings = () => {
 
   useEffect(() => {
     if (!user) {
-      toast.error("Please login to access settings");
       navigate("/login");
       return;
     }
 
-    // Use the profile from auth context if available
-    if (authProfile) {
-      setProfile({
-        nickname: authProfile.nickname,
-        avatar_url: authProfile.avatar_url,
-        dark_mode: authProfile.dark_mode,
-      });
-      setLoading(false);
-      return;
-    }
-
-    // Otherwise fetch directly
     fetchProfile();
-  }, [user, navigate, authProfile]);
+  }, [user, navigate]);
 
   const fetchProfile = async () => {
     if (!user) return;
@@ -62,41 +49,15 @@ const UserSettings = () => {
 
       if (error) {
         console.error("Error fetching profile:", error);
-        toast.error("Error loading profile data");
         return;
       }
       
       if (data) {
         console.log("Fetched profile data:", data);
         setProfile(data);
-      } else {
-        // If no profile exists, create one
-        try {
-          const { error: insertError } = await supabase
-            .from("profiles")
-            .insert({ 
-              id: user.id,
-              dark_mode: false,
-            });
-            
-          if (insertError) {
-            console.error("Error creating profile:", insertError);
-            toast.error("Failed to create user profile");
-          } else {
-            setProfile({
-              nickname: "",
-              avatar_url: null,
-              dark_mode: false,
-            });
-          }
-        } catch (e) {
-          console.error("Error in profile creation:", e);
-          toast.error("An unexpected error occurred");
-        }
       }
     } catch (error) {
       console.error("Error in fetchProfile:", error);
-      toast.error("Failed to load profile data");
     } finally {
       setLoading(false);
     }
@@ -105,7 +66,7 @@ const UserSettings = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="flex justify-center items-center h-64">
+        <div className="flex justify-center items-center h-screen">
           <Loader className="h-8 w-8 animate-spin text-primary" />
           <span className="ml-2">Loading profile...</span>
         </div>

@@ -21,60 +21,22 @@ interface LLMConfig {
 }
 
 const AdminPanel = () => {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [configs, setConfigs] = useState<LLMConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("journaling");
 
   useEffect(() => {
-    const checkAccess = async () => {
-      if (!user) {
-        toast.error("Please login to access this page");
-        navigate("/login");
-        return;
-      }
+    // Check if user is admin
+    if (user?.email !== "admin@mym8.app") {
+      toast.error("Unauthorized: Admin access only");
+      navigate("/dashboard");
+      return;
+    }
 
-      // First check if profile is loaded from context
-      if (profile && !profile.is_admin) {
-        toast.error("Unauthorized: Admin access only");
-        navigate("/dashboard");
-        return;
-      }
-
-      // Double check with database query in case profile isn't loaded properly
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("is_admin")
-          .eq("id", user.id)
-          .single();
-
-        if (error) {
-          console.error("Error checking admin status:", error);
-          toast.error("An error occurred while checking admin status");
-          navigate("/dashboard");
-          return;
-        }
-
-        if (!data || !data.is_admin) {
-          toast.error("Unauthorized: Admin access only");
-          navigate("/dashboard");
-          return;
-        }
-
-        fetchConfigs();
-      } catch (error) {
-        console.error("Error in admin access check:", error);
-        toast.error("An error occurred. Please try again later.");
-        navigate("/dashboard");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAccess();
-  }, [user, navigate, profile]);
+    fetchConfigs();
+  }, [user, navigate]);
 
   const fetchConfigs = async () => {
     try {
@@ -84,26 +46,18 @@ const AdminPanel = () => {
         .order("function_name", { ascending: true });
 
       if (error) throw error;
-      setConfigs(data || []);
+      setConfigs(data as LLMConfig[]);
     } catch (error) {
       console.error("Error fetching LLM configs:", error);
       toast.error("Failed to load LLM configurations");
+    } finally {
+      setLoading(false);
     }
   };
 
   const getConfigForFunction = (functionName: string) => {
     return configs.find(config => config.function_name === functionName) || null;
   };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex justify-center items-center h-64">
-          <p>Loading admin panel...</p>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
