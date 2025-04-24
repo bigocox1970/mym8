@@ -359,6 +359,7 @@ export type Database = {
           p_voice_service?: string
           p_elevenlabs_voice?: string
           p_elevenlabs_api_key?: string
+          p_api_key?: string
         }
         Returns: Json
       }

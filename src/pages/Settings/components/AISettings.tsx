@@ -176,7 +176,8 @@ const AISettings = () => {
         p_llm_provider: selectedModel,
         p_voice_service: voiceService,
         p_elevenlabs_voice: elevenlabsVoice,
-        p_elevenlabs_api_key: elevenlabsApiKey
+        p_elevenlabs_api_key: elevenlabsApiKey,
+        p_api_key: 'dummy-api-key'  // Use a placeholder value since we don't need this
       });
 
       if (error) {

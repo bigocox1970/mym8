@@ -2,9 +2,13 @@
 ALTER TABLE IF EXISTS llm_configs 
 ADD COLUMN IF NOT EXISTS voice_service TEXT DEFAULT 'browser',
 ADD COLUMN IF NOT EXISTS elevenlabs_voice TEXT DEFAULT 'rachel',
-ADD COLUMN IF NOT EXISTS elevenlabs_api_key TEXT;
+ADD COLUMN IF NOT EXISTS elevenlabs_api_key TEXT,
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
--- Update manage_user_llm_config function to include new parameters
+-- First drop the existing function with the EXACT signature
+DROP FUNCTION IF EXISTS manage_user_llm_config(text, text, text, text, text, text, text, text, text);
+
+-- Create the function with all parameters
 CREATE OR REPLACE FUNCTION manage_user_llm_config(
   p_function_name TEXT,
   p_assistant_name TEXT DEFAULT NULL,
@@ -14,7 +18,8 @@ CREATE OR REPLACE FUNCTION manage_user_llm_config(
   p_llm_provider TEXT DEFAULT 'gpt-4o',
   p_voice_service TEXT DEFAULT 'browser',
   p_elevenlabs_voice TEXT DEFAULT 'rachel',
-  p_elevenlabs_api_key TEXT DEFAULT NULL
+  p_elevenlabs_api_key TEXT DEFAULT NULL,
+  p_api_key TEXT DEFAULT 'dummy-api-key'
 ) RETURNS JSONB AS $$
 DECLARE
   v_user_id UUID;
@@ -38,7 +43,9 @@ BEGIN
     llm_provider,
     voice_service,
     elevenlabs_voice,
-    elevenlabs_api_key
+    elevenlabs_api_key,
+    api_key,
+    updated_at
   ) VALUES (
     p_function_name,
     p_assistant_name,
@@ -48,7 +55,9 @@ BEGIN
     p_llm_provider,
     p_voice_service,
     p_elevenlabs_voice,
-    p_elevenlabs_api_key
+    p_elevenlabs_api_key,
+    p_api_key,
+    NOW()
   )
   ON CONFLICT (function_name) 
   DO UPDATE SET
@@ -60,6 +69,7 @@ BEGIN
     voice_service = p_voice_service,
     elevenlabs_voice = p_elevenlabs_voice,
     elevenlabs_api_key = p_elevenlabs_api_key,
+    api_key = COALESCE(p_api_key, llm_configs.api_key),
     updated_at = NOW()
   RETURNING to_jsonb(llm_configs.*) INTO v_result;
   
@@ -70,4 +80,5 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Add comments to document the columns
 COMMENT ON COLUMN llm_configs.voice_service IS 'TTS service to use (browser, elevenlabs)';
 COMMENT ON COLUMN llm_configs.elevenlabs_voice IS 'ElevenLabs voice identifier';
-COMMENT ON COLUMN llm_configs.elevenlabs_api_key IS 'API key for ElevenLabs'; 
+COMMENT ON COLUMN llm_configs.elevenlabs_api_key IS 'API key for ElevenLabs';
+COMMENT ON COLUMN llm_configs.updated_at IS 'Last update timestamp'; 
