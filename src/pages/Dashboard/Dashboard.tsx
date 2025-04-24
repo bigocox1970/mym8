@@ -135,8 +135,9 @@ const Dashboard = () => {
 
     const fetchAssistantName = async () => {
       if (!user) return;
-
+      
       try {
+        // First try to get the data via regular select
         const { data, error } = await supabase
           .from("llm_configs")
           .select("*")
@@ -144,7 +145,26 @@ const Dashboard = () => {
           .single();
 
         if (error) {
-          console.error("Error fetching assistant name:", error);
+          console.log("Could not access llm_configs directly, using fallback");
+          // If we can't access llm_configs directly, try to get data from the profile
+          const { data: profileData, error: profileError } = await supabase
+            .from("profiles")
+            .select("nickname")
+            .eq("id", user.id)
+            .single();
+            
+          if (profileError) {
+            console.error("Error fetching profile nickname:", profileError);
+            setAssistantName("M8"); // Default fallback
+            return;
+          }
+          
+          // Use nickname as assistant name if available, otherwise default
+          if (profileData && profileData.nickname) {
+            setAssistantName(profileData.nickname);
+          } else {
+            setAssistantName("M8"); // Default name
+          }
           return;
         }
         

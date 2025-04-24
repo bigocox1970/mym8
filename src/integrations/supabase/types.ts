@@ -339,6 +339,16 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
+      manage_user_llm_config: {
+        Args: {
+          p_function_name: string
+          p_assistant_name: string
+          p_personality_type: string
+          p_pre_prompt: string
+          p_voice_gender: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       task_frequency:

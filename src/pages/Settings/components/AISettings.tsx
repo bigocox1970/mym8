@@ -122,45 +122,17 @@ const AISettings = () => {
     const fullPrompt = `${basePrompt} ${personalityPrompt}`;
 
     try {
-      // Check if config already exists
-      const { data: existingConfig } = await supabase
-        .from("llm_configs")
-        .select("id")
-        .eq("function_name", "openrouter")
-        .single();
+      // Use the manage_user_llm_config function instead of direct table access
+      const { data, error } = await supabase.rpc('manage_user_llm_config', {
+        p_function_name: 'openrouter',
+        p_assistant_name: assistantName,
+        p_personality_type: personalityType,
+        p_pre_prompt: fullPrompt,
+        p_voice_gender: 'neutral' // Default value since we don't have this field in the UI
+      });
 
-      if (existingConfig) {
-        // Update existing record
-        const { error } = await supabase
-          .from("llm_configs")
-          .update({
-            api_key: openRouterApiKey || "",
-            llm_provider: selectedModel,
-            enable_ai: enableAI,
-            pre_prompt: fullPrompt,
-            assistant_name: assistantName,
-            personality_type: personalityType
-          })
-          .eq("id", existingConfig.id);
-
-        if (error) {
-          throw error;
-        }
-      } else {
-        // Insert new record
-        const { error } = await supabase.from("llm_configs").insert({
-          function_name: "openrouter",
-          api_key: openRouterApiKey || "",
-          llm_provider: selectedModel,
-          enable_ai: enableAI,
-          pre_prompt: fullPrompt,
-          assistant_name: assistantName,
-          personality_type: personalityType
-        });
-
-        if (error) {
-          throw error;
-        }
+      if (error) {
+        throw error;
       }
 
       toast.success("AI settings saved successfully");

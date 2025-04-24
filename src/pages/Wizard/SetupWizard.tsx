@@ -261,54 +261,21 @@ const SetupWizard = () => {
 
       // Try to save AI assistant preferences
       try {
-        // Save assistant preferences
-        const { data: existingConfig, error: configError } = await supabase
-          .from("llm_configs")
-          .select("id")
-          .eq("function_name", "openrouter")
-          .single();
+        // Use the manage_user_llm_config function instead of direct table access
+        const { data, error } = await supabase.rpc('manage_user_llm_config', {
+          p_function_name: 'openrouter',
+          p_assistant_name: assistantName,
+          p_personality_type: personality,
+          p_pre_prompt: fullPrompt,
+          p_voice_gender: voiceGender
+        });
 
-        if (configError && configError.code !== 'PGRST116') {
-          console.error("Error checking existing config:", configError);
-          throw configError;
+        if (error) {
+          console.error("Error calling manage_user_llm_config:", error);
+          throw error;
         }
-
-        if (existingConfig) {
-          // Update existing record
-          const { error } = await supabase
-            .from("llm_configs")
-            .update({
-              assistant_name: assistantName,
-              personality_type: personality,
-              enable_ai: true,
-              pre_prompt: fullPrompt,
-              voice_gender: voiceGender
-            })
-            .eq("id", existingConfig.id);
-
-          if (error) {
-            console.error("Error updating llm_configs:", error);
-            throw error;
-          }
-        } else {
-          // Insert new record
-          const { error } = await supabase
-            .from("llm_configs")
-            .insert({
-              function_name: "openrouter",
-              assistant_name: assistantName,
-              personality_type: personality,
-              enable_ai: true,
-              pre_prompt: fullPrompt,
-              voice_gender: voiceGender,
-              api_key: ""  // Empty string as placeholder since it's required
-            });
-
-          if (error) {
-            console.error("Error inserting into llm_configs:", error);
-            throw error;
-          }
-        }
+        
+        console.log("AI preferences saved successfully:", data);
       } catch (llmError) {
         // Log but don't throw error for llm_configs issues
         console.error("Error handling llm_configs (continuing with setup):", llmError);
