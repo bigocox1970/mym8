@@ -896,6 +896,18 @@ const AIAssistant = () => {
         description: goal.description
       }));
       
+      // Prepare user info message
+      const userGoalsContext = `Here are the user's current goals:\n${formattedGoals.map((goal, index) => 
+        `${index + 1}. ${goal.text}${goal.description ? ` - ${goal.description}` : ''}`
+      ).join('\n')}`;
+      
+      const userActionsContext = `Here are the user's current actions:\n${formattedActions.map((action, index) => 
+        `${index + 1}. ${action.title} (Frequency: ${action.frequency}, Completed: ${action.completed ? 'Yes' : 'No'})`
+      ).join('\n')}`;
+      
+      // Combine contexts with instructions for the AI
+      const contextMessage = `${userGoalsContext}\n\n${userActionsContext}\n\nWhen displaying goals or actions to the user, present them in a clean, numbered list format without IDs or technical details. Don't use markdown formatting like bold (**) in your responses.`;
+      
       // Prepare the API request
       const endpoint = "https://openrouter.ai/api/v1/chat/completions";
       
@@ -918,6 +930,10 @@ const AIAssistant = () => {
           {
             role: "system",
             content: assistantConfig.prePrompt
+          },
+          {
+            role: "system",
+            content: contextMessage
           },
           ...messages.map(msg => ({
             role: msg.role,
@@ -1001,11 +1017,7 @@ const AIAssistant = () => {
         temperature: 0.7,
         max_tokens: 1000,
         stream: false,
-        tool_choice: "auto",
-        additional_context: {
-          user_goals: formattedGoals,
-          user_actions: formattedActions
-        }
+        tool_choice: "auto"
       };
 
       // Send the API request
