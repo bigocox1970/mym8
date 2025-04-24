@@ -41,11 +41,9 @@ const AdminPanel = () => {
         const enrichedProfiles = profiles.map(profile => {
           const user = authData?.users?.find(u => u.id === profile.id);
           return {
-            id: profile.id,
-            email: user?.email || 'No email',
-            is_admin: profile.is_admin || false,
-            created_at: profile.created_at || ''
-          };
+            ...profile,
+            email: user?.email || 'No email'
+          } as Profile;
         });
 
         setUsers(enrichedProfiles);
