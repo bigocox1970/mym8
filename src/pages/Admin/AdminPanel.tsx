@@ -21,7 +21,7 @@ interface LLMConfig {
 }
 
 const AdminPanel = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [configs, setConfigs] = useState<LLMConfig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,14 +29,14 @@ const AdminPanel = () => {
 
   useEffect(() => {
     // Check if user is admin
-    if (user?.email !== "admin@mym8.app") {
+    if (!profile?.is_admin) {
       toast.error("Unauthorized: Admin access only");
       navigate("/dashboard");
       return;
     }
 
     fetchConfigs();
-  }, [user, navigate]);
+  }, [user, navigate, profile]);
 
   const fetchConfigs = async () => {
     try {
@@ -58,6 +58,17 @@ const AdminPanel = () => {
   const getConfigForFunction = (functionName: string) => {
     return configs.find(config => config.function_name === functionName) || null;
   };
+
+  // If still loading or missing user/profile data, show loading state
+  if (loading || !user || !profile) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center h-64">
+          <p>Loading admin panel...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
