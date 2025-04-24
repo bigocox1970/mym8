@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "@/components/ui/sonner";
+import { Loader } from "lucide-react";
 
 interface Profile {
   nickname: string | null;
@@ -29,6 +30,7 @@ const UserSettings = () => {
   const [loading, setLoading] = useState(true);
   const [newPassword, setNewPassword] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -44,13 +46,19 @@ const UserSettings = () => {
     
     try {
       setLoading(true);
+      console.log("Fetching profile for user ID:", user.id);
+      
       const { data, error } = await supabase
         .from("profiles")
         .select("nickname, avatar_url, dark_mode")
         .eq("id", user.id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching profile:", error);
+        toast.error("Failed to load profile");
+        return;
+      }
       
       if (data) {
         console.log("Fetched profile data:", data);
@@ -60,15 +68,29 @@ const UserSettings = () => {
           dark_mode: !!data.dark_mode
         });
         
+        // Set avatar preview
+        setAvatarPreview(data.avatar_url);
+        
         // Update dark mode
         if (data.dark_mode) {
           document.documentElement.classList.add("dark");
         } else {
           document.documentElement.classList.remove("dark");
         }
+      } else {
+        console.log("No profile data found, creating new profile");
+        
+        // If no profile exists yet, create one
+        const { error: insertError } = await supabase
+          .from("profiles")
+          .insert({ id: user.id });
+          
+        if (insertError) {
+          console.error("Error creating profile:", insertError);
+        }
       }
     } catch (error) {
-      console.error("Error fetching profile:", error);
+      console.error("Error in fetchProfile:", error);
       toast.error("Failed to load profile");
     } finally {
       setLoading(false);
@@ -80,6 +102,10 @@ const UserSettings = () => {
       setIsSaving(true);
       const file = event.target.files?.[0];
       if (!file || !user) return;
+
+      // Set preview immediately for better UX
+      const objectUrl = URL.createObjectURL(file);
+      setAvatarPreview(objectUrl);
 
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${Math.random()}.${fileExt}`;
@@ -96,6 +122,8 @@ const UserSettings = () => {
         .from("avatars")
         .getPublicUrl(fileName);
 
+      console.log("Avatar uploaded, public URL:", publicUrl);
+
       // Update the profile with the new avatar URL
       const { error: updateError } = await supabase
         .from("profiles")
@@ -106,11 +134,13 @@ const UserSettings = () => {
 
       toast.success("Avatar updated successfully");
       
-      // Force a refresh of the profile data
+      // Refetch profile to ensure we have the latest data
       await fetchProfile();
     } catch (error) {
       console.error("Error uploading avatar:", error);
       toast.error("Failed to upload avatar");
+      // Reset preview on error
+      await fetchProfile();
     } finally {
       setIsSaving(false);
     }
@@ -121,6 +151,8 @@ const UserSettings = () => {
     
     try {
       setIsSaving(true);
+      console.log("Updating nickname to:", profile.nickname);
+      
       const { error } = await supabase
         .from("profiles")
         .update({ nickname: profile.nickname })
@@ -130,11 +162,13 @@ const UserSettings = () => {
       
       toast.success("Nickname updated successfully");
       
-      // Force a refresh of the profile data
+      // Refetch profile to ensure we have the latest data
       await fetchProfile();
     } catch (error) {
       console.error("Error updating nickname:", error);
       toast.error("Failed to update nickname");
+      // Reset to the last known good state
+      await fetchProfile();
     } finally {
       setIsSaving(false);
     }
@@ -165,6 +199,7 @@ const UserSettings = () => {
     try {
       setIsSaving(true);
       const newDarkMode = !profile.dark_mode;
+      console.log("Toggling dark mode to:", newDarkMode);
       
       const { error } = await supabase
         .from("profiles")
@@ -174,7 +209,7 @@ const UserSettings = () => {
       if (error) throw error;
       
       // Update local state
-      setProfile({ ...profile, dark_mode: newDarkMode });
+      setProfile(prev => ({ ...prev, dark_mode: newDarkMode }));
       
       // Apply dark mode toggle
       if (newDarkMode) {
@@ -185,18 +220,27 @@ const UserSettings = () => {
       
       toast.success(`${newDarkMode ? "Dark" : "Light"} mode enabled`);
       
-      // Force a refresh of the profile data after a short delay
-      setTimeout(() => fetchProfile(), 500);
+      // Refetch profile
+      await fetchProfile();
     } catch (error) {
       console.error("Error toggling dark mode:", error);
       toast.error("Failed to update theme");
+      // Reset to the last known good state
+      await fetchProfile();
     } finally {
       setIsSaving(false);
     }
   };
 
   if (loading) {
-    return <Layout><div className="flex justify-center items-center h-screen">Loading...</div></Layout>;
+    return (
+      <Layout>
+        <div className="flex justify-center items-center h-screen">
+          <Loader className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2">Loading profile...</span>
+        </div>
+      </Layout>
+    );
   }
 
   return (
@@ -210,8 +254,13 @@ const UserSettings = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center space-x-4">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={profile.avatar_url || ""} />
+              <Avatar className="h-20 w-20 relative">
+                {isSaving && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-full">
+                    <Loader className="h-6 w-6 animate-spin text-white" />
+                  </div>
+                )}
+                <AvatarImage src={avatarPreview || ""} />
                 <AvatarFallback>{profile.nickname?.[0] || user?.email?.[0]}</AvatarFallback>
               </Avatar>
               <Input
@@ -234,7 +283,12 @@ const UserSettings = () => {
                   disabled={isSaving}
                 />
                 <Button onClick={handleNicknameUpdate} disabled={isSaving}>
-                  {isSaving ? 'Saving...' : 'Save'}
+                  {isSaving ? (
+                    <>
+                      <Loader className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : 'Save'}
                 </Button>
               </div>
             </div>
@@ -261,7 +315,12 @@ const UserSettings = () => {
                   onClick={handlePasswordReset} 
                   disabled={isSaving || !newPassword}
                 >
-                  {isSaving ? 'Updating...' : 'Update'}
+                  {isSaving ? (
+                    <>
+                      <Loader className="mr-2 h-4 w-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : 'Update'}
                 </Button>
               </div>
             </div>
@@ -281,7 +340,12 @@ const UserSettings = () => {
                 disabled={isSaving}
               />
               <Label htmlFor="dark-mode">Dark Mode</Label>
-              {isSaving && <span className="text-sm text-muted-foreground ml-2">Saving...</span>}
+              {isSaving && (
+                <span className="text-sm text-muted-foreground ml-2 flex items-center">
+                  <Loader className="h-3 w-3 animate-spin mr-1" />
+                  Saving...
+                </span>
+              )}
             </div>
           </CardContent>
         </Card>

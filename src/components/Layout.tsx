@@ -10,13 +10,19 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user, signOut } = useAuth();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
+  const [profileData, setProfileData] = useState<{
+    nickname: string | null;
+    avatar_url: string | null;
+    dark_mode: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (user) {
-      // Load dark mode preference when the layout mounts
-      const loadDarkModePreference = async () => {
+      // Load profile data when the layout mounts
+      const loadProfileData = async () => {
         try {
           setLoading(true);
+          console.log("Layout fetching profile for user ID:", user.id);
           const { data, error } = await supabase
             .from("profiles")
             .select("dark_mode, nickname, avatar_url")
@@ -28,21 +34,41 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             return;
           }
           
-          if (data?.dark_mode) {
-            document.documentElement.classList.add("dark");
-          } else {
-            document.documentElement.classList.remove("dark");
+          console.log("Layout loaded profile data:", data);
+          
+          if (data) {
+            setProfileData(data);
+            
+            // Apply dark mode setting
+            if (data.dark_mode) {
+              document.documentElement.classList.add("dark");
+            } else {
+              document.documentElement.classList.remove("dark");
+            }
+          } else if (user) {
+            // If no profile exists, create one with default settings
+            console.log("No profile found, creating default profile");
+            const { error: insertError } = await supabase
+              .from("profiles")
+              .insert({ 
+                id: user.id,
+                dark_mode: false
+              });
+              
+            if (insertError) {
+              console.error("Error creating profile:", insertError);
+            }
           }
         } catch (error) {
-          console.error("Error loading dark mode preference:", error);
+          console.error("Error loading profile data:", error);
         } finally {
           setLoading(false);
         }
       };
       
-      loadDarkModePreference();
+      loadProfileData();
     }
-  }, [user, location.pathname]); // Re-fetch when pathname changes
+  }, [user, location.pathname]); // Re-fetch when user changes or pathname changes
 
   const isActive = (path: string) => {
     return location.pathname === path;
