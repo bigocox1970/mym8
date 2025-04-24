@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,27 +9,40 @@ import { supabase } from "@/lib/supabase";
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user, signOut } = useAuth();
   const location = useLocation();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
       // Load dark mode preference when the layout mounts
       const loadDarkModePreference = async () => {
-        const { data } = await supabase
-          .from("profiles")
-          .select("dark_mode")
-          .eq("id", user.id)
-          .maybeSingle();
+        try {
+          setLoading(true);
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("dark_mode, nickname, avatar_url")
+            .eq("id", user.id)
+            .maybeSingle();
+            
+          if (error) {
+            console.error("Error loading profile:", error);
+            return;
+          }
           
-        if (data?.dark_mode) {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
+          if (data?.dark_mode) {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+          }
+        } catch (error) {
+          console.error("Error loading dark mode preference:", error);
+        } finally {
+          setLoading(false);
         }
       };
       
       loadDarkModePreference();
     }
-  }, [user]);
+  }, [user, location.pathname]); // Re-fetch when pathname changes
 
   const isActive = (path: string) => {
     return location.pathname === path;

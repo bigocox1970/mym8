@@ -28,6 +28,7 @@ const UserSettings = () => {
   });
   const [loading, setLoading] = useState(true);
   const [newPassword, setNewPassword] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -39,17 +40,27 @@ const UserSettings = () => {
   }, [user, navigate]);
 
   const fetchProfile = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from("profiles")
         .select("nickname, avatar_url, dark_mode")
-        .eq("id", user?.id)
+        .eq("id", user.id)
         .maybeSingle();
 
       if (error) throw error;
+      
       if (data) {
-        setProfile(data);
+        console.log("Fetched profile data:", data);
+        setProfile({
+          nickname: data.nickname || "",
+          avatar_url: data.avatar_url,
+          dark_mode: !!data.dark_mode
+        });
+        
+        // Update dark mode
         if (data.dark_mode) {
           document.documentElement.classList.add("dark");
         } else {
@@ -66,23 +77,24 @@ const UserSettings = () => {
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
+      setIsSaving(true);
       const file = event.target.files?.[0];
       if (!file || !user) return;
 
       const fileExt = file.name.split(".").pop();
-      const filePath = `${user.id}/${Math.random()}.${fileExt}`;
+      const fileName = `${user.id}/${Math.random()}.${fileExt}`;
 
       // Upload the file to Supabase storage
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(filePath, file);
+        .upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
       // Get the public URL
       const { data: { publicUrl } } = supabase.storage
         .from("avatars")
-        .getPublicUrl(filePath);
+        .getPublicUrl(fileName);
 
       // Update the profile with the new avatar URL
       const { error: updateError } = await supabase
@@ -92,67 +104,79 @@ const UserSettings = () => {
 
       if (updateError) throw updateError;
 
-      // Update local state
-      setProfile({ ...profile, avatar_url: publicUrl });
       toast.success("Avatar updated successfully");
       
-      // Refresh the profile to ensure we have the latest data
+      // Force a refresh of the profile data
       await fetchProfile();
     } catch (error) {
       console.error("Error uploading avatar:", error);
       toast.error("Failed to upload avatar");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleNicknameUpdate = async () => {
+    if (!user) return;
+    
     try {
-      if (!user) return;
-
+      setIsSaving(true);
       const { error } = await supabase
         .from("profiles")
         .update({ nickname: profile.nickname })
         .eq("id", user.id);
 
       if (error) throw error;
+      
       toast.success("Nickname updated successfully");
       
-      // Refresh the profile to ensure we have the latest data
+      // Force a refresh of the profile data
       await fetchProfile();
     } catch (error) {
       console.error("Error updating nickname:", error);
       toast.error("Failed to update nickname");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handlePasswordReset = async () => {
     try {
+      setIsSaving(true);
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (error) throw error;
+      
       setNewPassword("");
       toast.success("Password updated successfully");
     } catch (error) {
       console.error("Error updating password:", error);
       toast.error("Failed to update password");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const toggleDarkMode = async () => {
+    if (!user) return;
+    
     try {
+      setIsSaving(true);
       const newDarkMode = !profile.dark_mode;
-      if (!user) return;
-
+      
       const { error } = await supabase
         .from("profiles")
         .update({ dark_mode: newDarkMode })
         .eq("id", user.id);
 
       if (error) throw error;
-
+      
+      // Update local state
       setProfile({ ...profile, dark_mode: newDarkMode });
       
+      // Apply dark mode toggle
       if (newDarkMode) {
         document.documentElement.classList.add("dark");
       } else {
@@ -161,11 +185,13 @@ const UserSettings = () => {
       
       toast.success(`${newDarkMode ? "Dark" : "Light"} mode enabled`);
       
-      // Refresh the profile to ensure we have the latest data
-      await fetchProfile();
+      // Force a refresh of the profile data after a short delay
+      setTimeout(() => fetchProfile(), 500);
     } catch (error) {
       console.error("Error toggling dark mode:", error);
       toast.error("Failed to update theme");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -193,6 +219,7 @@ const UserSettings = () => {
                 accept="image/*"
                 onChange={handleAvatarUpload}
                 className="max-w-xs"
+                disabled={isSaving}
               />
             </div>
 
@@ -204,8 +231,11 @@ const UserSettings = () => {
                   value={profile.nickname || ""}
                   onChange={(e) => setProfile({ ...profile, nickname: e.target.value })}
                   placeholder="Enter nickname"
+                  disabled={isSaving}
                 />
-                <Button onClick={handleNicknameUpdate}>Save</Button>
+                <Button onClick={handleNicknameUpdate} disabled={isSaving}>
+                  {isSaving ? 'Saving...' : 'Save'}
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -225,8 +255,14 @@ const UserSettings = () => {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new password"
+                  disabled={isSaving}
                 />
-                <Button onClick={handlePasswordReset}>Update</Button>
+                <Button 
+                  onClick={handlePasswordReset} 
+                  disabled={isSaving || !newPassword}
+                >
+                  {isSaving ? 'Updating...' : 'Update'}
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -242,8 +278,10 @@ const UserSettings = () => {
                 id="dark-mode"
                 checked={profile.dark_mode}
                 onCheckedChange={toggleDarkMode}
+                disabled={isSaving}
               />
               <Label htmlFor="dark-mode">Dark Mode</Label>
+              {isSaving && <span className="text-sm text-muted-foreground ml-2">Saving...</span>}
             </div>
           </CardContent>
         </Card>
