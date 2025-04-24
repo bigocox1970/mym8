@@ -65,7 +65,10 @@ export type Database = {
           enable_ai?: boolean
           assistant_name?: string
           personality_type?: string
-          voice_gender?: string
+          voice_type?: string
+          voice_service?: string
+          elevenlabs_voice?: string
+          elevenlabs_api_key?: string
         }
         Insert: {
           id?: string
@@ -77,7 +80,10 @@ export type Database = {
           enable_ai?: boolean
           assistant_name?: string
           personality_type?: string
-          voice_gender?: string
+          voice_type?: string
+          voice_service?: string
+          elevenlabs_voice?: string
+          elevenlabs_api_key?: string
         }
         Update: {
           id?: string
@@ -89,7 +95,10 @@ export type Database = {
           enable_ai?: boolean
           assistant_name?: string
           personality_type?: string
-          voice_gender?: string
+          voice_type?: string
+          voice_service?: string
+          elevenlabs_voice?: string
+          elevenlabs_api_key?: string
         }
         Relationships: []
       }
@@ -342,12 +351,16 @@ export type Database = {
       manage_user_llm_config: {
         Args: {
           p_function_name: string
-          p_assistant_name: string
-          p_personality_type: string
-          p_pre_prompt: string
-          p_voice_gender: string
+          p_assistant_name?: string
+          p_personality_type?: string
+          p_pre_prompt?: string
+          p_voice_type?: string
+          p_llm_provider?: string
+          p_voice_service?: string
+          p_elevenlabs_voice?: string
+          p_elevenlabs_api_key?: string
         }
-        Returns: boolean
+        Returns: Json
       }
       get_user_llm_config: {
         Args: {

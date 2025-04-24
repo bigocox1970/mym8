@@ -108,6 +108,10 @@ interface LLMConfig {
   personality_type?: string;
   pre_prompt?: string;
   llm_provider?: string;
+  voice_type?: string;
+  voice_service?: string;
+  elevenlabs_voice?: string;
+  elevenlabs_api_key?: string;
 }
 
 const AIAssistant = () => {
@@ -630,7 +634,7 @@ const AIAssistant = () => {
   }, [messages]);
 
   // Text-to-speech functionality
-  const speakText = (text: string) => {
+  const speakText = async (text: string) => {
     if (!voiceEnabled) return;
     
     // Stop any ongoing speech
@@ -639,26 +643,125 @@ const AIAssistant = () => {
     }
     
     setIsSpeaking(true);
-    const utterance = new SpeechSynthesisUtterance(text);
     
-    // Get available voices and select a suitable one
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(voice => 
-      voice.lang === 'en-US' && voice.name.includes('Female')
-    );
-    
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
+    try {
+      // Get user's voice preference from settings
+      const { data: configData, error: configError } = await supabase.rpc('get_user_llm_config');
+      if (configError) {
+        console.error('Error fetching voice settings:', configError);
+      }
+      
+      const config = configData as LLMConfig || {};
+      const voiceService = config?.voice_service || 'browser';
+      
+      // Use ElevenLabs if configured
+      if (voiceService === 'elevenlabs' && config?.elevenlabs_api_key) {
+        const apiKey = config.elevenlabs_api_key;
+        const voiceId = getElevenLabsVoiceId(config.elevenlabs_voice || 'rachel');
+        
+        // Call ElevenLabs API
+        const response = await fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'xi-api-key': apiKey,
+            },
+            body: JSON.stringify({
+              text: text,
+              model_id: 'eleven_monolingual_v1',
+              voice_settings: {
+                stability: 0.5,
+                similarity_boost: 0.75,
+              },
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to convert text to speech using ElevenLabs');
+        }
+
+        // Get audio data from response
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBlob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        // Play the audio
+        const audio = new Audio(audioUrl);
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          setIsSpeaking(false);
+        };
+        
+        audio.play();
+      } else {
+        // Use browser's built-in speech synthesis
+        const utterance = new SpeechSynthesisUtterance(text);
+        const voiceType = config?.voice_type || 'female';
+        
+        // Get available voices and select based on preference
+        const voices = window.speechSynthesis.getVoices();
+        let preferredVoice;
+        
+        if (voiceType === 'male') {
+          preferredVoice = voices.find(voice => 
+            voice.lang === 'en-US' && !voice.name.includes('Female')
+          );
+        } else if (voiceType === 'female') {
+          preferredVoice = voices.find(voice => 
+            voice.lang === 'en-US' && voice.name.includes('Female')
+          );
+        } else {
+          // Neutral or default
+          preferredVoice = voices.find(voice => 
+            voice.lang === 'en-US'
+          );
+        }
+        
+        if (preferredVoice) {
+          utterance.voice = preferredVoice;
+        }
+        
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        
+        utterance.onend = () => {
+          setIsSpeaking(false);
+        };
+        
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (error) {
+      console.error('Error with text-to-speech:', error);
+      // Fallback to browser TTS if ElevenLabs fails
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.onend = () => {
+        setIsSpeaking(false);
+      };
+      window.speechSynthesis.speak(utterance);
     }
-    
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    
-    utterance.onend = () => {
-      setIsSpeaking(false);
-    };
-    
-    window.speechSynthesis.speak(utterance);
+  };
+  
+  // Function to get ElevenLabs voice ID from our simplified voice names
+  const getElevenLabsVoiceId = (voiceName: string): string => {
+    switch (voiceName) {
+      case 'rachel':
+        return '21m00Tcm4TlvDq8ikWAM'; // Rachel
+      case 'domi':
+        return 'AZnzlk1XvdvUeBnXmlld'; // Domi
+      case 'bella':
+        return 'EXAVITQu4vr4xnSDxMaL'; // Bella
+      case 'antoni':
+        return 'ErXwobaYiN019PkySvjV'; // Antoni
+      case 'josh':
+        return 'TxGEqnHWrfWFTfGW9XjX'; // Josh
+      case 'elli':
+        return 'MF3mGyEYCl7XYWbV9V6O'; // Elli
+      default:
+        return '21m00Tcm4TlvDq8ikWAM'; // Rachel (default)
+    }
   };
   
   // Stop speaking

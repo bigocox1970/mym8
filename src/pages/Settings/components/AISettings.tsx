@@ -19,6 +19,7 @@ interface LLMConfig {
   enable_ai?: boolean;
   assistant_name?: string;
   personality_type?: string;
+  voice_type?: string;
 }
 
 const AI_MODELS = [
@@ -34,6 +35,26 @@ const PERSONALITY_TYPES = [
   { value: "gentle", label: "Gentle and understanding" },
   { value: "sarcastic", label: "Slightly sarcastic but to the point" },
   { value: "no_prisoners", label: "Take no prisoners" },
+];
+
+const VOICE_TYPES = [
+  { value: "female", label: "Female" },
+  { value: "male", label: "Male" },
+  { value: "neutral", label: "Neutral" },
+];
+
+const VOICE_SERVICES = [
+  { value: "browser", label: "Browser Default (Free)" },
+  { value: "elevenlabs", label: "ElevenLabs (Premium)" },
+];
+
+const ELEVENLABS_VOICES = [
+  { value: "rachel", label: "Rachel (Female)" },
+  { value: "domi", label: "Domi (Female)" },
+  { value: "bella", label: "Bella (Female)" },
+  { value: "antoni", label: "Antoni (Male)" },
+  { value: "josh", label: "Josh (Male)" },
+  { value: "elli", label: "Elli (Child)" },
 ];
 
 const getPersonalityPrompt = (personalityType: string): string => {
@@ -58,6 +79,10 @@ const AISettings = () => {
   const [enableAI, setEnableAI] = useState(true);
   const [assistantName, setAssistantName] = useState("M8");
   const [personalityType, setPersonalityType] = useState<string>("gentle");
+  const [voiceType, setVoiceType] = useState<string>("female");
+  const [voiceService, setVoiceService] = useState<string>("browser");
+  const [elevenlabsVoice, setElevenlabsVoice] = useState<string>("rachel");
+  const [elevenlabsApiKey, setElevenlabsApiKey] = useState<string>("");
   const openRouterApiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
 
   // Fetch existing configuration
@@ -93,6 +118,26 @@ const AISettings = () => {
           if (config.personality_type) {
             setPersonalityType(config.personality_type);
           }
+
+          // Set voice type if available
+          if (config.voice_type) {
+            setVoiceType(config.voice_type);
+          }
+          
+          // Set voice service if available
+          if (config.voice_service) {
+            setVoiceService(config.voice_service);
+          }
+          
+          // Set ElevenLabs voice if available
+          if (config.elevenlabs_voice) {
+            setElevenlabsVoice(config.elevenlabs_voice);
+          }
+          
+          // Set ElevenLabs API key if available
+          if (config.elevenlabs_api_key) {
+            setElevenlabsApiKey(config.elevenlabs_api_key);
+          }
         }
       } catch (error) {
         console.error("Error fetching OpenRouter configuration:", error);
@@ -127,7 +172,11 @@ const AISettings = () => {
         p_assistant_name: assistantName,
         p_personality_type: personalityType,
         p_pre_prompt: fullPrompt,
-        p_voice_gender: 'neutral' // Default value since we don't have this field in the UI
+        p_voice_type: voiceType,
+        p_llm_provider: selectedModel,
+        p_voice_service: voiceService,
+        p_elevenlabs_voice: elevenlabsVoice,
+        p_elevenlabs_api_key: elevenlabsApiKey
       });
 
       if (error) {
@@ -227,6 +276,95 @@ const AISettings = () => {
                     Choose how your assistant will communicate with you
                   </p>
                 </div>
+              </div>
+              
+              {/* Voice Settings Section */}
+              <div className="pt-4 border-t border-border">
+                <h3 className="text-lg font-medium mb-4">Voice Settings</h3>
+                
+                {/* Voice Service Selection */}
+                <div className="space-y-2 mb-4">
+                  <Label htmlFor="voice-service-select" className="text-base font-medium">
+                    Voice Service
+                  </Label>
+                  <Select value={voiceService} onValueChange={setVoiceService}>
+                    <SelectTrigger id="voice-service-select" className="w-full">
+                      <SelectValue placeholder="Select voice service" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VOICE_SERVICES.map((service) => (
+                        <SelectItem key={service.value} value={service.value}>
+                          {service.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Choose which service to use for text-to-speech
+                  </p>
+                </div>
+                
+                {voiceService === "browser" ? (
+                  <div className="space-y-2 mb-4">
+                    <Label htmlFor="voice-select" className="text-base font-medium">
+                      Browser Voice Type
+                    </Label>
+                    <Select value={voiceType} onValueChange={setVoiceType}>
+                      <SelectTrigger id="voice-select" className="w-full">
+                        <SelectValue placeholder="Select voice type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VOICE_TYPES.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-muted-foreground">
+                      Choose the voice type for your assistant's speech
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2 mb-4">
+                      <Label htmlFor="elevenlabs-voice-select" className="text-base font-medium">
+                        ElevenLabs Voice
+                      </Label>
+                      <Select value={elevenlabsVoice} onValueChange={setElevenlabsVoice}>
+                        <SelectTrigger id="elevenlabs-voice-select" className="w-full">
+                          <SelectValue placeholder="Select ElevenLabs voice" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ELEVENLABS_VOICES.map((voice) => (
+                            <SelectItem key={voice.value} value={voice.value}>
+                              {voice.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">
+                        Choose which ElevenLabs voice to use
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2 mb-4">
+                      <Label htmlFor="elevenlabs-api-key" className="text-base font-medium">
+                        ElevenLabs API Key
+                      </Label>
+                      <Input
+                        id="elevenlabs-api-key"
+                        type="password"
+                        value={elevenlabsApiKey}
+                        onChange={(e) => setElevenlabsApiKey(e.target.value)}
+                        placeholder="Enter your ElevenLabs API key"
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Your ElevenLabs API key is stored securely
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
               
               <div className="pt-4 border-t border-border">

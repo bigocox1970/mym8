@@ -1,0 +1,57 @@
+-- Rename voice_gender to voice_type in llm_configs table
+ALTER TABLE IF EXISTS llm_configs 
+RENAME COLUMN voice_gender TO voice_type;
+
+-- Update manage_user_llm_config function to use voice_type
+CREATE OR REPLACE FUNCTION manage_user_llm_config(
+  p_function_name TEXT,
+  p_assistant_name TEXT DEFAULT NULL,
+  p_personality_type TEXT DEFAULT NULL,
+  p_pre_prompt TEXT DEFAULT NULL,
+  p_voice_type TEXT DEFAULT 'female',
+  p_llm_provider TEXT DEFAULT 'gpt-4o'
+) RETURNS JSONB AS $$
+DECLARE
+  v_user_id UUID;
+  v_result JSONB;
+BEGIN
+  -- Get the current user ID
+  v_user_id := auth.uid();
+  
+  -- Check if user is authenticated
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'User is not authenticated';
+  END IF;
+  
+  -- Insert or update the record
+  INSERT INTO llm_configs (
+    function_name,
+    assistant_name,
+    personality_type,
+    pre_prompt,
+    voice_type,
+    llm_provider
+  ) VALUES (
+    p_function_name,
+    p_assistant_name,
+    p_personality_type,
+    p_pre_prompt,
+    p_voice_type,
+    p_llm_provider
+  )
+  ON CONFLICT (function_name) 
+  DO UPDATE SET
+    assistant_name = p_assistant_name,
+    personality_type = p_personality_type,
+    pre_prompt = p_pre_prompt,
+    voice_type = p_voice_type,
+    llm_provider = p_llm_provider,
+    updated_at = NOW()
+  RETURNING to_jsonb(llm_configs.*) INTO v_result;
+  
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Update comment on column
+COMMENT ON COLUMN llm_configs.voice_type IS 'Voice type preference for the assistant (male, female, neutral)'; 
