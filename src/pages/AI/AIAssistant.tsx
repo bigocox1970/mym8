@@ -112,6 +112,14 @@ interface LLMConfig {
   voice_service?: string;
   elevenlabs_voice?: string;
   elevenlabs_api_key?: string;
+  google_api_key?: string;
+  google_voice?: string;
+  azure_api_key?: string;
+  azure_voice?: string;
+  amazon_api_key?: string;
+  amazon_voice?: string;
+  openai_api_key?: string;
+  openai_voice?: string;
 }
 
 const AIAssistant = () => {
@@ -654,6 +662,45 @@ const AIAssistant = () => {
       const config = configData as LLMConfig || {};
       const voiceService = config?.voice_service || 'browser';
       
+      // Use browser's built-in speech synthesis
+      if (voiceService === 'browser') {
+        const utterance = new SpeechSynthesisUtterance(text);
+        const voiceType = config?.voice_gender || 'female';
+        
+        // Get available voices and select based on preference
+        const voices = window.speechSynthesis.getVoices();
+        let preferredVoice;
+        
+        if (voiceType === 'male') {
+          preferredVoice = voices.find(voice => 
+            voice.lang === 'en-US' && !voice.name.includes('Female')
+          );
+        } else if (voiceType === 'female') {
+          preferredVoice = voices.find(voice => 
+            voice.lang === 'en-US' && voice.name.includes('Female')
+          );
+        } else {
+          // Neutral or default
+          preferredVoice = voices.find(voice => 
+            voice.lang === 'en-US'
+          );
+        }
+        
+        if (preferredVoice) {
+          utterance.voice = preferredVoice;
+        }
+        
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        
+        utterance.onend = () => {
+          setIsSpeaking(false);
+        };
+        
+        window.speechSynthesis.speak(utterance);
+        return;
+      }
+      
       // Use ElevenLabs if configured
       if (voiceService === 'elevenlabs' && config?.elevenlabs_api_key) {
         const apiKey = config.elevenlabs_api_key;
@@ -696,46 +743,197 @@ const AIAssistant = () => {
         };
         
         audio.play();
-      } else {
-        // Use browser's built-in speech synthesis
-        const utterance = new SpeechSynthesisUtterance(text);
-        const voiceType = config?.voice_gender || 'female';
+        return;
+      }
+
+      // Use Google Cloud TTS if configured
+      if (voiceService === 'google' && config?.google_api_key) {
+        const apiKey = config.google_api_key;
+        const voiceName = config.google_voice || 'en-US-Neural2-F';
         
-        // Get available voices and select based on preference
-        const voices = window.speechSynthesis.getVoices();
-        let preferredVoice;
+        // Call Google Cloud TTS API
+        const response = await fetch(
+          `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              input: { text },
+              voice: { 
+                languageCode: voiceName.substring(0, 5), 
+                name: voiceName 
+              },
+              audioConfig: { audioEncoding: 'MP3' },
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to convert text to speech using Google Cloud');
+        }
+
+        // Get audio data from response
+        const jsonResponse = await response.json();
+        const audioContent = jsonResponse.audioContent; // Base64 encoded audio
+        const binaryAudio = atob(audioContent);
         
-        if (voiceType === 'male') {
-          preferredVoice = voices.find(voice => 
-            voice.lang === 'en-US' && !voice.name.includes('Female')
-          );
-        } else if (voiceType === 'female') {
-          preferredVoice = voices.find(voice => 
-            voice.lang === 'en-US' && voice.name.includes('Female')
-          );
-        } else {
-          // Neutral or default
-          preferredVoice = voices.find(voice => 
-            voice.lang === 'en-US'
-          );
+        // Convert base64 to array buffer
+        const bytes = new Uint8Array(binaryAudio.length);
+        for (let i = 0; i < binaryAudio.length; i++) {
+          bytes[i] = binaryAudio.charCodeAt(i);
         }
         
-        if (preferredVoice) {
-          utterance.voice = preferredVoice;
-        }
+        const audioBlob = new Blob([bytes.buffer], { type: 'audio/mp3' });
+        const audioUrl = URL.createObjectURL(audioBlob);
         
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        
-        utterance.onend = () => {
+        // Play the audio
+        const audio = new Audio(audioUrl);
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
           setIsSpeaking(false);
         };
         
-        window.speechSynthesis.speak(utterance);
+        audio.play();
+        return;
       }
+
+      // Use Azure TTS if configured
+      if (voiceService === 'azure' && config?.azure_api_key) {
+        const apiKey = config.azure_api_key;
+        const voiceName = config.azure_voice || 'en-US-JennyNeural';
+        const region = 'eastus'; // Default to East US region - could be made configurable
+        
+        // Call Azure Speech API
+        const response = await fetch(
+          `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,
+          {
+            method: 'POST',
+            headers: {
+              'Ocp-Apim-Subscription-Key': apiKey,
+              'Content-Type': 'application/ssml+xml',
+              'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+            },
+            body: `<speak version='1.0' xml:lang='en-US'><voice xml:lang='en-US' name='${voiceName}'>${text}</voice></speak>`,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to convert text to speech using Azure');
+        }
+
+        // Get audio data from response
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBlob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        // Play the audio
+        const audio = new Audio(audioUrl);
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          setIsSpeaking(false);
+        };
+        
+        audio.play();
+        return;
+      }
+
+      // Use Amazon Polly if configured
+      if (voiceService === 'amazon' && config?.amazon_api_key) {
+        const apiKey = config.amazon_api_key;
+        const voiceName = config.amazon_voice || 'Joanna';
+        
+        // In a production app, you would use AWS SDK or AWS Amplify
+        // This is a simplified example using a serverless function as proxy
+        // You would need to set up a serverless function that calls Amazon Polly
+        const response = await fetch(
+          '/api/tts/amazon-polly', // Your serverless function endpoint
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text,
+              voice: voiceName,
+              accessKey: apiKey,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to convert text to speech using Amazon Polly');
+        }
+
+        // Get audio data from response
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBlob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        // Play the audio
+        const audio = new Audio(audioUrl);
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          setIsSpeaking(false);
+        };
+        
+        audio.play();
+        return;
+      }
+
+      // Use OpenAI TTS if configured
+      if (voiceService === 'openai' && config?.openai_api_key) {
+        const apiKey = config.openai_api_key;
+        const voiceName = config.openai_voice || 'nova';
+        
+        // Call OpenAI TTS API
+        const response = await fetch(
+          'https://api.openai.com/v1/audio/speech',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: 'tts-1',
+              input: text,
+              voice: voiceName,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to convert text to speech using OpenAI');
+        }
+
+        // Get audio data from response
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBlob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        // Play the audio
+        const audio = new Audio(audioUrl);
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          setIsSpeaking(false);
+        };
+        
+        audio.play();
+        return;
+      }
+
+      // Fallback to browser TTS if no service matched or service config was incomplete
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.onend = () => {
+        setIsSpeaking(false);
+      };
+      window.speechSynthesis.speak(utterance);
+      
     } catch (error) {
       console.error('Error with text-to-speech:', error);
-      // Fallback to browser TTS if ElevenLabs fails
+      // Fallback to browser TTS if any service fails
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.onend = () => {
         setIsSpeaking(false);
