@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/lib/supabase";
-import { BarChart, Plus } from "lucide-react";
+import { BarChart, ListTodo, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [goals, setGoals] = useState([]);
   const [progress, setProgress] = useState({
     daily: 0,
     weekly: 0,
@@ -20,6 +21,30 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
+    const fetchGoals = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from("goals")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(5);
+          
+        if (error) {
+          console.error("Error fetching goals:", error);
+          toast.error("Failed to load goals");
+          return;
+        }
+        
+        setGoals(data || []);
+      } catch (error) {
+        console.error("Error fetching goals:", error);
+        toast.error("Failed to load goals");
+      }
+    };
+
     const calculateProgress = async () => {
       if (!user) return;
 
@@ -60,6 +85,7 @@ const Dashboard = () => {
       }
     };
 
+    fetchGoals();
     calculateProgress();
   }, [user]);
 
@@ -76,44 +102,85 @@ const Dashboard = () => {
           </Link>
         </div>
 
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart className="h-5 w-5" />
-              Track Your Progress
-            </CardTitle>
-            <CardDescription>See how you're doing with your goals</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm text-foreground">
-                <span>Daily Progress</span>
-                <span>{progress.daily}%</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Progress Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart className="h-5 w-5" />
+                Track Your Progress
+              </CardTitle>
+              <CardDescription>See how you're doing with your goals</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-foreground">
+                  <span>Daily Progress</span>
+                  <span>{progress.daily}%</span>
+                </div>
+                <Progress value={progress.daily} />
               </div>
-              <Progress value={progress.daily} />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm text-foreground">
-                <span>Weekly Progress</span>
-                <span>{progress.weekly}%</span>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-foreground">
+                  <span>Weekly Progress</span>
+                  <span>{progress.weekly}%</span>
+                </div>
+                <Progress value={progress.weekly} />
               </div>
-              <Progress value={progress.weekly} />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm text-foreground">
-                <span>Monthly Progress</span>
-                <span>{progress.monthly}%</span>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-foreground">
+                  <span>Monthly Progress</span>
+                  <span>{progress.monthly}%</span>
+                </div>
+                <Progress value={progress.monthly} />
               </div>
-              <Progress value={progress.monthly} />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Goals Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ListTodo className="h-5 w-5" />
+                Your Goals
+              </CardTitle>
+              <CardDescription>Recent goals you've set</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <p>Loading your goals...</p>
+              ) : goals.length > 0 ? (
+                <ul className="space-y-2">
+                  {goals.map((goal) => (
+                    <li key={goal.id} className="p-3 border rounded-md hover:bg-muted/50 transition-colors">
+                      <Link to={`/goals/${goal.id}`} className="block">
+                        <p className="font-medium">{goal.goal_text}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Created: {new Date(goal.created_at).toLocaleDateString()}
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground mb-4">You haven't set any goals yet</p>
+                  <Link to="/goals/new">
+                    <Button size="sm" variant="outline">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Your First Goal
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </Layout>
   );
 };
 
 export default Dashboard;
-
