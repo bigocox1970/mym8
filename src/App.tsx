@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,6 +16,7 @@ import JournalDetail from "./pages/Journal/JournalDetail";
 import EditJournal from "./pages/Journal/EditJournal";
 import AdminPanel from "./pages/Admin/AdminPanel";
 import NotFound from "./pages/NotFound";
+import GoalDetail from "./pages/Goals/GoalDetail";
 
 const queryClient = new QueryClient();
 
@@ -73,6 +73,9 @@ const App = () => (
             
             {/* Admin routes */}
             <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
+            
+            {/* Add the new route */}
+            <Route path="/goals/:id" element={<ProtectedRoute><GoalDetail /></ProtectedRoute>} />
             
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />

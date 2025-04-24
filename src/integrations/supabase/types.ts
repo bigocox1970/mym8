@@ -51,6 +51,50 @@ export type Database = {
         }
         Relationships: []
       }
+      tasks: {
+        Row: {
+          completed: boolean
+          created_at: string
+          description: string | null
+          frequency: Database["public"]["Enums"]["task_frequency"]
+          goal_id: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          description?: string | null
+          frequency: Database["public"]["Enums"]["task_frequency"]
+          goal_id: string
+          id?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          description?: string | null
+          frequency?: Database["public"]["Enums"]["task_frequency"]
+          goal_id?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -59,7 +103,13 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      task_frequency:
+        | "morning"
+        | "afternoon"
+        | "evening"
+        | "daily"
+        | "weekly"
+        | "monthly"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -174,6 +224,15 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      task_frequency: [
+        "morning",
+        "afternoon",
+        "evening",
+        "daily",
+        "weekly",
+        "monthly",
+      ],
+    },
   },
 } as const

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
@@ -32,7 +31,6 @@ const Dashboard = () => {
       if (!user) return;
 
       try {
-        // Fetch user goals
         const { data: goalsData, error: goalsError } = await supabase
           .from("goals")
           .select("*")
@@ -42,7 +40,6 @@ const Dashboard = () => {
         if (goalsError) throw goalsError;
         setGoals(goalsData as Goal[]);
 
-        // Fetch recent journal entries
         const { data: entriesData, error: entriesError } = await supabase
           .from("journal_entries")
           .select("*")
@@ -96,8 +93,13 @@ const Dashboard = () => {
               ) : goals.length > 0 ? (
                 <ul className="space-y-2">
                   {goals.map((goal) => (
-                    <li key={goal.id} className="p-3 bg-gray-50 rounded-md">
-                      {goal.goal_text}
+                    <li key={goal.id}>
+                      <Link
+                        to={`/goals/${goal.id}`}
+                        className="p-3 block bg-gray-50 rounded-md hover:bg-gray-100 transition-colors"
+                      >
+                        {goal.goal_text}
+                      </Link>
                     </li>
                   ))}
                 </ul>
