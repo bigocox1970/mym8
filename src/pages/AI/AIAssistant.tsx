@@ -621,27 +621,37 @@ const AIAssistant = () => {
     userActions: Action[]
   ) => {
     try {
+      // Format the date for the assistant
+      const today = new Date();
+      const formattedDate = today.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+
       // Check if OpenRouter API key is configured
-      const { data: config, error: configError } = await supabase
+      const openRouterApiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+      if (!openRouterApiKey) {
+        throw new Error("OpenRouter API key not found in environment variables");
+      }
+
+      // Get AI assistant configuration
+      const { data: config, error } = await supabase
         .from('llm_configs')
         .select('*')
         .eq('function_name', 'openrouter')
         .single();
       
-      if (configError || !config) {
+      if (error || !config) {
         throw new Error("OpenRouter API configuration not found");
       }
-      
-      // Prepare context for the AI
-      const today = new Date();
-      const formattedDate = today.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-      
-      // Format goals and actions for context
+
+      if (!config.enable_ai) {
+        return { message: "AI assistant is currently disabled. You can enable it in the settings." };
+      }
+
+      // Prepare context for the assistant
       const goalsContext = userGoals.map(g => 
         `Goal: ${g.goal_text}${g.description ? ` - ${g.description}` : ''} (ID: ${g.id})`
       ).join('\n');
@@ -662,7 +672,7 @@ const AIAssistant = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.api_key}`,
+          'Authorization': `Bearer ${openRouterApiKey}`,
           'HTTP-Referer': window.location.origin,
         },
         body: JSON.stringify({

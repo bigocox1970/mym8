@@ -6,13 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Bot, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { Loader2, Bot } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
 interface LLMConfig {
   id: string;
-  api_key?: string;
   llm_provider?: string;
   function_name: string;
   created_at?: string;
@@ -54,16 +53,14 @@ const getPersonalityPrompt = (personalityType: string): string => {
 
 const AISettings = () => {
   const { user } = useAuth();
-  const [apiKey, setApiKey] = useState("");
   const [selectedModel, setSelectedModel] = useState<string>(AI_MODELS[0].value);
   const [isSaving, setIsSaving] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [hasExistingKey, setHasExistingKey] = useState(false);
   const [enableAI, setEnableAI] = useState(true);
   const [assistantName, setAssistantName] = useState("M8");
   const [personalityType, setPersonalityType] = useState<string>("gentle");
+  const openRouterApiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
 
-  // Fetch existing API key
+  // Fetch existing configuration
   useEffect(() => {
     const fetchConfig = async () => {
       if (!user) return;
@@ -81,11 +78,6 @@ const AISettings = () => {
         }
 
         if (data) {
-          if (data.api_key) {
-            setHasExistingKey(true);
-            setApiKey(data.api_key);
-          }
-          
           if (data.llm_provider) {
             setSelectedModel(data.llm_provider);
           }
@@ -117,8 +109,8 @@ const AISettings = () => {
       return;
     }
 
-    if (!apiKey && enableAI) {
-      toast.error("Please enter your OpenRouter API key");
+    if (!openRouterApiKey && enableAI) {
+      toast.error("OpenRouter API key is missing from environment variables");
       return;
     }
 
@@ -142,7 +134,7 @@ const AISettings = () => {
         const { error } = await supabase
           .from("llm_configs")
           .update({
-            api_key: apiKey,
+            api_key: openRouterApiKey || "",
             llm_provider: selectedModel,
             enable_ai: enableAI,
             pre_prompt: fullPrompt,
@@ -158,7 +150,7 @@ const AISettings = () => {
         // Insert new record
         const { error } = await supabase.from("llm_configs").insert({
           function_name: "openrouter",
-          api_key: apiKey,
+          api_key: openRouterApiKey || "",
           llm_provider: selectedModel,
           enable_ai: enableAI,
           pre_prompt: fullPrompt,
@@ -172,7 +164,6 @@ const AISettings = () => {
       }
 
       toast.success("AI settings saved successfully");
-      setHasExistingKey(!!apiKey);
     } catch (error) {
       console.error("Error saving AI settings:", error);
       toast.error("Failed to save AI settings");
@@ -194,6 +185,15 @@ const AISettings = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {!openRouterApiKey && (
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-900 rounded-md text-yellow-800 dark:text-yellow-200">
+              <p className="font-medium">OpenRouter API Key Missing</p>
+              <p className="text-sm mt-1">
+                The OpenRouter API key is not set in your environment variables. Please add it to your .env file to use the AI assistant.
+              </p>
+            </div>
+          )}
+          
           <div className="flex flex-col space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="enable-ai" className="text-base font-medium">
@@ -259,49 +259,9 @@ const AISettings = () => {
               </div>
               
               <div className="pt-4 border-t border-border">
-                <h3 className="text-lg font-medium mb-4">API Configuration</h3>
+                <h3 className="text-lg font-medium mb-4">AI Model Selection</h3>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="api-key" className="text-base font-medium">
-                    OpenRouter API Key {hasExistingKey && "*****"}
-                  </Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        id="api-key"
-                        type={showApiKey ? "text" : "password"}
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        placeholder="Enter your OpenRouter API key"
-                        className="pr-10"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                      >
-                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    <p>Don't have an API key?{" "}
-                      <a 
-                        href="https://openrouter.ai/keys" 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="text-primary hover:underline inline-flex items-center"
-                      >
-                        Get one from OpenRouter
-                        <ExternalLink className="h-3 w-3 ml-1" />
-                      </a>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-2 mt-4">
                   <Label htmlFor="model-select" className="text-base font-medium">
                     AI Model
                   </Label>
