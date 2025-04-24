@@ -1,9 +1,9 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Home, FileText, Settings, LogOut, ListTodo } from "lucide-react";
+import { Home, FileText, Settings, LogOut, ListTodo, Shield } from "lucide-react";
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user, signOut, profile } = useAuth();
@@ -69,13 +69,15 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                   <span className="hidden md:inline">Settings</span>
                 </Button>
               </Link>
+              
+              {/* Admin link - only visible to admin users */}
               {profile?.is_admin && (
                 <Link to="/admin">
                   <Button 
                     variant={isActive("/admin") ? "default" : "ghost"} 
                     className="w-full justify-start"
                   >
-                    <Settings className="mr-2 h-4 w-4" />
+                    <Shield className="mr-2 h-4 w-4" />
                     <span className="hidden md:inline">Admin</span>
                   </Button>
                 </Link>

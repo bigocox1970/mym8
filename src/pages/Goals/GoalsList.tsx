@@ -21,7 +21,7 @@ const GoalsList = () => {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const { data: goals, isLoading, isError, refetch } = useQuery({
+  const { data: goals, isLoading, isError } = useQuery({
     queryKey: ['goals', user?.id],
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated");
@@ -29,6 +29,7 @@ const GoalsList = () => {
       const { data, error } = await supabase
         .from('goals')
         .select('*')
+        .eq('user_id', user.id)  // Filter goals by user_id
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -70,11 +71,11 @@ const GoalsList = () => {
             Error loading goals. Please try again.
           </div>
         ) : goals && goals.length > 0 ? (
-          <div className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {goals.map((goal) => (
-              <Card key={goal.id} className="w-full">
+              <Card key={goal.id}>
                 <CardHeader>
-                  <CardTitle className="text-xl">{goal.goal_text}</CardTitle>
+                  <CardTitle className="text-xl truncate">{goal.goal_text}</CardTitle>
                   <CardDescription>
                     Created on {new Date(goal.created_at).toLocaleDateString()}
                   </CardDescription>
