@@ -40,6 +40,7 @@ const UserSettings = () => {
 
   const fetchProfile = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from("profiles")
         .select("nickname, avatar_url, dark_mode")
@@ -51,6 +52,8 @@ const UserSettings = () => {
         setProfile(data);
         if (data.dark_mode) {
           document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
         }
       }
     } catch (error) {
@@ -69,16 +72,19 @@ const UserSettings = () => {
       const fileExt = file.name.split(".").pop();
       const filePath = `${user.id}/${Math.random()}.${fileExt}`;
 
+      // Upload the file to Supabase storage
       const { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
+      // Get the public URL
       const { data: { publicUrl } } = supabase.storage
         .from("avatars")
         .getPublicUrl(filePath);
 
+      // Update the profile with the new avatar URL
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ avatar_url: publicUrl })
@@ -86,8 +92,12 @@ const UserSettings = () => {
 
       if (updateError) throw updateError;
 
+      // Update local state
       setProfile({ ...profile, avatar_url: publicUrl });
       toast.success("Avatar updated successfully");
+      
+      // Refresh the profile to ensure we have the latest data
+      await fetchProfile();
     } catch (error) {
       console.error("Error uploading avatar:", error);
       toast.error("Failed to upload avatar");
@@ -105,6 +115,9 @@ const UserSettings = () => {
 
       if (error) throw error;
       toast.success("Nickname updated successfully");
+      
+      // Refresh the profile to ensure we have the latest data
+      await fetchProfile();
     } catch (error) {
       console.error("Error updating nickname:", error);
       toast.error("Failed to update nickname");
@@ -139,8 +152,17 @@ const UserSettings = () => {
       if (error) throw error;
 
       setProfile({ ...profile, dark_mode: newDarkMode });
-      document.documentElement.classList.toggle("dark");
+      
+      if (newDarkMode) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+      
       toast.success(`${newDarkMode ? "Dark" : "Light"} mode enabled`);
+      
+      // Refresh the profile to ensure we have the latest data
+      await fetchProfile();
     } catch (error) {
       console.error("Error toggling dark mode:", error);
       toast.error("Failed to update theme");
@@ -148,7 +170,7 @@ const UserSettings = () => {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <Layout><div className="flex justify-center items-center h-screen">Loading...</div></Layout>;
   }
 
   return (
