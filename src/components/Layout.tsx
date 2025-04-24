@@ -176,15 +176,16 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
       {/* Add the CSS styles */}
       <style>{styles}</style>
       
-      <div className="min-h-screen bg-gray-50 flex dark:bg-gray-900 overflow-hidden">
+      <div className="h-screen w-full bg-gray-50 flex dark:bg-gray-900 overflow-hidden">
         {/* Sidebar */}
         {user && (
           <aside 
             className={`${
               sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-            } fixed md:static h-screen z-40 w-64 bg-white border-r shadow-sm dark:bg-gray-800 dark:border-gray-700 flex flex-col transition-transform duration-300 ease-in-out overflow-hidden`}
+            } fixed md:static h-full z-40 w-64 bg-white border-r shadow-sm dark:bg-gray-800 dark:border-gray-700 flex flex-col transition-transform duration-300 ease-in-out`}
+            style={{ height: '100vh', maxHeight: '100vh', top: 0 }}
           >
-            <div className="flex-shrink-0 pt-4 pb-4 flex justify-center items-center">
+            <div className="flex-shrink-0 pt-4 pb-4 flex justify-center items-center border-b dark:border-gray-700">
               <Link to="/dashboard" className="flex justify-center w-full">
                 <img 
                   src="/mym8-logo1.png" 
@@ -193,8 +194,8 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 />
               </Link>
             </div>
-            <div className="flex flex-col h-[calc(100vh-5rem)] overflow-hidden">
-              <nav className="flex-grow overflow-y-auto p-4 space-y-2 no-scrollbar">
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <nav className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
                 <Link to="/dashboard">
                   <Button 
                     variant={isActive("/dashboard") ? "default" : "ghost"} 
@@ -307,10 +308,10 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                   </Link>
                 )}
               </nav>
-              <div className="flex-shrink-0 p-4 mt-auto border-t dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="sticky bottom-0 p-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800 shadow-[0_-1px_2px_rgba(0,0,0,0.1)]">
                 <Button 
                   variant="ghost" 
-                  className="w-full justify-start" 
+                  className="w-full justify-start font-medium" 
                   onClick={handleSignOut}
                   disabled={loading}
                 >
@@ -322,7 +323,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
           </aside>
         )}
         {/* Main content */}
-        <main className="flex-1 dark:bg-gray-900 dark:text-white w-full overflow-y-auto">
+        <main className="flex-1 dark:bg-gray-900 dark:text-white w-full overflow-y-auto h-screen">
           <div className="p-4 md:p-8 w-full">
             {children}
           </div>
