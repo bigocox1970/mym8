@@ -222,13 +222,6 @@ const SetupWizard = () => {
         if (goalsError) throw goalsError;
       }
 
-      // Save assistant preferences
-      const { data: existingConfig, error: configError } = await supabase
-        .from("llm_configs")
-        .select("id")
-        .eq("function_name", "openrouter")
-        .single();
-
       // Create pre-prompt based on personality, toughness, and using proper names
       const basePrompt = `You are a helpful AI assistant for a goal-tracking application. Your name is ${assistantName}. You should refer to the user as ${userNickname || "the user"}. You're here to help with: ${selectedIssues.map(id => ISSUES.find(i => i.id === id)?.label).join(", ")}${otherIssue ? `, ${otherIssue}` : ""}.`;
       
@@ -266,35 +259,60 @@ const SetupWizard = () => {
 
       const fullPrompt = `${basePrompt} ${personalityPrompt} ${toughnessPrompt}`;
 
-      if (existingConfig) {
-        // Update existing record
-        const { error } = await supabase
+      // Try to save AI assistant preferences
+      try {
+        // Save assistant preferences
+        const { data: existingConfig, error: configError } = await supabase
           .from("llm_configs")
-          .update({
-            assistant_name: assistantName,
-            personality_type: personality,
-            enable_ai: true,
-            pre_prompt: fullPrompt,
-            voice_gender: voiceGender
-          })
-          .eq("id", existingConfig.id);
+          .select("id")
+          .eq("function_name", "openrouter")
+          .single();
 
-        if (error) throw error;
-      } else {
-        // Insert new record
-        const { error } = await supabase
-          .from("llm_configs")
-          .insert({
-            function_name: "openrouter",
-            assistant_name: assistantName,
-            personality_type: personality,
-            enable_ai: true,
-            pre_prompt: fullPrompt,
-            voice_gender: voiceGender,
-            api_key: ""  // Empty string as placeholder since it's required
-          });
+        if (configError && configError.code !== 'PGRST116') {
+          console.error("Error checking existing config:", configError);
+          throw configError;
+        }
 
-        if (error) throw error;
+        if (existingConfig) {
+          // Update existing record
+          const { error } = await supabase
+            .from("llm_configs")
+            .update({
+              assistant_name: assistantName,
+              personality_type: personality,
+              enable_ai: true,
+              pre_prompt: fullPrompt,
+              voice_gender: voiceGender
+            })
+            .eq("id", existingConfig.id);
+
+          if (error) {
+            console.error("Error updating llm_configs:", error);
+            throw error;
+          }
+        } else {
+          // Insert new record
+          const { error } = await supabase
+            .from("llm_configs")
+            .insert({
+              function_name: "openrouter",
+              assistant_name: assistantName,
+              personality_type: personality,
+              enable_ai: true,
+              pre_prompt: fullPrompt,
+              voice_gender: voiceGender,
+              api_key: ""  // Empty string as placeholder since it's required
+            });
+
+          if (error) {
+            console.error("Error inserting into llm_configs:", error);
+            throw error;
+          }
+        }
+      } catch (llmError) {
+        // Log but don't throw error for llm_configs issues
+        console.error("Error handling llm_configs (continuing with setup):", llmError);
+        // We'll still continue with the wizard completion
       }
 
       // Update user profile with preferences and mark wizard as completed
