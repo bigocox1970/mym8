@@ -41,6 +41,7 @@ const Dashboard = () => {
     weekly: { total: 0, completed: 0, percentage: 0 },
     monthly: { total: 0, completed: 0, percentage: 0 }
   });
+  const [assistantName, setAssistantName] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchGoals = async () => {
@@ -132,8 +133,35 @@ const Dashboard = () => {
       }
     };
 
+    const fetchAssistantName = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from("llm_configs")
+          .select("*")
+          .eq("function_name", "openrouter")
+          .single();
+
+        if (error) {
+          console.error("Error fetching assistant name:", error);
+          return;
+        }
+        
+        if (data && data.assistant_name) {
+          setAssistantName(data.assistant_name);
+        } else {
+          setAssistantName("M8"); // Default name
+        }
+      } catch (error) {
+        console.error("Error fetching assistant name:", error);
+        setAssistantName("M8"); // Default name on error
+      }
+    };
+
     fetchGoals();
     calculateProgress();
+    fetchAssistantName();
   }, [user]);
 
   return (
@@ -278,7 +306,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">
-                Chat with your AI assistant to help manage goals, track actions, or get motivation.
+                Chat with {assistantName || "your AI assistant"} to help manage goals, track actions, or get motivation.
               </p>
               <div className="space-y-2">
                 <p className="text-sm">Try asking:</p>

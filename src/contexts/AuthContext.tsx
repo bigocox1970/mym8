@@ -1,13 +1,17 @@
-
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Session, User } from "@supabase/supabase-js";
 import { toast } from "@/components/ui/sonner";
 
 type ProfileType = {
+  id: string;
   nickname: string | null;
   avatar_url: string | null;
-  dark_mode: boolean;
+  theme: string | null;
+  wizard_completed: boolean | null;
+  selected_issues?: string[] | null;
+  other_issue?: string | null;
+  assistant_toughness?: string | null;
 };
 
 type AuthContextType = {
@@ -35,52 +39,99 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileType | null>(null);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string): Promise<ProfileType | null> => {
     try {
       console.log("Fetching profile for user ID:", userId);
       
       // Check if profile exists
-      const { data: existingProfile, error: checkError } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
-        .maybeSingle();
+        .single();
       
-      // If profile doesn't exist, create it
-      if (!existingProfile) {
-        console.log("Profile doesn't exist, creating one");
-        const { error: insertError } = await supabase
+      if (error) {
+        console.error("Error fetching profile:", error);
+        
+        // Create new profile for first-time users
+        const { data: newProfile, error: insertError } = await supabase
           .from("profiles")
           .insert({ 
             id: userId,
-            dark_mode: false
-          });
-          
+            wizard_completed: false
+          })
+          .select()
+          .single();
+        
         if (insertError) {
           console.error("Error creating profile:", insertError);
           return null;
         }
+        
+        console.log("Created new profile");
+        
+        // Redirect new users to wizard
+        if (window.location.pathname !== '/wizard') {
+          console.log('New user detected, redirecting to wizard');
+          setTimeout(() => {
+            window.location.href = '/wizard';
+          }, 500);
+        }
+        
+        return newProfile as ProfileType;
       }
       
-      // Now fetch the profile data
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("nickname, avatar_url, dark_mode")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Error fetching profile:", error);
-        return null;
+      // Check if we should redirect to wizard for existing users who haven't completed it
+      if (data && data.wizard_completed === false && window.location.pathname !== '/wizard') {
+        console.log('User has not completed wizard, redirecting');
+        setTimeout(() => {
+          window.location.href = '/wizard';
+        }, 500);
       }
-
-      // Apply dark mode setting
-      if (data && data.dark_mode) {
-        document.documentElement.classList.add("dark");
+      
+      // Handle theme
+      if (data) {
+        const theme = data.theme || 'light';
+        
+        // First remove any existing theme classes
+        document.documentElement.classList.remove("dark", "light");
+        
+        if (theme === 'dark') {
+          document.documentElement.classList.add("dark");
+        } else if (theme === 'light') {
+          document.documentElement.classList.add("light");
+        } else if (theme === 'system') {
+          // Use system preference
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (prefersDark) {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.add("light");
+          }
+          
+          // Listen for changes in system preference
+          const colorSchemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+          const handleChange = (e: MediaQueryListEvent) => {
+            document.documentElement.classList.remove("dark", "light");
+            if (e.matches) {
+              document.documentElement.classList.add("dark");
+            } else {
+              document.documentElement.classList.add("light");
+            }
+          };
+          
+          colorSchemeMediaQuery.addEventListener('change', handleChange);
+          // Clean up (will be called when profile is refreshed)
+          setTimeout(() => {
+            colorSchemeMediaQuery.removeEventListener('change', handleChange);
+          }, 60000);
+        }
       } else {
+        // Default to light theme if no profile data
         document.documentElement.classList.remove("dark");
+        document.documentElement.classList.add("light");
       }
-
+      
       return data as ProfileType;
     } catch (error) {
       console.error("Error in fetchProfile:", error);

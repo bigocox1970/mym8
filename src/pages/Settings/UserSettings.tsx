@@ -8,6 +8,9 @@ import { PasswordSettings } from "./components/PasswordSettings";
 import { AppearanceSettings } from "./components/AppearanceSettings";
 import AISettings from "./components/AISettings";
 import { toast } from "@/components/ui/sonner";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
 
 const UserSettings = () => {
   const { user, loading: authLoading, profile, refreshProfile } = useAuth();
@@ -82,11 +85,49 @@ const UserSettings = () => {
         
         <AppearanceSettings 
           user={user} 
-          darkMode={profile?.dark_mode || false} 
+          theme={profile?.theme || 'light'} 
           onAppearanceUpdate={handleProfileUpdate}
         />
         
         <AISettings />
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Setup Wizard</CardTitle>
+            <CardDescription>Run the setup wizard again to reconfigure your preferences</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm">Reset your wizard data and go through the setup process again</p>
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={async () => {
+                  try {
+                    setIsLoading(true);
+                    const { error } = await supabase
+                      .from("profiles")
+                      .update({ wizard_completed: false })
+                      .eq("id", user?.id);
+                      
+                    if (error) throw error;
+                    
+                    toast.success("Wizard reset successful");
+                    navigate("/wizard");
+                  } catch (error) {
+                    console.error("Error resetting wizard:", error);
+                    toast.error("Failed to reset wizard");
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+              >
+                Run Wizard Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );

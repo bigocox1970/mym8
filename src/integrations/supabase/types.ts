@@ -56,60 +56,95 @@ export type Database = {
       }
       llm_configs: {
         Row: {
-          api_key: string
-          created_at: string | null
-          function_name: string
           id: string
+          created_at: string
+          function_name: string
+          api_key: string
           llm_provider: string
           pre_prompt: string
+          enable_ai?: boolean
+          assistant_name?: string
+          personality_type?: string
+          voice_gender?: string
         }
         Insert: {
-          api_key: string
-          created_at?: string | null
+          id?: string
+          created_at?: string
           function_name: string
-          id?: string
-          llm_provider: string
-          pre_prompt: string
-        }
-        Update: {
-          api_key?: string
-          created_at?: string | null
-          function_name?: string
-          id?: string
+          api_key: string
           llm_provider?: string
           pre_prompt?: string
+          enable_ai?: boolean
+          assistant_name?: string
+          personality_type?: string
+          voice_gender?: string
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          function_name?: string
+          api_key?: string
+          llm_provider?: string
+          pre_prompt?: string
+          enable_ai?: boolean
+          assistant_name?: string
+          personality_type?: string
+          voice_gender?: string
         }
         Relationships: []
       }
       profiles: {
         Row: {
-          avatar_url: string | null
-          created_at: string | null
-          dark_mode: boolean | null
           id: string
-          is_admin: boolean
-          nickname: string | null
+          created_at: string | null
           updated_at: string | null
+          username: string | null
+          full_name: string | null
+          avatar_url: string | null
+          theme: string | null
+          wizard_completed: boolean | null
+          nickname: string | null
+          selected_issues: string[] | null
+          other_issue: string | null
+          assistant_toughness: string | null
         }
         Insert: {
-          avatar_url?: string | null
-          created_at?: string | null
-          dark_mode?: boolean | null
           id: string
-          is_admin?: boolean
-          nickname?: string | null
+          created_at?: string | null
           updated_at?: string | null
+          username?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          theme?: string | null
+          wizard_completed?: boolean | null
+          nickname?: string | null
+          selected_issues?: string[] | null
+          other_issue?: string | null
+          assistant_toughness?: string | null
         }
         Update: {
-          avatar_url?: string | null
-          created_at?: string | null
-          dark_mode?: boolean | null
           id?: string
-          is_admin?: boolean
-          nickname?: string | null
+          created_at?: string | null
           updated_at?: string | null
+          username?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          theme?: string | null
+          wizard_completed?: boolean | null
+          nickname?: string | null
+          selected_issues?: string[] | null
+          other_issue?: string | null
+          assistant_toughness?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       tasks: {
         Row: {
@@ -206,6 +241,83 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      conversations: {
+        Row: {
+          id: string
+          user_id: string
+          title: string | null
+          last_message_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title?: string | null
+          last_message_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string | null
+          last_message_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      chat_messages: {
+        Row: {
+          id: string
+          user_id: string
+          role: string
+          content: string
+          timestamp: string
+          conversation_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          role: string
+          content: string
+          timestamp?: string
+          conversation_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          role?: string
+          content?: string
+          timestamp?: string
+          conversation_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           }
         ]

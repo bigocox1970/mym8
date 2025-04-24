@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Label } from "@/components/ui/label";
@@ -10,11 +9,11 @@ import { User } from "@supabase/supabase-js";
 
 interface AppearanceSettingsProps {
   user: User | null;
-  darkMode: boolean;
+  theme: string | null;
   onAppearanceUpdate: () => Promise<void>;
 }
 
-export const AppearanceSettings = ({ user, darkMode, onAppearanceUpdate }: AppearanceSettingsProps) => {
+export const AppearanceSettings = ({ user, theme, onAppearanceUpdate }: AppearanceSettingsProps) => {
   const [isSaving, setIsSaving] = useState(false);
 
   const toggleDarkMode = async () => {
@@ -22,29 +21,32 @@ export const AppearanceSettings = ({ user, darkMode, onAppearanceUpdate }: Appea
       if (!user) return;
       
       setIsSaving(true);
-      const newDarkMode = !darkMode;
+      const isDarkMode = theme === 'dark';
+      const newTheme = isDarkMode ? 'light' : 'dark';
       
       const { error } = await supabase
         .from("profiles")
-        .update({ dark_mode: newDarkMode })
+        .update({ theme: newTheme })
         .eq("id", user.id);
 
       if (error) {
-        console.error("Error toggling dark mode:", error);
+        console.error("Error toggling theme:", error);
         toast.error("Failed to update theme");
         return;
       }
       
-      if (newDarkMode) {
+      // Apply theme immediately
+      document.documentElement.classList.remove("dark", "light");
+      if (newTheme === 'dark') {
         document.documentElement.classList.add("dark");
       } else {
-        document.documentElement.classList.remove("dark");
+        document.documentElement.classList.add("light");
       }
       
-      toast.success(`${newDarkMode ? "Dark" : "Light"} mode enabled`);
+      toast.success(`${newTheme === 'dark' ? "Dark" : "Light"} mode enabled`);
       await onAppearanceUpdate();
     } catch (error) {
-      console.error("Error toggling dark mode:", error);
+      console.error("Error toggling theme:", error);
       toast.error("Failed to update theme");
     } finally {
       setIsSaving(false);
@@ -60,7 +62,7 @@ export const AppearanceSettings = ({ user, darkMode, onAppearanceUpdate }: Appea
         <div className="flex items-center space-x-2">
           <Switch
             id="dark-mode"
-            checked={darkMode}
+            checked={theme === 'dark'}
             onCheckedChange={toggleDarkMode}
             disabled={isSaving}
           />
