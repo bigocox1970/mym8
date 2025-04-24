@@ -1139,9 +1139,56 @@ const AIAssistant = () => {
       }
 
       const result = await response.json();
-      const aiResponse = result.choices[0].message.content;
       
-      // Check if the response contains a JSON action command
+      // Check for tool calls in the response
+      if (result.choices[0].message.tool_calls && result.choices[0].message.tool_calls.length > 0) {
+        const toolCall = result.choices[0].message.tool_calls[0];
+        
+        // Process function calls
+        if (toolCall.type === 'function') {
+          const functionName = toolCall.function.name;
+          const functionArgs = JSON.parse(toolCall.function.arguments);
+          
+          console.log("AI function call:", functionName, functionArgs);
+          
+          // Handle different function calls
+          if (functionName === 'create_goal') {
+            await handleCreateGoal(functionArgs.goalText, functionArgs.description);
+            return {
+              message: `I've created a new goal: "${functionArgs.goalText}"`,
+              action: "New goal created successfully!",
+              refresh: true,
+              navigate: "/goals"
+            };
+          } 
+          else if (functionName === 'add_action') {
+            await handleAddAction(
+              functionArgs.goalId,
+              functionArgs.title,
+              functionArgs.description,
+              functionArgs.frequency || "daily"
+            );
+            return {
+              message: `I've added a new action: "${functionArgs.title}" to your goal`,
+              action: "New action added successfully!",
+              refresh: true
+            };
+          }
+          else if (functionName === 'complete_action') {
+            await handleCompleteAction(functionArgs.actionId);
+            return {
+              message: "I've marked that action as completed. Great job!",
+              action: "Action marked as completed!",
+              refresh: true
+            };
+          }
+        }
+      }
+      
+      // If no tool calls, get regular content
+      const aiResponse = result.choices[0].message.content || "I'm not sure how to respond to that.";
+      
+      // Check if the response contains a JSON action command (legacy format)
       try {
         if (aiResponse.includes('{"action":')) {
           const actionMatch = aiResponse.match(/\{.*?\}/s);
