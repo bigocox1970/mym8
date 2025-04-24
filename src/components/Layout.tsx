@@ -51,7 +51,6 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     if (user && !profile) {
       const loadProfile = async () => {
         try {
-          console.log("Layout fetching profile for user ID:", user.id);
           await refreshProfile();
         } catch (error) {
           console.error("Error loading profile:", error);

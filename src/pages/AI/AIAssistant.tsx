@@ -74,7 +74,7 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
-  timestamp: Date;
+  timestamp: string;
   conversation_id?: string;
   created_at?: string;
 }
@@ -102,13 +102,21 @@ interface Conversation {
   created_at: string;
 }
 
+// Add this interface before the AIAssistant component
+interface LLMConfig {
+  assistant_name?: string;
+  personality_type?: string;
+  pre_prompt?: string;
+  llm_provider?: string;
+}
+
 const AIAssistant = () => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -247,7 +255,7 @@ const AIAssistant = () => {
         }
         
         // Parse the JSON response and set defaults if needed
-        const config = configData as Record<string, any> || {};
+        const config = configData as LLMConfig || {};
         
         // Default values if no config found
         const assistantName = config?.assistant_name || 'M8';
@@ -305,9 +313,9 @@ const AIAssistant = () => {
         id: msg.id,
         role: msg.role as "user" | "assistant",
         content: msg.content,
-        timestamp: new Date(msg.created_at),
         conversation_id: msg.conversation_id,
-        created_at: msg.created_at
+        created_at: msg.created_at,
+        timestamp: msg.timestamp
       }));
 
       setMessages(formattedMessages);
@@ -350,7 +358,7 @@ const AIAssistant = () => {
       }
       
       // Parse the JSON response and set defaults if needed
-      const config = configData as Record<string, any> || {};
+      const config = configData as LLMConfig || {};
       
       // Default values if no config found
       const assistantName = config?.assistant_name || 'M8';
@@ -399,7 +407,7 @@ const AIAssistant = () => {
         id: uuidv4(),
         role: 'assistant' as "user" | "assistant",
         content: welcomeMessage,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         conversation_id: data.id
       }]);
       
@@ -516,7 +524,7 @@ const AIAssistant = () => {
         id: "welcome-" + Date.now().toString(),
         role: "assistant",
         content: welcomeContent,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
       };
       
       setMessages([welcomeMessage]);
@@ -528,7 +536,7 @@ const AIAssistant = () => {
           user_id: user.id,
           role: welcomeMessage.role,
           content: welcomeMessage.content,
-          timestamp: welcomeMessage.timestamp.toISOString(),
+          timestamp: welcomeMessage.timestamp,
           conversation_id: currentConversationId
         });
       
@@ -591,7 +599,7 @@ const AIAssistant = () => {
           user_id: user.id,
           role: message.role,
           content: message.content,
-          timestamp: message.timestamp.toISOString(),
+          timestamp: message.timestamp,
           conversation_id: conversationId
         });
         
@@ -784,7 +792,7 @@ const AIAssistant = () => {
       id: Date.now().toString(),
       role: "user",
       content: input,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
     
     setMessages((prev) => [...prev, userMessage]);
@@ -803,7 +811,7 @@ const AIAssistant = () => {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: response.message,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
       };
       
       setMessages((prev) => [...prev, aiMessage]);
@@ -833,7 +841,7 @@ const AIAssistant = () => {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: "I'm sorry, I encountered an error processing your request. Please try again.",
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
       };
       
       setMessages((prev) => [...prev, errorMessage]);
@@ -853,9 +861,21 @@ const AIAssistant = () => {
     userGoals: Goal[], 
     userActions: Action[]
   ) => {
+    if (!message || !userGoals || !userActions || isProcessing) return;
+
+    // Add user message to the conversation immediately for UX
+    const userMessageObj: Message = {
+      id: uuidv4(),
+      conversation_id: currentConversationId || "",
+      content: message,
+      role: 'user',
+      created_at: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
+    };
+
     setIsProcessing(true);
-    setError(null);
-    
+    setIsSpeaking(true);
+
     try {
       // Get AI assistant configuration
       const assistantConfig = await getAssistantConfig();
@@ -886,9 +906,14 @@ const AIAssistant = () => {
         throw new Error("OpenRouter API key is missing");
       }
       
+      // Get model from config or use fallback
+      const { data: configData, error: configError } = await supabase.rpc('get_user_llm_config');
+      const config = configData as LLMConfig | null;
+      const modelToUse = config?.llm_provider || "gpt-4o";
+      
       // AI request body
       const requestBody = {
-        model: "anthropic/claude-3-opus:beta",
+        model: modelToUse,
         messages: [
           {
             role: "system",
@@ -1055,6 +1080,7 @@ const AIAssistant = () => {
       };
     } finally {
       setIsProcessing(false);
+      setIsSpeaking(false);
     }
   };
 
@@ -1172,17 +1198,11 @@ const AIAssistant = () => {
     if (!user) return defaultConfig;
     
     try {
-      // First try to access llm_configs directly
-      const { data, error } = await supabase
-        .from('llm_configs')
-        .select('*')
-        .eq('function_name', 'openrouter')
-        .single();
-        
-      if (error) {
-        console.log('Could not access llm_configs directly, using profile fallback');
-        
-        // Try to get profile info as fallback
+      // Use the get_user_llm_config RPC function
+      const { data: configData, error: configError } = await supabase.rpc('get_user_llm_config');
+      
+      if (configError) {
+        // Fallback to using profile data
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('nickname, assistant_toughness')
@@ -1190,7 +1210,6 @@ const AIAssistant = () => {
           .single();
           
         if (profileError) {
-          console.error('Error getting profile data:', profileError);
           return defaultConfig;
         }
         
@@ -1225,16 +1244,14 @@ const AIAssistant = () => {
         };
       }
       
-      // If we have data from llm_configs, use it
-      if (data) {
-        return {
-          name: data.assistant_name || defaultConfig.name,
-          personality: data.personality_type || defaultConfig.personality,
-          prePrompt: data.pre_prompt || defaultConfig.prePrompt
-        };
-      }
+      // Parse the RPC response and use it
+      const config = configData as LLMConfig || {};
       
-      return defaultConfig;
+      return {
+        name: config.assistant_name || defaultConfig.name,
+        personality: config.personality_type || defaultConfig.personality,
+        prePrompt: config.pre_prompt || defaultConfig.prePrompt
+      };
     } catch (error) {
       console.error('Error getting assistant config:', error);
       return defaultConfig;
@@ -1588,7 +1605,7 @@ const AIAssistant = () => {
                       <div>
                         <p className="text-sm whitespace-pre-line break-words">{message.content}</p>
                         <p className="text-[10px] sm:text-xs opacity-50 mt-1">
-                          {message.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </p>
                       </div>
                     </div>

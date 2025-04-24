@@ -137,16 +137,12 @@ const Dashboard = () => {
       if (!user) return;
       
       try {
-        // First try to get the data via regular select
-        const { data, error } = await supabase
-          .from("llm_configs")
-          .select("*")
-          .eq("function_name", "openrouter")
-          .single();
+        // Use the get_user_llm_config function instead of direct table access
+        const { data, error } = await supabase.rpc('get_user_llm_config');
 
         if (error) {
-          console.log("Could not access llm_configs directly, using fallback");
-          // If we can't access llm_configs directly, try to get data from the profile
+          console.error("Error fetching assistant config:", error);
+          // Fallback to profile data
           const { data: profileData, error: profileError } = await supabase
             .from("profiles")
             .select("nickname")
@@ -168,8 +164,10 @@ const Dashboard = () => {
           return;
         }
         
-        if (data && data.assistant_name) {
-          setAssistantName(data.assistant_name);
+        // Parse the JSON data
+        const config = data as any;
+        if (config && config.assistant_name) {
+          setAssistantName(config.assistant_name);
         } else {
           setAssistantName("M8"); // Default name
         }

@@ -46,8 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string): Promise<ProfileType | null> => {
     try {
-      console.log("Fetching profile for user ID:", userId);
-      
       // Check if profile exists
       const { data, error } = await supabase
         .from("profiles")
@@ -73,11 +71,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return null;
         }
         
-        console.log("Created new profile");
-        
         // Redirect new users to wizard
         if (window.location.pathname !== '/wizard') {
-          console.log('New user detected, redirecting to wizard');
           setTimeout(() => {
             window.location.href = `${getBaseUrl()}/wizard`;
           }, 500);
@@ -88,7 +83,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Check if we should redirect to wizard for existing users who haven't completed it
       if (data && data.wizard_completed === false && window.location.pathname !== '/wizard') {
-        console.log('User has not completed wizard, redirecting');
         setTimeout(() => {
           window.location.href = `${getBaseUrl()}/wizard`;
         }, 500);

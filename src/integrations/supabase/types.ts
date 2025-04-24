@@ -349,6 +349,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      get_user_llm_config: {
+        Args: {
+          p_function_name?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       task_frequency:

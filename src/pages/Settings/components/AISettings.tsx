@@ -66,33 +66,32 @@ const AISettings = () => {
       if (!user) return;
 
       try {
-        const { data, error } = await supabase
-          .from("llm_configs")
-          .select("*")
-          .eq("function_name", "openrouter")
-          .single();
+        // Use the get_user_llm_config function instead of direct table access
+        const { data, error } = await supabase.rpc('get_user_llm_config');
 
         if (error) {
-          console.log("No existing OpenRouter configuration found");
+          console.log("Error fetching AI config:", error);
           return;
         }
 
-        if (data) {
-          if (data.llm_provider) {
-            setSelectedModel(data.llm_provider);
+        // Parse the JSON data
+        const config = data as Record<string, any>;
+        if (config) {
+          if (config.llm_provider) {
+            setSelectedModel(config.llm_provider);
           }
           
           // If there's an enable_ai field, use it, otherwise default to true
-          setEnableAI(data.enable_ai === undefined ? true : data.enable_ai);
+          setEnableAI(config.enable_ai === undefined ? true : config.enable_ai);
           
           // Set assistant name if available
-          if (data.assistant_name) {
-            setAssistantName(data.assistant_name);
+          if (config.assistant_name) {
+            setAssistantName(config.assistant_name);
           }
           
           // Set personality type if available
-          if (data.personality_type) {
-            setPersonalityType(data.personality_type);
+          if (config.personality_type) {
+            setPersonalityType(config.personality_type);
           }
         }
       } catch (error) {

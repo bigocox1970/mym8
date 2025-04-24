@@ -1,58 +1,70 @@
 -- Add RLS for llm_configs table
 ALTER TABLE llm_configs ENABLE ROW LEVEL SECURITY;
 
--- Admin policy for llm_configs (full access)
-CREATE POLICY "Allow admins full access to llm_configs" 
+-- Only admins can directly access llm_configs
+CREATE POLICY "Only admins can access llm_configs" 
 ON llm_configs 
 FOR ALL 
 TO authenticated 
-USING (auth.jwt() -> 'email' = 'admin@mym8.app');
+USING (auth.jwt() ->> 'email' = 'admin@mym8.app');
 
--- User policy for select only
-CREATE POLICY "Allow users to view llm_configs" 
-ON llm_configs 
-FOR SELECT 
-TO authenticated 
-USING (true);
-
--- Create a function to handle llm_configs inserts
-CREATE OR REPLACE FUNCTION handle_llm_config_insert()
-RETURNS TRIGGER AS $$
+-- Create a function to handle llm_configs operations for normal users
+CREATE OR REPLACE FUNCTION manage_user_llm_config(
+  p_function_name TEXT,
+  p_assistant_name TEXT,
+  p_personality_type TEXT,
+  p_pre_prompt TEXT,
+  p_voice_gender TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  config_exists BOOLEAN;
 BEGIN
-  -- Check if a row with the same function_name already exists
-  IF EXISTS (
-    SELECT 1 FROM llm_configs 
-    WHERE function_name = NEW.function_name
-  ) THEN
-    -- If it exists, update it instead of inserting
-    UPDATE llm_configs
-    SET 
-      api_key = COALESCE(NEW.api_key, api_key),
-      llm_provider = COALESCE(NEW.llm_provider, llm_provider),
-      pre_prompt = COALESCE(NEW.pre_prompt, pre_prompt),
-      enable_ai = COALESCE(NEW.enable_ai, enable_ai),
-      assistant_name = COALESCE(NEW.assistant_name, assistant_name),
-      personality_type = COALESCE(NEW.personality_type, personality_type),
-      voice_gender = COALESCE(NEW.voice_gender, voice_gender)
-    WHERE function_name = NEW.function_name;
-    
-    RETURN NULL; -- Skip the insert
+  -- Check if config exists
+  SELECT EXISTS (
+    SELECT 1 FROM llm_configs WHERE function_name = p_function_name
+  ) INTO config_exists;
+  
+  IF config_exists THEN
+    -- Update existing config
+    UPDATE llm_configs SET
+      assistant_name = p_assistant_name,
+      personality_type = p_personality_type,
+      pre_prompt = p_pre_prompt,
+      voice_gender = p_voice_gender,
+      enable_ai = TRUE
+    WHERE function_name = p_function_name;
   ELSE
-    -- Otherwise, proceed with the insert
-    RETURN NEW;
+    -- Insert new config
+    INSERT INTO llm_configs (
+      function_name,
+      assistant_name,
+      personality_type,
+      pre_prompt,
+      voice_gender,
+      enable_ai,
+      api_key,
+      llm_provider
+    ) VALUES (
+      p_function_name,
+      p_assistant_name,
+      p_personality_type,
+      p_pre_prompt,
+      p_voice_gender,
+      TRUE,
+      '',  -- Empty API key as placeholder
+      'anthropic/claude-3-opus:beta'  -- Default provider
+    );
   END IF;
+  
+  RETURN TRUE;
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE NOTICE 'Error in manage_user_llm_config: %', SQLERRM;
+    RETURN FALSE;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Create trigger for the function
-CREATE TRIGGER handle_llm_config_insert_trigger
-BEFORE INSERT ON llm_configs
-FOR EACH ROW
-EXECUTE FUNCTION handle_llm_config_insert();
-
--- User policy for insert (with the trigger handling duplicates)
-CREATE POLICY "Allow users to insert llm_configs" 
-ON llm_configs 
-FOR INSERT 
-TO authenticated 
-WITH CHECK (true); 
+$$; 
