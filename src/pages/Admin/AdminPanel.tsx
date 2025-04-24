@@ -26,15 +26,25 @@ const AdminPanel = () => {
 
         if (error) throw error;
 
-        // Fetch user emails from auth.users through the profiles
-        const { data: users, error: authError } = await supabase.auth.admin.listUsers();
+        // Fetch user emails from auth.users
+        const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
         
         if (authError) throw authError;
 
-        const enrichedProfiles = profiles.map(profile => ({
-          ...profile,
-          email: users.users.find(u => u.id === profile.id)?.email || 'No email'
-        }));
+        // Make sure profiles is not null before mapping
+        if (!profiles) {
+          setUsers([]);
+          return;
+        }
+
+        // Safely map profiles with proper type checking
+        const enrichedProfiles = profiles.map(profile => {
+          const user = authData?.users?.find(u => u.id === profile.id);
+          return {
+            ...profile,
+            email: user?.email || 'No email'
+          } as Profile;
+        });
 
         setUsers(enrichedProfiles);
       } catch (error) {
