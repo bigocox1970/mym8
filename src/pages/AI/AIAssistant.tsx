@@ -239,20 +239,19 @@ const AIAssistant = () => {
 
       // If no messages, add a welcome message
       if (data.length === 0) {
-        // Fetch assistant config to get name and personality
-        const { data: configData, error: configError } = await supabase
-          .from('llm_configs')
-          .select('assistant_name, personality_type')
-          .eq('user_id', user.id)
-          .single();
+        // Use the get_user_llm_config function instead of direct table access
+        const { data: configData, error: configError } = await supabase.rpc('get_user_llm_config');
 
-        if (configError && configError.code !== 'PGRST116') {
+        if (configError) {
           console.error('Error fetching assistant config:', configError);
         }
         
+        // Parse the JSON response and set defaults if needed
+        const config = configData as Record<string, any> || {};
+        
         // Default values if no config found
-        const assistantName = configData?.assistant_name || 'M8';
-        const personalityType = configData?.personality_type || 'direct';
+        const assistantName = config?.assistant_name || 'M8';
+        const personalityType = config?.personality_type || 'direct';
         
         // Create personalized welcome message based on personality
         let welcomeMessage = '';
@@ -343,20 +342,19 @@ const AIAssistant = () => {
       // Update local state
       setCurrentConversationId(data.id);
       
-      // Fetch assistant config to get name and personality
-      const { data: configData, error: configError } = await supabase
-        .from('llm_configs')
-        .select('assistant_name, personality_type')
-        .eq('user_id', user.id)
-        .single();
+      // Use the get_user_llm_config function instead of direct table access
+      const { data: configData, error: configError } = await supabase.rpc('get_user_llm_config');
 
-      if (configError && configError.code !== 'PGRST116') {
+      if (configError) {
         console.error('Error fetching assistant config:', configError);
       }
       
+      // Parse the JSON response and set defaults if needed
+      const config = configData as Record<string, any> || {};
+      
       // Default values if no config found
-      const assistantName = configData?.assistant_name || 'M8';
-      const personalityType = configData?.personality_type || 'direct';
+      const assistantName = config?.assistant_name || 'M8';
+      const personalityType = config?.personality_type || 'direct';
       
       // Create personalized welcome message based on personality
       let welcomeMessage = '';
@@ -404,6 +402,10 @@ const AIAssistant = () => {
         timestamp: new Date(),
         conversation_id: data.id
       }]);
+      
+      // Clear the new conversation title and close the dialog
+      setNewConversationTitle('');
+      setShowNewConversationDialog(false);
     } catch (err) {
       console.error('Error in createNewConversation:', err);
     }
@@ -851,98 +853,151 @@ const AIAssistant = () => {
     userGoals: Goal[], 
     userActions: Action[]
   ) => {
+    setIsProcessing(true);
+    setError(null);
+    
     try {
-      // Format the date for the assistant
-      const today = new Date();
-      const formattedDate = today.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-
-      // Check if OpenRouter API key is configured
-      const openRouterApiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-      if (!openRouterApiKey) {
-        throw new Error("OpenRouter API key not found in environment variables");
-      }
-
       // Get AI assistant configuration
-      const { data: config, error } = await supabase
-        .from('llm_configs')
-        .select('*')
-        .eq('function_name', 'openrouter')
-        .single();
+      const assistantConfig = await getAssistantConfig();
       
-      if (error || !config) {
-        throw new Error("OpenRouter API configuration not found");
+      // Format actions for the AI
+      const formattedActions = userActions.map(action => ({
+        id: action.id,
+        title: action.title,
+        completed: action.completed,
+        frequency: action.frequency,
+        goalId: action.goal_id
+      }));
+      
+      // Format goals for the AI
+      const formattedGoals = userGoals.map(goal => ({
+        id: goal.id,
+        text: goal.goal_text,
+        description: goal.description
+      }));
+      
+      // Prepare the API request
+      const endpoint = "https://openrouter.ai/api/v1/chat/completions";
+      
+      // Get the AI key from env
+      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+      
+      if (!apiKey) {
+        throw new Error("OpenRouter API key is missing");
       }
+      
+      // AI request body
+      const requestBody = {
+        model: "anthropic/claude-3-opus:beta",
+        messages: [
+          {
+            role: "system",
+            content: assistantConfig.prePrompt
+          },
+          ...messages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          {
+            role: "user",
+            content: message
+          }
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "create_goal",
+              description: "Create a new goal for the user",
+              parameters: {
+                type: "object",
+                properties: {
+                  goalText: {
+                    type: "string",
+                    description: "The text describing the goal"
+                  },
+                  description: {
+                    type: "string",
+                    description: "Additional details about the goal"
+                  }
+                },
+                required: ["goalText"]
+              }
+            }
+          },
+          {
+            type: "function",
+            function: {
+              name: "add_action",
+              description: "Add a new action item to an existing goal",
+              parameters: {
+                type: "object",
+                properties: {
+                  goalId: {
+                    type: "string",
+                    description: "The ID of the goal to add the action to"
+                  },
+                  title: {
+                    type: "string",
+                    description: "The title of the action"
+                  },
+                  description: {
+                    type: "string",
+                    description: "Additional details about the action"
+                  },
+                  frequency: {
+                    type: "string",
+                    enum: ["morning", "afternoon", "evening", "daily", "weekly", "monthly"],
+                    description: "How often the action should be performed"
+                  }
+                },
+                required: ["goalId", "title", "frequency"]
+              }
+            }
+          },
+          {
+            type: "function",
+            function: {
+              name: "complete_action",
+              description: "Mark an action as completed",
+              parameters: {
+                type: "object",
+                properties: {
+                  actionId: {
+                    type: "string",
+                    description: "The ID of the action to mark as completed"
+                  }
+                },
+                required: ["actionId"]
+              }
+            }
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+        stream: false,
+        tool_choice: "auto",
+        additional_context: {
+          user_goals: formattedGoals,
+          user_actions: formattedActions
+        }
+      };
 
-      if (!config.enable_ai) {
-        return { message: "AI assistant is currently disabled. You can enable it in the settings." };
-      }
-
-      // Prepare context for the assistant
-      const goalsContext = userGoals.map(g => 
-        `Goal: ${g.goal_text}${g.description ? ` - ${g.description}` : ''} (ID: ${g.id})`
-      ).join('\n');
-      
-      const actionsContext = userActions.map(a => 
-        `Action: ${a.title}${a.description ? ` - ${a.description}` : ''} (Status: ${a.completed ? 'Completed' : 'Pending'}, Frequency: ${a.frequency}, Goal ID: ${a.goal_id})`
-      ).join('\n');
-      
-      // Get assistant name or use default
-      const assistantName = config.assistant_name || "M8";
-      
-      // Use custom pre-prompt if available or fall back to default
-      const prePrompt = config.pre_prompt || 
-        `You are an AI assistant for a goal-tracking application. Your name is ${assistantName}. Today is ${formattedDate}.`;
-      
-      // Call OpenRouter API
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      // Send the API request
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openRouterApiKey}`,
+          'Authorization': `Bearer ${apiKey}`,
           'HTTP-Referer': window.location.origin,
         },
-        body: JSON.stringify({
-          model: config.llm_provider || "anthropic/claude-3-opus:beta",
-          messages: [
-            {
-              role: "system",
-              content: `${prePrompt}
-              
-The user has the following goals:
-${goalsContext || "No goals created yet."}
-
-The user has the following actions:
-${actionsContext || "No actions created yet."}
-
-Your job is to:
-1. Answer questions about the user's goals and actions
-2. Provide encouragement and motivation
-3. Process commands to add or modify goals and actions
-
-If the user wants to create a new goal, respond with: {"action": "create_goal", "data": {"goal_text": "...", "description": "..." }}
-If the user wants to add an action to a goal, respond with: {"action": "add_action", "data": {"goal_id": "...", "title": "...", "description": "...", "frequency": "..."}}
-If the user wants to mark an action as complete, respond with: {"action": "complete_action", "data": {"action_id": "..."}}
-
-Only use these formats for those specific intents. Otherwise, respond conversationally to help and encourage the user.`
-            },
-            {
-              role: "user",
-              content: message
-            }
-          ],
-          temperature: 0.7,
-        }),
+        body: JSON.stringify(requestBody),
       });
-      
+
       if (!response.ok) {
         throw new Error(`API request failed with status ${response.status}`);
       }
-      
+
       const result = await response.json();
       const aiResponse = result.choices[0].message.content;
       
@@ -998,6 +1053,8 @@ Only use these formats for those specific intents. Otherwise, respond conversati
       return { 
         message: "I'm having trouble connecting to my AI capabilities right now. Please try again later."
       };
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -1099,6 +1156,90 @@ Only use these formats for those specific intents. Otherwise, respond conversati
       document.head.removeChild(style);
     };
   }, []);
+
+  // Function to get assistant configuration
+  const getAssistantConfig = async (): Promise<{
+    name: string;
+    personality: string;
+    prePrompt: string;
+  }> => {
+    const defaultConfig = {
+      name: 'M8',
+      personality: 'gentle',
+      prePrompt: 'You are a helpful AI assistant for a goal-tracking application called "My M8". Your job is to help users manage their goals and actions, provide encouragement, and answer questions.'
+    };
+    
+    if (!user) return defaultConfig;
+    
+    try {
+      // First try to access llm_configs directly
+      const { data, error } = await supabase
+        .from('llm_configs')
+        .select('*')
+        .eq('function_name', 'openrouter')
+        .single();
+        
+      if (error) {
+        console.log('Could not access llm_configs directly, using profile fallback');
+        
+        // Try to get profile info as fallback
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('nickname, assistant_toughness')
+          .eq('id', user.id)
+          .single();
+          
+        if (profileError) {
+          console.error('Error getting profile data:', profileError);
+          return defaultConfig;
+        }
+        
+        // Create a basic pre-prompt using profile data
+        const name = profileData.nickname || defaultConfig.name;
+        const personality = profileData.assistant_toughness || 'balanced';
+        
+        let personalityPrompt = '';
+        switch (personality) {
+          case 'gentle':
+            personalityPrompt = 'Be gentle, supportive, and understanding. Use encouraging language.';
+            break;
+          case 'balanced':
+            personalityPrompt = 'Balance support with accountability. Gently remind the user of their commitments.';
+            break;
+          case 'firm':
+            personalityPrompt = 'Hold the user accountable. Remind them of their goals and commitments firmly.';
+            break;
+          case 'tough':
+            personalityPrompt = 'Be tough on excuses. Call out procrastination and push the user towards their goals firmly.';
+            break;
+          default:
+            personalityPrompt = 'Be supportive and helpful.';
+        }
+        
+        const prePrompt = `You are a helpful AI assistant for a goal-tracking application. Your name is ${name}. ${personalityPrompt}`;
+        
+        return {
+          name,
+          personality,
+          prePrompt
+        };
+      }
+      
+      // If we have data from llm_configs, use it
+      if (data) {
+        return {
+          name: data.assistant_name || defaultConfig.name,
+          personality: data.personality_type || defaultConfig.personality,
+          prePrompt: data.pre_prompt || defaultConfig.prePrompt
+        };
+      }
+      
+      return defaultConfig;
+    } catch (error) {
+      console.error('Error getting assistant config:', error);
+      return defaultConfig;
+    }
+  };
 
   return (
     <Layout>
@@ -1537,7 +1678,9 @@ Only use these formats for those specific intents. Otherwise, respond conversati
             <Button variant="outline" onClick={() => setShowNewConversationDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={() => createNewConversation(newConversationTitle)}>
+            <Button onClick={() => {
+              createNewConversation(newConversationTitle);
+            }}>
               Create
             </Button>
           </DialogFooter>
