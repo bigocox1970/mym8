@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -121,11 +120,16 @@ const Onboarding = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-2xl space-y-8 bg-white p-8 rounded-lg shadow-md">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 dark:bg-gray-900">
+      <div className="w-full max-w-2xl space-y-6 bg-white p-8 rounded-lg shadow-md dark:bg-gray-800 dark:text-white">
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Welcome to MyM8.app</h1>
-          <p className="mt-2 text-gray-600">Let's set some personal goals to get started</p>
+          <img 
+            src="/mym8-logo1.png" 
+            alt="MyM8 Logo" 
+            className="mx-auto mb-4 w-36"
+          />
+          <h1 className="text-3xl font-bold">Welcome to MyM8</h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">Let's set some personal goals to get started</p>
         </div>
         
         <Form {...form}>
