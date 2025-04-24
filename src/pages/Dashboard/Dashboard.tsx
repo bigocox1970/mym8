@@ -3,8 +3,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/lib/supabase";
-import { FileText, Mic, Plus } from "lucide-react";
+import { FileText, Mic, Plus, BarChart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 
@@ -25,6 +26,11 @@ const Dashboard = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [recentEntries, setRecentEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState({
+    daily: 0,
+    weekly: 0,
+    monthly: 0
+  });
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -60,6 +66,47 @@ const Dashboard = () => {
     fetchUserData();
   }, [user]);
 
+  useEffect(() => {
+    const calculateProgress = async () => {
+      if (!user) return;
+
+      const now = new Date();
+      const startOfDay = new Date(now.setHours(0,0,0,0));
+      const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      try {
+        const { data: dailyEntries } = await supabase
+          .from("journal_entries")
+          .select("created_at")
+          .eq("user_id", user.id)
+          .gte("created_at", startOfDay.toISOString());
+
+        const { data: weeklyEntries } = await supabase
+          .from("journal_entries")
+          .select("created_at")
+          .eq("user_id", user.id)
+          .gte("created_at", startOfWeek.toISOString());
+
+        const { data: monthlyEntries } = await supabase
+          .from("journal_entries")
+          .select("created_at")
+          .eq("user_id", user.id)
+          .gte("created_at", startOfMonth.toISOString());
+
+        setProgress({
+          daily: Math.min((dailyEntries?.length || 0) * 25, 100),
+          weekly: Math.min((weeklyEntries?.length || 0) * 15, 100),
+          monthly: Math.min((monthlyEntries?.length || 0) * 5, 100)
+        });
+      } catch (error) {
+        console.error("Error calculating progress:", error);
+      }
+    };
+
+    calculateProgress();
+  }, [user]);
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
@@ -80,6 +127,41 @@ const Dashboard = () => {
             </Button>
           </Link>
         </div>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart className="h-5 w-5" />
+              Progress Overview
+            </CardTitle>
+            <CardDescription>Track your journaling progress</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Daily Progress</span>
+                <span>{progress.daily}%</span>
+              </div>
+              <Progress value={progress.daily} />
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Weekly Progress</span>
+                <span>{progress.weekly}%</span>
+              </div>
+              <Progress value={progress.weekly} />
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Monthly Progress</span>
+                <span>{progress.monthly}%</span>
+              </div>
+              <Progress value={progress.monthly} />
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
