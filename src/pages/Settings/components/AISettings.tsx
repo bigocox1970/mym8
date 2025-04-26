@@ -22,7 +22,7 @@ import {
   DEFAULT_VOICE_SETTINGS 
 } from "@/config/voice";
 import { PERSONALITY_PROMPTS, generateFullPrompt } from "@/config/prompts";
-import { getConfig, updateConfig } from "@/lib/configManager";
+import { getConfig, updateConfig, initConfig } from "@/lib/configManager";
 
 // Define personality types from our prompts configuration
 const PERSONALITY_TYPES = Object.keys(PERSONALITY_PROMPTS).map(key => ({
@@ -65,6 +65,7 @@ const AISettings = () => {
     const loadConfig = async () => {
       try {
         setIsLoading(true);
+        await initConfig(); // Wait for Supabase sync
         const config = getConfig();
         console.log("Loaded config from storage:", config);
         
@@ -502,4 +503,4 @@ const AISettings = () => {
   );
 };
 
-export default AISettings; 
+export default AISettings;

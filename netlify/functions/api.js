@@ -775,31 +775,22 @@ async function handleCreateGoal(args, userId) {
   }
   
   try {
-    // Create a database connection
+    // Create a database connection with service role key
     const { createClient } = await import('@supabase/supabase-js');
     const supabaseUrl = process.env.VITE_SUPABASE_URL;
-    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     
-    console.log("DEBUG: Supabase URL exists:", !!supabaseUrl);
-    console.log("DEBUG: Supabase Key exists:", !!supabaseKey);
-    console.log("DEBUG: Service Role Key exists:", !!serviceRoleKey);
-    
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("ERROR: Missing Supabase configuration");
       return { error: "Database configuration is missing" };
     }
     
-    if (!serviceRoleKey) {
-      console.error("ERROR: SUPABASE_SERVICE_ROLE_KEY is missing!");
-      return { error: "Supabase service role key is missing. Please add it to your environment variables." };
-    }
-    
-    // Always use the admin client with service role key for goal creation
-    console.log("DEBUG: Creating admin Supabase client for goal creation");
+    // Create admin client with service role key
     const adminSupabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
-        persistSession: false
+        persistSession: false,
+        detectSessionInUrl: false
       }
     });
     

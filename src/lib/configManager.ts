@@ -1,5 +1,7 @@
 import appConfig from '@/config/app-config.json';
 import { toast } from '@/components/ui/sonner';
+import { supabase } from '@/lib/supabaseClient';
+import { Database } from '@/types/supabase';
 
 // Define the configuration interface
 export interface AppConfig {
@@ -66,8 +68,51 @@ export async function updateConfig(newConfig: Partial<AppConfig>): Promise<void>
     // Save to localStorage - API keys are never stored here
     localStorage.setItem('app-config', JSON.stringify(currentConfig));
     
-    // For a production app, sync user preferences to the backend
-    // await syncConfigToBackend(currentConfig);
+    try {
+      // Get the current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        const preferences = {
+          user_id: user.id,
+          llm_provider: safeConfig.llm_provider || null,
+          enable_ai: safeConfig.enable_ai ?? true,
+          assistant_name: safeConfig.assistant_name || null,
+          personality_type: safeConfig.personality_type || null,
+          voice_gender: safeConfig.voice_gender || null,
+          voice_service: safeConfig.voice_service || null,
+          elevenlabs_voice: safeConfig.elevenlabs_voice || null,
+          google_voice: safeConfig.google_voice || null,
+          azure_voice: safeConfig.azure_voice || null,
+          amazon_voice: safeConfig.amazon_voice || null,
+          openai_voice: safeConfig.openai_voice || null,
+          updated_at: new Date().toISOString()
+        };
+
+        // Check if preferences exist
+        const { data: existingPrefs } = await supabase
+          .from('user_preferences')
+          .select('user_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (existingPrefs) {
+          // Update existing preferences
+          await supabase
+            .from('user_preferences')
+            .update(preferences)
+            .eq('user_id', user.id);
+        } else {
+          // Insert new preferences
+          await supabase
+            .from('user_preferences')
+            .insert([preferences]);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving preferences to Supabase:', error);
+      // Continue with local storage even if Supabase fails
+    }
     
     console.log('Config updated successfully:', currentConfig);
     return Promise.resolve();
@@ -91,10 +136,11 @@ export async function getAvailableServices(): Promise<string[]> {
 
 /**
  * Initializes the configuration system
- * Loads any saved config from localStorage
+ * Loads any saved config from localStorage and Supabase
  */
-export function initConfig(): void {
+export async function initConfig(): Promise<void> {
   try {
+    // First load from localStorage for immediate availability
     const savedConfig = localStorage.getItem('app-config');
     if (savedConfig) {
       const parsedConfig = JSON.parse(savedConfig);
@@ -107,12 +153,32 @@ export function initConfig(): void {
       delete parsedConfig.openai_api_key;
       
       currentConfig = { ...currentConfig, ...parsedConfig };
-      console.log('Loaded config from localStorage:', currentConfig);
+    }
+
+    try {
+      // Then try to load from Supabase if user is logged in
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        const { data: preferences } = await supabase
+          .from('user_preferences')
+          .select()
+          .eq('user_id', user.id)
+          .single();
+
+        if (preferences) {
+          // Update both memory and localStorage with Supabase data
+          const { user_id, updated_at, ...configData } = preferences;
+          currentConfig = { ...currentConfig, ...configData };
+          localStorage.setItem('app-config', JSON.stringify(currentConfig));
+          console.log('Loaded config from Supabase:', currentConfig);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading preferences from Supabase:', error);
+      // Continue with local storage even if Supabase fails
     }
   } catch (error) {
     console.error('Error initializing config:', error);
   }
 }
-
-// Initialize config when this module is imported
-initConfig(); 
