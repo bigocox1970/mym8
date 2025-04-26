@@ -2,8 +2,12 @@
 [build]
   # Adjust these as needed based on your build setup
   publish = "dist"
-  command = "npm run build"
+  command = "npm install && npm run build"
   functions = "netlify/functions"
+  
+  # Ensure dev dependencies are installed
+  [build.environment]
+    NPM_FLAGS = "--legacy-peer-deps"
 
 [dev]
   targetPort = 8082
@@ -26,6 +30,7 @@
 # Environment variables for functions
 [build.environment]
   NODE_ENV = "production"
+  NODE_VERSION = "18.19.0"
 
 # Development environment overrides
 [context.dev.environment]
