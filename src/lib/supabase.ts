@@ -1,13 +1,9 @@
 
-import { createClient } from "@supabase/supabase-js";
-import { Database } from "../types/supabase";
-
-// Use the client from integrations/supabase/client.ts to avoid duplication
-import { supabase as supabaseClient } from "@/integrations/supabase/client";
-
-export const supabase = supabaseClient;
+// Re-export the singleton Supabase client
+export { supabase } from './supabaseClient';
 
 // Function to check if Supabase connection is configured properly
 export const isSupabaseConfigured = () => {
-  return true;
+  const { VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY } = import.meta.env;
+  return Boolean(VITE_SUPABASE_URL && VITE_SUPABASE_ANON_KEY);
 };

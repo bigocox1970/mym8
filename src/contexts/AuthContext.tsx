@@ -212,86 +212,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
   };
 
-  // Initialize auth state from localStorage
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        setIsLoading(true);
-        const storedToken = localStorage.getItem('auth_token');
-        
-        if (storedToken) {
-          // Verify token with the server
-          try {
-            const response = await fetch(`${API_BASE_URL}/auth/verify`, {
-              headers: {
-                'Authorization': `Bearer ${storedToken}`
-              }
-            });
-            
-            if (response.ok) {
-              const data = await response.json();
-              setUser(data.user);
-              setIsAuthenticated(true);
-              setToken(storedToken);
-              
-              // Check for token refresh in response headers
-              const newToken = response.headers.get('X-New-Token');
-              if (newToken) {
-                localStorage.setItem('auth_token', newToken);
-                setToken(newToken);
-              }
-            } else {
-              // Token is invalid or expired
-              localStorage.removeItem('auth_token');
-              setUser(null);
-              setIsAuthenticated(false);
-              setToken(null);
-            }
-          } catch (error) {
-            console.error('Error verifying token:', error);
-            // If server is unreachable, keep the token but set auth state to false
-            setUser(null);
-            setIsAuthenticated(false);
-          }
-        } else {
-          // No token found
-          setUser(null);
-          setIsAuthenticated(false);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initAuth();
-  }, []);
-
   // Login function
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email, password })
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
       
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Login failed');
-      }
+      if (error) throw error;
       
-      const data = await response.json();
-      
-      // Save token and user info
-      localStorage.setItem('auth_token', data.token);
-      setToken(data.token);
-      setUser(data.user);
       setIsAuthenticated(true);
-      
       toast.success('Login successful');
     } catch (error: any) {
       console.error('Login error:', error);
@@ -306,31 +238,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     try {
       setIsLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       
-      // Call logout endpoint (for server-side cleanup if needed)
-      if (token) {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-      }
-      
-      // Clear local storage and state
-      localStorage.removeItem('auth_token');
-      setToken(null);
-      setUser(null);
       setIsAuthenticated(false);
-      
       toast.success('Logged out successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Logout error:', error);
-      // Even if the server request fails, clear local state
-      localStorage.removeItem('auth_token');
-      setToken(null);
-      setUser(null);
-      setIsAuthenticated(false);
+      toast.error(error.message || 'Logout failed');
     } finally {
       setIsLoading(false);
     }
@@ -338,13 +253,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Function to get the current token (for API calls)
   const getToken = async (): Promise<string | null> => {
-    // If token exists and user is authenticated, return it
-    if (token && isAuthenticated) {
-      return token;
-    }
-    
-    // If no token or not authenticated, return null
-    return null;
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token ?? null;
   };
 
   const value = {

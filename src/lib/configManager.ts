@@ -69,12 +69,12 @@ export async function updateConfig(newConfig: Partial<AppConfig>): Promise<void>
     localStorage.setItem('app-config', JSON.stringify(currentConfig));
     
     try {
-      // Get the current user
-      const { data: { user } } = await supabase.auth.getUser();
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (user) {
+      if (session?.user) {
         const preferences = {
-          user_id: user.id,
+          user_id: session.user.id,
           llm_provider: safeConfig.llm_provider || null,
           enable_ai: safeConfig.enable_ai ?? true,
           assistant_name: safeConfig.assistant_name || null,
@@ -89,24 +89,26 @@ export async function updateConfig(newConfig: Partial<AppConfig>): Promise<void>
           updated_at: new Date().toISOString()
         };
 
-        // Check if preferences exist
-        const { data: existingPrefs } = await supabase
-          .from('user_preferences')
-          .select('user_id')
-          .eq('user_id', user.id)
-          .single();
+        try {
+          // Try to upsert preferences
+          const { error } = await supabase
+            .from('user_preferences')
+            .upsert([preferences], {
+              onConflict: 'user_id'
+            });
 
-        if (existingPrefs) {
-          // Update existing preferences
-          await supabase
-            .from('user_preferences')
-            .update(preferences)
-            .eq('user_id', user.id);
-        } else {
-          // Insert new preferences
-          await supabase
-            .from('user_preferences')
-            .insert([preferences]);
+          if (error) {
+            if (error.code === '42P01') { // relation does not exist
+              console.error('user_preferences table does not exist:', error);
+              toast.error('Database setup required. Please run the migrations.');
+            } else {
+              console.error('Database operation failed:', error);
+              toast.error('Failed to save preferences to database');
+            }
+          }
+        } catch (dbError: any) {
+          console.error('Database operation failed:', dbError);
+          toast.error('Failed to save preferences to database');
         }
       }
     } catch (error) {
@@ -157,16 +159,24 @@ export async function initConfig(): Promise<void> {
 
     try {
       // Then try to load from Supabase if user is logged in
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (user) {
-        const { data: preferences } = await supabase
+      if (session?.user) {
+        const { data: preferences, error } = await supabase
           .from('user_preferences')
-          .select()
-          .eq('user_id', user.id)
-          .single();
+          .select('*')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
 
-        if (preferences) {
+        if (error) {
+          if (error.code === '42P01') { // relation does not exist
+            console.error('user_preferences table does not exist:', error);
+            toast.error('Database setup required. Please run the migrations.');
+          } else {
+            console.error('Error loading preferences:', error);
+            toast.error('Failed to load preferences from database');
+          }
+        } else if (preferences) {
           // Update both memory and localStorage with Supabase data
           const { user_id, updated_at, ...configData } = preferences;
           currentConfig = { ...currentConfig, ...configData };
@@ -176,6 +186,7 @@ export async function initConfig(): Promise<void> {
       }
     } catch (error) {
       console.error('Error loading preferences from Supabase:', error);
+      toast.error('Failed to connect to database');
       // Continue with local storage even if Supabase fails
     }
   } catch (error) {
