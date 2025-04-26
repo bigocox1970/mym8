@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/sonner";
 import { Sparkles, ArrowRight, ArrowLeft, Bot, Heart, Check, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { updateConfig } from "@/lib/configManager";
 
 const ISSUES = [
   { id: "depression", label: "Depression" },
@@ -261,24 +262,17 @@ const SetupWizard = () => {
 
       // Try to save AI assistant preferences
       try {
-        // Use the manage_user_llm_config function instead of direct table access
-        const { data, error } = await supabase.rpc('manage_user_llm_config', {
-          p_function_name: 'openrouter',
-          p_assistant_name: assistantName,
-          p_personality_type: personality,
-          p_pre_prompt: fullPrompt,
-          p_voice_gender: voiceGender
+        // Use our config manager instead of supabase directly
+        await updateConfig({
+          assistant_name: assistantName,
+          personality_type: personality,
+          voice_gender: voiceGender
         });
-
-        if (error) {
-          console.error("Error calling manage_user_llm_config:", error);
-          throw error;
-        }
         
-        console.log("AI preferences saved successfully:", data);
-      } catch (llmError) {
-        // Log but don't throw error for llm_configs issues
-        console.error("Error handling llm_configs (continuing with setup):", llmError);
+        console.log("AI preferences saved successfully");
+      } catch (configError) {
+        // Log but don't throw error for config issues
+        console.error("Error saving config (continuing with setup):", configError);
         // We'll still continue with the wizard completion
       }
 

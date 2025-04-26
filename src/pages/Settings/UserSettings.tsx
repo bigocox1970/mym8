@@ -7,6 +7,7 @@ import { ProfileSettings } from "./components/ProfileSettings";
 import { PasswordSettings } from "./components/PasswordSettings";
 import { AppearanceSettings } from "./components/AppearanceSettings";
 import AISettings from "./components/AISettings";
+import ConfigEditor from "./components/ConfigEditor";
 import { toast } from "@/components/ui/sonner";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,8 @@ const UserSettings = () => {
         />
         
         <AISettings />
+        
+        <ConfigEditor />
         
         <Card>
           <CardHeader>

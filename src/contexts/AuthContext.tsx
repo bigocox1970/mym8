@@ -1,12 +1,10 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { Session, User } from "@supabase/supabase-js";
 import { toast } from "@/components/ui/sonner";
 
-// Helper function to get the base URL
-const getBaseUrl = () => {
-  return `${window.location.protocol}//${window.location.host}`;
-};
+// Base URL for the API
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 type ProfileType = {
   id: string;
@@ -19,7 +17,7 @@ type ProfileType = {
   assistant_toughness?: string | null;
 };
 
-type AuthContextType = {
+interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
@@ -34,15 +32,23 @@ type AuthContextType = {
   }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-};
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  getToken: () => Promise<string | null>;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileType | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [token, setToken] = useState<string | null>(null);
 
   const fetchProfile = async (userId: string): Promise<ProfileType | null> => {
     try {
@@ -74,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Redirect new users to wizard
         if (window.location.pathname !== '/wizard') {
           setTimeout(() => {
-            window.location.href = `${getBaseUrl()}/wizard`;
+            window.location.href = `${API_BASE_URL}/wizard`;
           }, 500);
         }
         
@@ -84,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Check if we should redirect to wizard for existing users who haven't completed it
       if (data && data.wizard_completed === false && window.location.pathname !== '/wizard') {
         setTimeout(() => {
-          window.location.href = `${getBaseUrl()}/wizard`;
+          window.location.href = `${API_BASE_URL}/wizard`;
         }, 500);
       }
       
@@ -206,6 +212,141 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  // Initialize auth state from localStorage
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        setIsLoading(true);
+        const storedToken = localStorage.getItem('auth_token');
+        
+        if (storedToken) {
+          // Verify token with the server
+          try {
+            const response = await fetch(`${API_BASE_URL}/auth/verify`, {
+              headers: {
+                'Authorization': `Bearer ${storedToken}`
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              setUser(data.user);
+              setIsAuthenticated(true);
+              setToken(storedToken);
+              
+              // Check for token refresh in response headers
+              const newToken = response.headers.get('X-New-Token');
+              if (newToken) {
+                localStorage.setItem('auth_token', newToken);
+                setToken(newToken);
+              }
+            } else {
+              // Token is invalid or expired
+              localStorage.removeItem('auth_token');
+              setUser(null);
+              setIsAuthenticated(false);
+              setToken(null);
+            }
+          } catch (error) {
+            console.error('Error verifying token:', error);
+            // If server is unreachable, keep the token but set auth state to false
+            setUser(null);
+            setIsAuthenticated(false);
+          }
+        } else {
+          // No token found
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+  }, []);
+
+  // Login function
+  const login = async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Login failed');
+      }
+      
+      const data = await response.json();
+      
+      // Save token and user info
+      localStorage.setItem('auth_token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+      setIsAuthenticated(true);
+      
+      toast.success('Login successful');
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(error.message || 'Login failed');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Logout function
+  const logout = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Call logout endpoint (for server-side cleanup if needed)
+      if (token) {
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+      }
+      
+      // Clear local storage and state
+      localStorage.removeItem('auth_token');
+      setToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
+      
+      toast.success('Logged out successfully');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if the server request fails, clear local state
+      localStorage.removeItem('auth_token');
+      setToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to get the current token (for API calls)
+  const getToken = async (): Promise<string | null> => {
+    // If token exists and user is authenticated, return it
+    if (token && isAuthenticated) {
+      return token;
+    }
+    
+    // If no token or not authenticated, return null
+    return null;
+  };
+
   const value = {
     session,
     user,
@@ -215,10 +356,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signOut,
     refreshProfile,
+    isAuthenticated,
+    isLoading,
+    login,
+    logout,
+    getToken
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -227,3 +373,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export default AuthContext;

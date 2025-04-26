@@ -1,27 +1,81 @@
-# MyM8 - Personal Goal Tracking and AI Assistant
+# MyM8 - Goal Tracking App
 
-A modern goal tracking application with AI assistant capabilities, designed to help you achieve your goals.
+A modern goal tracking application with AI assistant capabilities that helps you manage goals, actions, and track your progress.
 
 ## Features
 
-- **Goal Management:** Create and track your personal goals
-- **Task Management:** Add actions to your goals with frequency settings (daily, weekly, monthly)
-- **AI Assistant:** Chat with an AI assistant that can help manage your goals and tasks
-- **Voice Integration:** Text-to-speech with browser voices or premium ElevenLabs voices
-- **Activity Logs:** Track your completed actions and see your progress
-- **Customizable:** Configure the AI assistant's personality, voice, and more
+- **Goal Tracking and Management**: Create, update, and manage your personal and professional goals
+- **AI-powered Assistant**: Intelligent assistant that can create goals, add actions, and mark tasks as complete
+- **Voice Interaction**: Speak to your AI assistant with speech recognition
+- **Action Planning**: Break down goals into manageable actions with different frequencies
+- **Journal Entries**: Track your thoughts and reflections
+- **Activity Logging**: Monitor your progress over time
 
-## Getting Started
+## Deployment with Netlify
 
-1. Clone the repository
-2. Install dependencies with `npm install`
-3. Set up your environment variables in `.env`:
+This app is designed for seamless deployment with Netlify, including serverless functions for the backend API that handle AI integration and database operations.
+
+### Deployment Instructions
+
+1. **Clone or Push to Your Repository**
    ```
-   VITE_SUPABASE_URL=your_supabase_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   VITE_OPENROUTER_API_KEY=your_openrouter_api_key
+   git push https://github.com/bigocox1970/mym8-app.git main
    ```
-4. Run the development server with `npm run dev`
+
+2. **Connect to Netlify**
+   - Sign in to [Netlify](https://app.netlify.com/)
+   - Click "Add new site" → "Import an existing project"
+   - Connect to GitHub and select your repository
+   - Use these build settings:
+     - Build command: `npm run build`
+     - Publish directory: `dist`
+
+3. **Set up Environment Variables**
+   - After initial setup, go to Site settings > Build & deploy > Environment
+   - Copy ALL variables from the `netlify-env-vars.txt` file in this repository
+   - These variables are crucial for the app to function properly, especially:
+     - Supabase connection details
+     - Supabase service role key (required for AI assistant functionality)
+     - OpenAI API key
+     - OpenRouter API key
+   
+4. **Deploy**
+   - Netlify will automatically build and deploy your site
+   - Any future pushes to your main branch will trigger automatic deployments
+
+### Local Development
+
+1. Install dependencies:
+   ```
+   npm install
+   ```
+
+2. Create a `.env` file with:
+   ```
+   VITE_API_BASE_URL=/.netlify/functions/api
+   ```
+
+3. Install Netlify CLI:
+   ```
+   npm install -g netlify-cli
+   ```
+
+4. Run the local development server:
+   ```
+   netlify dev
+   ```
+
+This will run both your frontend and serverless functions locally for testing.
+
+## Technologies Used
+
+- React with TypeScript
+- Vite
+- Supabase for authentication and database
+- Shadcn UI components
+- OpenRouter for AI capabilities
+- Various text-to-speech services (ElevenLabs, OpenAI, Google, Azure)
+- Netlify for hosting and serverless functions
 
 ## Configuration System
 

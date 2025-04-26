@@ -3,9 +3,35 @@
   # Adjust these as needed based on your build setup
   publish = "dist"
   command = "npm run build"
+  functions = "netlify/functions"
 
-# This redirect is crucial for SPA routing
+[dev]
+  targetPort = 8082
+  port = 9000
+  framework = "#custom"
+  command = "npm run dev:local"
+  
+# This redirect ensures API requests go to the functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+# Force SPA routing to work correctly
 [[redirects]]
   from = "/*"
   to = "/index.html"
-  status = 200 
+  status = 200
+  
+# Environment variables for functions
+[build.environment]
+  NODE_ENV = "production"
+
+# Development environment overrides
+[context.dev.environment]
+  NODE_ENV = "development"
+
+# Map prefixed variables to non-prefixed versions for functions
+[functions]
+  # This allows environment variables prefixed with VITE_ to be available to functions without the prefix
+  node_bundler = "esbuild"

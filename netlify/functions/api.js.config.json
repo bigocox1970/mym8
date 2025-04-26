@@ -1,0 +1,4 @@
+{
+  "nodeModulesPaths": ["node_modules"],
+  "includeDependencies": true
+} 

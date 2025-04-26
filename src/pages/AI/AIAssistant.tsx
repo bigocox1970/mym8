@@ -38,6 +38,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { v4 as uuidv4 } from 'uuid';
+import { getConfig } from "@/lib/configManager";
+import { processMessage } from "@/lib/api";
 
 // Add SpeechRecognition type definitions
 interface SpeechRecognitionEvent extends Event {
@@ -51,6 +53,8 @@ interface SpeechRecognitionError extends Event {
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
+  lang: string;
+  maxAlternatives?: number;
   start(): void;
   stop(): void;
   onresult: (event: SpeechRecognitionEvent) => void;
@@ -67,6 +71,7 @@ declare global {
     webkitSpeechRecognition?: {
       new (): SpeechRecognition;
     };
+    speechSynthesisHasInteracted?: boolean;
   }
 }
 
@@ -129,7 +134,7 @@ const AIAssistant = () => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [showNewConversationDialog, setShowNewConversationDialog] = useState(false);
@@ -259,19 +264,12 @@ const AIAssistant = () => {
 
       // If no messages, add a welcome message
       if (data.length === 0) {
-        // Use the get_user_llm_config function instead of direct table access
-        const { data: configData, error: configError } = await supabase.rpc('get_user_llm_config');
-
-        if (configError) {
-          console.error('Error fetching assistant config:', configError);
-        }
+        // Use our config manager instead of database call
+        const config = getConfig();
         
-        // Parse the JSON response and set defaults if needed
-        const config = configData as LLMConfig || {};
-        
-        // Default values if no config found
-        const assistantName = config?.assistant_name || 'M8';
-        const personalityType = config?.personality_type || 'direct';
+        // Get values from config
+        const assistantName = config.assistant_name || 'M8';
+        const personalityType = config.personality_type || 'friendly';
         
         // Create personalized welcome message based on personality
         let welcomeMessage = '';
@@ -282,6 +280,9 @@ const AIAssistant = () => {
             break;
           case 'gentle':
             welcomeMessage = `Hello! I'm ${assistantName}, your friendly assistant. I'm here to support you with whatever you need. How are you feeling today?`;
+            break;
+          case 'friendly':
+            welcomeMessage = `Hi there! It's ${assistantName} here. I'm ready to chat and help you with your goals. How are you doing today?`;
             break;
           case 'sarcastic':
             welcomeMessage = `Hey, I'm ${assistantName}. What brilliance can I assist you with today? I'm all digital ears.`;
@@ -362,19 +363,12 @@ const AIAssistant = () => {
       // Update local state
       setCurrentConversationId(data.id);
       
-      // Use the get_user_llm_config function instead of direct table access
-      const { data: configData, error: configError } = await supabase.rpc('get_user_llm_config');
-
-      if (configError) {
-        console.error('Error fetching assistant config:', configError);
-      }
+      // Use our config manager instead of database call
+      const config = getConfig();
       
-      // Parse the JSON response and set defaults if needed
-      const config = configData as LLMConfig || {};
-      
-      // Default values if no config found
-      const assistantName = config?.assistant_name || 'M8';
-      const personalityType = config?.personality_type || 'direct';
+      // Get values from config
+      const assistantName = config.assistant_name || 'M8';
+      const personalityType = config.personality_type || 'friendly';
       
       // Create personalized welcome message based on personality
       let welcomeMessage = '';
@@ -385,6 +379,9 @@ const AIAssistant = () => {
           break;
         case 'gentle':
           welcomeMessage = `Hello! I'm ${assistantName}, your friendly assistant. I'm here to support you with whatever you need. How are you feeling today?`;
+          break;
+        case 'friendly':
+          welcomeMessage = `Hi there! It's ${assistantName} here. I'm ready to chat and help you with your goals. How are you doing today?`;
           break;
         case 'sarcastic':
           welcomeMessage = `Hey, I'm ${assistantName}. What brilliance can I assist you with today? I'm all digital ears.`;
@@ -500,15 +497,11 @@ const AIAssistant = () => {
       // Reset UI
       setMessages([]);
       
-      // Fetch assistant configuration
-      const { data: config } = await supabase
-        .from('llm_configs')
-        .select('*')
-        .eq('function_name', 'openrouter')
-        .single();
+      // Use our config manager instead of database call
+      const config = getConfig();
       
-      const assistantName = config?.assistant_name || "M8";
-      const personalityType = config?.personality_type || "gentle";
+      const assistantName = config.assistant_name || "M8";
+      const personalityType = config.personality_type || "friendly";
       
       // Create personalized welcome message
       let welcomeContent = `I've cleared our conversation. I'm ${assistantName}, `;
@@ -520,6 +513,9 @@ const AIAssistant = () => {
           break;
         case "gentle":
           welcomeContent += "how else can I support you today?";
+          break;
+        case "friendly":
+          welcomeContent += "ready to chat about something new?";
           break;
         case "sarcastic":
           welcomeContent += "ready for a fresh start or just hiding the evidence?";
@@ -643,302 +639,204 @@ const AIAssistant = () => {
 
   // Text-to-speech functionality
   const speakText = async (text: string) => {
-    if (!voiceEnabled) return;
+    // Skip if no text or voice is disabled
+    if (!text || !isVoiceEnabled) return;
     
-    // Stop any ongoing speech
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
+    // Check if speech synthesis is supported
+    if (!window.speechSynthesis) {
+      console.error('Speech synthesis not supported in this browser');
+      toast.error("Speech synthesis is not supported in your browser");
+      return;
     }
     
-    setIsSpeaking(true);
+    // iOS requires user interaction before audio can play
+    // Create a "dummy" utterance to unlock audio on iOS
+    const unlockAudio = () => {
+      try {
+        console.log("Attempting to unlock audio on mobile...");
+        const shortUtterance = new SpeechSynthesisUtterance(".");
+        shortUtterance.volume = 0; // Silent
+        window.speechSynthesis.speak(shortUtterance);
+        window.speechSynthesis.cancel(); // Immediately cancel it
+        console.log("Audio unlock attempt completed");
+      } catch (e) {
+        console.error("Error unlocking audio:", e);
+      }
+    };
+    
+    // Try to unlock audio on mobile
+    unlockAudio();
+    
+    // Mobile browsers require user interaction before audio can play
+    // This ensures we have a flag to track user interaction
+    if (!window.speechSynthesisHasInteracted) {
+      console.log("First user interaction, initializing speech synthesis");
+      window.speechSynthesisHasInteracted = true;
+    }
+    
+    // If already speaking, stop current speech first
+    if (isSpeaking) {
+      stopSpeaking();
+      // Add a small delay to ensure previous speech is cancelled
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
     
     try {
-      // Get user's voice preference from settings
-      const { data: configData, error: configError } = await supabase.rpc('get_user_llm_config');
-      if (configError) {
-        console.error('Error fetching voice settings:', configError);
+      setIsSpeaking(true);
+      
+      // Detect if running on iOS (which has more restrictions)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as unknown as { MSStream: boolean }).MSStream;
+      if (isIOS) {
+        console.log("iOS device detected, using special handling");
       }
       
-      const config = configData as LLMConfig || {};
-      const voiceService = config?.voice_service || 'browser';
+      // Get the voice configuration from settings
+      const config = getConfig();
+      const voiceService = config.voice_service || 'browser';
       
+      // Log the selected voice service
+      console.log("Using voice service:", voiceService);
+
+      // For services requiring a backend, use browser TTS for now
+      if (voiceService !== 'browser') {
+        console.log(`${voiceService} TTS service requires a backend implementation. Using browser TTS instead.`);
+      }
+
       // Use browser's built-in speech synthesis
-      if (voiceService === 'browser') {
-        const utterance = new SpeechSynthesisUtterance(text);
-        const voiceType = config?.voice_gender || 'female';
-        
-        // Get available voices and select based on preference
-        const voices = window.speechSynthesis.getVoices();
-        let preferredVoice;
-        
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Set voice based on preference
+      const voiceType = config.voice_gender || 'female';
+      
+      // Get all available voices
+      const availableVoices = window.speechSynthesis.getVoices();
+      console.log(`Available voices: ${availableVoices.length}`);
+      
+      // If no voices available yet, wait a moment and try again (mobile browsers often load voices asynchronously)
+      if (availableVoices.length === 0) {
+        console.log("No voices available yet, waiting...");
+        // Wait a bit and try again
+        setTimeout(() => {
+          console.log("Retrying speech after delay");
+          const updatedVoices = window.speechSynthesis.getVoices();
+          console.log(`Voices loaded after delay: ${updatedVoices.length}`);
+          
+          // Force reload voices on some mobile browsers
+          if (updatedVoices.length === 0) {
+            window.speechSynthesis.onvoiceschanged = () => {
+              console.log("Voices changed event triggered");
+              // Try one more time with the new voices
+              speakText(text);
+            };
+            return;
+          }
+          
+          if (updatedVoices.length > 0) {
+            // Try speaking again with the loaded voices
+            speakText(text);
+          } else {
+            // If still no voices, try with default voice
+            const fallbackUtterance = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(fallbackUtterance);
+          }
+        }, 1000);
+        return;
+      }
+      
+      // Find an appropriate voice - prioritize mobile native voices for better performance
+      let voice;
+      
+      // For iOS, prioritize Samantha (female) or Alex (male) voices
+      if (isIOS) {
         if (voiceType === 'male') {
-          preferredVoice = voices.find(voice => 
-            voice.lang === 'en-US' && !voice.name.includes('Female')
-          );
-        } else if (voiceType === 'female') {
-          preferredVoice = voices.find(voice => 
-            voice.lang === 'en-US' && voice.name.includes('Female')
-          );
+          voice = availableVoices.find(v => v.name.includes('Alex')) || 
+                 availableVoices.find(v => v.name.includes('Male') || v.name.includes('male'));
         } else {
-          // Neutral or default
-          preferredVoice = voices.find(voice => 
-            voice.lang === 'en-US'
-          );
+          voice = availableVoices.find(v => v.name.includes('Samantha')) || 
+                 availableVoices.find(v => v.name.includes('Female') || v.name.includes('female'));
         }
-        
-        if (preferredVoice) {
-          utterance.voice = preferredVoice;
+      } else {
+        // For other devices
+        if (voiceType === 'male') {
+          voice = availableVoices.find(v => v.name.includes('Male') || v.name.includes('male'));
+        } else {
+          voice = availableVoices.find(v => v.name.includes('Female') || v.name.includes('female'));
         }
-        
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        
-        utterance.onend = () => {
-          setIsSpeaking(false);
-        };
-        
-        window.speechSynthesis.speak(utterance);
-        return;
       }
       
-      // Use ElevenLabs if configured
-      if (voiceService === 'elevenlabs' && config?.elevenlabs_api_key) {
-        const apiKey = config.elevenlabs_api_key;
-        const voiceId = getElevenLabsVoiceId(config.elevenlabs_voice || 'rachel');
-        
-        // Call ElevenLabs API
-        const response = await fetch(
-          `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'xi-api-key': apiKey,
-            },
-            body: JSON.stringify({
-              text: text,
-              model_id: 'eleven_monolingual_v1',
-              voice_settings: {
-                stability: 0.5,
-                similarity_boost: 0.75,
-              },
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to convert text to speech using ElevenLabs');
-        }
-
-        // Get audio data from response
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBlob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        
-        // Play the audio
-        const audio = new Audio(audioUrl);
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          setIsSpeaking(false);
-        };
-        
-        audio.play();
-        return;
+      // Set the voice if found
+      if (voice) {
+        console.log(`Selected voice: ${voice.name}`);
+        utterance.voice = voice;
+      } else {
+        console.log('No matching voice found, using default voice');
       }
-
-      // Use Google Cloud TTS if configured
-      if (voiceService === 'google' && config?.google_api_key) {
-        const apiKey = config.google_api_key;
-        const voiceName = config.google_voice || 'en-US-Neural2-F';
-        
-        // Call Google Cloud TTS API
-        const response = await fetch(
-          `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              input: { text },
-              voice: { 
-                languageCode: voiceName.substring(0, 5), 
-                name: voiceName 
-              },
-              audioConfig: { audioEncoding: 'MP3' },
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to convert text to speech using Google Cloud');
+      
+      // Configure the utterance
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      
+      // Special handling for iOS
+      if (isIOS) {
+        // iOS has issues with longer texts
+        // Split text into smaller chunks if needed (adjust based on testing)
+        if (text.length > 200) {
+          const chunks = text.match(/.{1,200}(?:\s|$)/g) || [];
+          console.log(`Text too long for iOS, split into ${chunks.length} chunks`);
+          
+          // Speak first chunk and queue the rest
+          let currentChunk = 0;
+          
+          const speakNextChunk = () => {
+            if (currentChunk < chunks.length) {
+              const chunkUtterance = new SpeechSynthesisUtterance(chunks[currentChunk]);
+              if (voice) chunkUtterance.voice = voice;
+              
+              chunkUtterance.onend = () => {
+                currentChunk++;
+                speakNextChunk();
+              };
+              
+              chunkUtterance.onerror = (error) => {
+                console.error(`Chunk ${currentChunk} speech error:`, error);
+                currentChunk++;
+                speakNextChunk();
+              };
+              
+              window.speechSynthesis.speak(chunkUtterance);
+            } else {
+              setIsSpeaking(false);
+            }
+          };
+          
+          speakNextChunk();
+          return;
         }
-
-        // Get audio data from response
-        const jsonResponse = await response.json();
-        const audioContent = jsonResponse.audioContent; // Base64 encoded audio
-        const binaryAudio = atob(audioContent);
-        
-        // Convert base64 to array buffer
-        const bytes = new Uint8Array(binaryAudio.length);
-        for (let i = 0; i < binaryAudio.length; i++) {
-          bytes[i] = binaryAudio.charCodeAt(i);
-        }
-        
-        const audioBlob = new Blob([bytes.buffer], { type: 'audio/mp3' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        
-        // Play the audio
-        const audio = new Audio(audioUrl);
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          setIsSpeaking(false);
-        };
-        
-        audio.play();
-        return;
       }
-
-      // Use Azure TTS if configured
-      if (voiceService === 'azure' && config?.azure_api_key) {
-        const apiKey = config.azure_api_key;
-        const voiceName = config.azure_voice || 'en-US-JennyNeural';
-        const region = 'eastus'; // Default to East US region - could be made configurable
-        
-        // Call Azure Speech API
-        const response = await fetch(
-          `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,
-          {
-            method: 'POST',
-            headers: {
-              'Ocp-Apim-Subscription-Key': apiKey,
-              'Content-Type': 'application/ssml+xml',
-              'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
-            },
-            body: `<speak version='1.0' xml:lang='en-US'><voice xml:lang='en-US' name='${voiceName}'>${text}</voice></speak>`,
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to convert text to speech using Azure');
-        }
-
-        // Get audio data from response
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBlob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        
-        // Play the audio
-        const audio = new Audio(audioUrl);
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          setIsSpeaking(false);
-        };
-        
-        audio.play();
-        return;
-      }
-
-      // Use Amazon Polly if configured
-      if (voiceService === 'amazon' && config?.amazon_api_key) {
-        const apiKey = config.amazon_api_key;
-        const voiceName = config.amazon_voice || 'Joanna';
-        
-        // In a production app, you would use AWS SDK or AWS Amplify
-        // This is a simplified example using a serverless function as proxy
-        // You would need to set up a serverless function that calls Amazon Polly
-        const response = await fetch(
-          '/api/tts/amazon-polly', // Your serverless function endpoint
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              text,
-              voice: voiceName,
-              accessKey: apiKey,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to convert text to speech using Amazon Polly');
-        }
-
-        // Get audio data from response
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBlob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        
-        // Play the audio
-        const audio = new Audio(audioUrl);
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          setIsSpeaking(false);
-        };
-        
-        audio.play();
-        return;
-      }
-
-      // Use OpenAI TTS if configured
-      if (voiceService === 'openai' && config?.openai_api_key) {
-        const apiKey = config.openai_api_key;
-        const voiceName = config.openai_voice || 'nova';
-        
-        // Call OpenAI TTS API
-        const response = await fetch(
-          'https://api.openai.com/v1/audio/speech',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-              model: 'tts-1',
-              input: text,
-              voice: voiceName,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to convert text to speech using OpenAI');
-        }
-
-        // Get audio data from response
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBlob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        
-        // Play the audio
-        const audio = new Audio(audioUrl);
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          setIsSpeaking(false);
-        };
-        
-        audio.play();
-        return;
-      }
-
-      // Fallback to browser TTS if no service matched or service config was incomplete
-      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // When speech ends
       utterance.onend = () => {
+        console.log('Speech synthesis completed successfully');
         setIsSpeaking(false);
       };
-      window.speechSynthesis.speak(utterance);
       
+      // When error occurs
+      utterance.onerror = (error) => {
+        console.error('Speech synthesis error:', error);
+        // Don't show toast for interrupted or canceled errors as these are normal
+        if (error.error !== 'interrupted' && error.error !== 'canceled') {
+          toast.error("Speech synthesis failed.");
+        }
+        setIsSpeaking(false);
+      };
+      
+      // Start speaking
+      window.speechSynthesis.speak(utterance);
     } catch (error) {
-      console.error('Error with text-to-speech:', error);
-      // Fallback to browser TTS if any service fails
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.onend = () => {
-        setIsSpeaking(false);
-      };
-      window.speechSynthesis.speak(utterance);
+      console.error('Speech error:', error);
+      setIsSpeaking(false);
+      toast.error("Failed to generate speech.");
     }
   };
   
@@ -972,7 +870,7 @@ const AIAssistant = () => {
   
   // Toggle voice response mode
   const toggleVoiceMode = () => {
-    setVoiceEnabled(prev => !prev);
+    setIsVoiceEnabled(prev => !prev);
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
@@ -1001,78 +899,146 @@ const AIAssistant = () => {
   
   // Speak new assistant messages if voice is enabled
   useEffect(() => {
-    if (voiceEnabled && messages.length > 0) {
+    if (isVoiceEnabled && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.role === 'assistant') {
         speakText(lastMessage.content);
       }
     }
-  }, [messages, voiceEnabled]);
+  }, [messages, isVoiceEnabled]);
 
-  // Speech recognition setup
-  useEffect(() => {
-    let recognition: SpeechRecognition | null = null;
-    
-    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      
-      recognition.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0])
-          .map(result => result.transcript)
-          .join('');
-          
-        setInput(transcript);
-      };
-      
-      recognition.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-        setIsListening(false);
-        toast.error("Speech recognition failed. Try again or type your message.");
-      };
+  // Start speech recognition
+  const startListening = () => {
+    // Check for browser support
+    if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
+      toast.error("Speech recognition is not supported in your browser.");
+      setIsListening(false);
+      return;
     }
     
-    return () => {
-      if (recognition) {
-        recognition.stop();
+    try {
+      // Detect iOS
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && 
+        !(window as unknown as { MSStream: boolean }).MSStream;
+      
+      // On iOS, we need to request permission explicitly first
+      if (isIOS) {
+        console.log("iOS device detected for speech recognition");
+        // iOS requires user interaction to grant microphone permission
+        toast.message("Please allow microphone access when prompted");
       }
-    };
-  }, []);
-
-  // Add these functions before toggleListening
-  const startListening = () => {
-    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      recognition.start();
-      setIsListening(true);
       
+      // Configure recognition - different settings for mobile
+      recognition.continuous = false; // Set to false for better mobile compatibility
+      recognition.interimResults = true;
+      recognition.lang = 'en-US'; // Set language explicitly
+      
+      // For mobile devices, we may need shorter timeouts
+      if (isIOS || /Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        // Mobile device - can time out more quickly
+        console.log("Mobile device detected, using mobile-optimized speech recognition");
+        recognition.maxAlternatives = 1; // Limit alternatives for speed
+      }
+      
+      // Handle results
       recognition.onresult = (event) => {
+        // Get the most confident result
         const transcript = Array.from(event.results)
           .map(result => result[0])
           .map(result => result.transcript)
           .join('');
           
+        console.log("Speech recognized:", transcript);
         setInput(transcript);
+        
+        // On mobile, we often want to submit immediately after speaking
+        if (isIOS && event.results[0].isFinal) {
+          console.log("iOS final result detected, auto-stopping recognition");
+          recognition.stop();
+        }
       };
       
+      // Handle end of recognition
       recognition.onend = () => {
+        console.log("Speech recognition ended");
         setIsListening(false);
       };
-    } else {
-      toast.error("Speech recognition is not supported in your browser.");
+      
+      // Handle errors with better mobile-specific messaging
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        
+        // Provide more specific error messages based on error type and device
+        if (event.error === 'not-allowed') {
+          if (isIOS) {
+            toast.error("Microphone access denied. Please enable microphone in your iOS Settings app.");
+          } else {
+            toast.error("Microphone access denied. Please enable microphone permissions in your browser settings.");
+          }
+        } else if (event.error === 'network') {
+          toast.error("Network error occurred. Check your internet connection.");
+        } else if (event.error === 'no-speech') {
+          toast.message("No speech detected. Please try again.", {
+            description: "Speak clearly and ensure your microphone is working."
+          });
+        } else if (event.error === 'aborted') {
+          // This is usually intentional, so no toast needed
+          console.log("Speech recognition aborted");
+        } else {
+          toast.error("Speech recognition failed. Try typing your message instead.");
+        }
+      };
+      
+      // On some mobile browsers, especially iOS, we need a user gesture to start recognition
+      // This function ensures we've had user interaction before trying to use the microphone
+      const ensureUserInteraction = () => {
+        // Try to unlock audio context if needed (helps with microphone access on some devices)
+        if (typeof AudioContext !== 'undefined' || typeof (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext !== 'undefined') {
+          const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+          if (AudioContextClass) {
+            const audioContext = new AudioContextClass();
+            if (audioContext.state === 'suspended') {
+              audioContext.resume().then(() => {
+                console.log('AudioContext resumed successfully');
+              });
+            }
+          }
+        }
+        
+        // Now start recognition
+        recognition.start();
+        setIsListening(true);
+        console.log("Speech recognition started");
+      };
+      
+      // Start recognition with user interaction handling
+      ensureUserInteraction();
+      
+    } catch (error) {
+      console.error("Error starting speech recognition:", error);
+      toast.error("Failed to start speech recognition. Please try again.");
+      setIsListening(false);
     }
   };
 
   const stopListening = () => {
-    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.stop();
-      setIsListening(false);
+    if (isListening) {
+      try {
+        if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+          // Create a new instance to stop
+          const recognition = new SpeechRecognition();
+          recognition.stop();
+          setIsListening(false);
+          console.log("Speech recognition stopped");
+        }
+      } catch (error) {
+        console.error("Error stopping speech recognition:", error);
+      }
     }
   };
 
@@ -1104,7 +1070,7 @@ const AIAssistant = () => {
     await saveMessage(userMessage, currentConversationId);
     
     try {
-      // Process the message with OpenRouter API
+      // Process the message with mock function
       const response = await processUserMessage(input, goals || [], actions || []);
       
       // Add AI response
@@ -1119,6 +1085,11 @@ const AIAssistant = () => {
       
       // Save AI message to database
       await saveMessage(aiMessage, currentConversationId);
+      
+      // Speak the response if voice is enabled
+      if (isVoiceEnabled) {
+        speakText(response.message);
+      }
       
       // If the AI performed an action, display a toast and potentially navigate
       if (response.action) {
@@ -1156,7 +1127,7 @@ const AIAssistant = () => {
     }
   };
 
-  // Function to process user messages and interact with OpenRouter API
+  // Function to process user messages
   const processUserMessage = async (
     message: string, 
     userGoals: Goal[], 
@@ -1164,378 +1135,30 @@ const AIAssistant = () => {
   ) => {
     if (!message || !userGoals || !userActions || isProcessing) return;
 
-    // Add user message to the conversation immediately for UX
-    const userMessageObj: Message = {
-      id: uuidv4(),
-      conversation_id: currentConversationId || "",
-      content: message,
-      role: 'user',
-      created_at: new Date().toISOString(),
-      timestamp: new Date().toISOString(),
-    };
-
     setIsProcessing(true);
-    setIsSpeaking(true);
 
     try {
-      // Get AI assistant configuration
-      const assistantConfig = await getAssistantConfig();
-      
-      // Format actions for the AI
-      const formattedActions = userActions.map(action => ({
-        id: action.id,
-        title: action.title,
-        completed: action.completed,
-        frequency: action.frequency,
-        goalId: action.goal_id
-      }));
-      
-      // Format goals for the AI
-      const formattedGoals = userGoals.map(goal => ({
-        id: goal.id,
-        text: goal.goal_text,
-        description: goal.description
-      }));
-      
-      // Prepare user info message
-      const userGoalsContext = `Here are the user's current goals:\n${formattedGoals.map((goal, index) => 
-        `${index + 1}. ${goal.text} (ID: ${goal.id})${goal.description ? ` - ${goal.description}` : ''}`
-      ).join('\n')}`;
-      
-      const userActionsContext = `Here are the user's current actions:\n${formattedActions.map((action, index) => 
-        `${index + 1}. ${action.title} (ID: ${action.id}, Frequency: ${action.frequency}, Completed: ${action.completed ? 'Yes' : 'No'})`
-      ).join('\n')}`;
-      
-      // Combine contexts with instructions for the AI
-      const contextMessage = `${userGoalsContext}\n\n${userActionsContext}\n\n
-IMPORTANT: When using functions like complete_action, add_action, or create_goal, always use the FULL UUID format for IDs.
-Example of correct usage: complete_action with actionId: "7bc1fdb5-fce8-49aa-8e9b-a63b2bc6a9fb"
-Example of INCORRECT usage: complete_action with actionId: "2"
-      
-When displaying goals or actions to the user, present them in a clean, numbered list format without IDs or technical details. Don't use markdown formatting like bold (**) in your responses.`;
-      
-      // Prepare the API request
-      const endpoint = "https://openrouter.ai/api/v1/chat/completions";
-      
-      // Get the AI key from env
-      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-      
-      if (!apiKey) {
-        throw new Error("OpenRouter API key is missing");
-      }
-      
-      // Get model from config or use fallback
-      const { data: configData, error: configError } = await supabase.rpc('get_user_llm_config');
-      const config = configData as LLMConfig | null;
-      const modelToUse = config?.llm_provider || "gpt-4o";
-      
-      // AI request body
-      const requestBody = {
-        model: modelToUse,
-        messages: [
-          {
-            role: "system",
-            content: assistantConfig.prePrompt
-          },
-          {
-            role: "system",
-            content: contextMessage
-          },
-          ...messages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          })),
-          {
-            role: "user",
-            content: message
-          }
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "create_goal",
-              description: "Create a new goal for the user",
-              parameters: {
-                type: "object",
-                properties: {
-                  goalText: {
-                    type: "string",
-                    description: "The text describing the goal"
-                  },
-                  description: {
-                    type: "string",
-                    description: "Additional details about the goal"
-                  }
-                },
-                required: ["goalText"]
-              }
-            }
-          },
-          {
-            type: "function",
-            function: {
-              name: "add_action",
-              description: "Add a new action item to an existing goal",
-              parameters: {
-                type: "object",
-                properties: {
-                  goalId: {
-                    type: "string",
-                    description: "The ID of the goal to add the action to"
-                  },
-                  title: {
-                    type: "string",
-                    description: "The title of the action"
-                  },
-                  description: {
-                    type: "string",
-                    description: "Additional details about the action"
-                  },
-                  frequency: {
-                    type: "string",
-                    enum: ["morning", "afternoon", "evening", "daily", "weekly", "monthly"],
-                    description: "How often the action should be performed"
-                  }
-                },
-                required: ["goalId", "title", "frequency"]
-              }
-            }
-          },
-          {
-            type: "function",
-            function: {
-              name: "complete_action",
-              description: "Mark an action as completed",
-              parameters: {
-                type: "object",
-                properties: {
-                  actionId: {
-                    type: "string",
-                    description: "The ID of the action to mark as completed"
-                  }
-                },
-                required: ["actionId"]
-              }
-            }
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
-        stream: false,
-        tool_choice: "auto"
-      };
-
-      // Send the API request
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.origin,
-        },
-        body: JSON.stringify(requestBody),
+      // Use the API service to process messages through the backend
+      const response = await processMessage(message, {
+        goals: userGoals,
+        actions: userActions,
+        conversation: messages.slice(-10) // Send the last 10 messages for context
       });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
-
-      const result = await response.json();
       
-      // Check for tool calls in the response
-      if (result.choices[0].message.tool_calls && result.choices[0].message.tool_calls.length > 0) {
-        const toolCall = result.choices[0].message.tool_calls[0];
-        
-        // Process function calls
-        if (toolCall.type === 'function') {
-          const functionName = toolCall.function.name;
-          const functionArgs = JSON.parse(toolCall.function.arguments);
-          
-          console.log("AI function call:", functionName, functionArgs);
-          
-          // Handle different function calls
-          if (functionName === 'create_goal') {
-            await handleCreateGoal(functionArgs.goalText, functionArgs.description);
-            return {
-              message: `I've created a new goal: "${functionArgs.goalText}"`,
-              action: "New goal created successfully!",
-              refresh: true,
-              navigate: "/goals"
-            };
-          } 
-          else if (functionName === 'add_action') {
-            // Ensure goalId is a valid UUID
-            if (!functionArgs.goalId || !functionArgs.goalId.includes('-')) {
-              return {
-                message: "I couldn't add that action because I need a valid goal ID. Please try again with a specific goal.",
-                action: "Failed to add action: Invalid goal ID format",
-                refresh: false
-              };
-            }
-            await handleAddAction(
-              functionArgs.goalId,
-              functionArgs.title,
-              functionArgs.description,
-              functionArgs.frequency || "daily"
-            );
-            return {
-              message: `I've added a new action: "${functionArgs.title}" to your goal`,
-              action: "New action added successfully!",
-              refresh: true
-            };
-          }
-          else if (functionName === 'complete_action') {
-            // Ensure actionId is a valid UUID
-            if (!functionArgs.actionId || !functionArgs.actionId.includes('-')) {
-              return {
-                message: "I couldn't mark that action as completed because I need a valid action ID. Please try again by specifying the exact action.",
-                action: "Failed to complete action: Invalid action ID format",
-                refresh: false
-              };
-            }
-            await handleCompleteAction(functionArgs.actionId);
-            return {
-              message: "I've marked that action as completed. Great job!",
-              action: "Action marked as completed!",
-              refresh: true
-            };
-          }
-        }
-      }
-      
-      // If no tool calls, get regular content
-      const aiResponse = result.choices[0].message.content || "I'm not sure how to respond to that.";
-      
-      // Check if the response contains a JSON action command (legacy format)
-      try {
-        if (aiResponse.includes('{"action":')) {
-          const actionMatch = aiResponse.match(/\{.*?\}/s);
-          if (actionMatch) {
-            const actionCommand = JSON.parse(actionMatch[0]);
-            
-            // Process the different action types
-            if (actionCommand.action === "create_goal" && actionCommand.data) {
-              await handleCreateGoal(actionCommand.data.goal_text, actionCommand.data.description);
-              return {
-                message: `I've created a new goal: "${actionCommand.data.goal_text}"`,
-                action: "New goal created successfully!",
-                refresh: true,
-                navigate: "/goals"
-              };
-            } 
-            else if (actionCommand.action === "add_action" && actionCommand.data) {
-              await handleAddAction(
-                actionCommand.data.goal_id,
-                actionCommand.data.title,
-                actionCommand.data.description,
-                actionCommand.data.frequency || "daily"
-              );
-              return {
-                message: `I've added a new action: "${actionCommand.data.title}" to your goal`,
-                action: "New action added successfully!",
-                refresh: true
-              };
-            }
-            else if (actionCommand.action === "complete_action" && actionCommand.data) {
-              await handleCompleteAction(actionCommand.data.action_id);
-              return {
-                message: "I've marked that action as completed. Great job!",
-                action: "Action marked as completed!",
-                refresh: true
-              };
-            }
-          }
-        }
-        
-        // If no action command, return the plain response
-        return { message: aiResponse };
-      } catch (error) {
-        console.error("Error parsing AI action:", error);
-        return { message: aiResponse };
-      }
+      return response;
     } catch (error) {
-      console.error("Error in processUserMessage:", error);
-      return { 
-        message: "I'm having trouble connecting to my AI capabilities right now. Please try again later."
+      console.error("Error processing message:", error);
+      
+      // Return a fallback error message
+      return {
+        message: "I'm sorry, I encountered an error processing your request. Please try again.",
+        action: null,
+        navigate: null,
+        refresh: false
       };
     } finally {
       setIsProcessing(false);
-      setIsSpeaking(false);
     }
-  };
-
-  // Handle creating a new goal
-  const handleCreateGoal = async (goalText: string, description: string | null) => {
-    if (!user) throw new Error("User must be logged in to create a goal");
-    
-    const { data, error } = await supabase
-      .from("goals")
-      .insert([{ 
-        goal_text: goalText, 
-        description: description || null,
-        user_id: user.id 
-      }])
-      .select();
-      
-    if (error) throw error;
-    return data;
-  };
-
-  // Handle adding a new action to a goal
-  const handleAddAction = async (
-    goalId: string,
-    title: string,
-    description: string | null,
-    frequency: string
-  ) => {
-    if (!user) throw new Error("User must be logged in to add an action");
-    
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert([{ 
-        title: title,
-        description: description || null,
-        goal_id: goalId,
-        completed: false,
-        frequency: frequency,
-        user_id: user.id
-      }])
-      .select();
-      
-    if (error) throw error;
-    return data;
-  };
-
-  // Handle marking an action as complete
-  const handleCompleteAction = async (actionId: string) => {
-    if (!user) throw new Error("User must be logged in to complete an action");
-    
-    const currentTime = new Date().toISOString();
-    
-    // Update the task
-    const { error } = await supabase
-      .from("tasks")
-      .update({ 
-        completed: true,
-        skipped: false,
-        updated_at: currentTime
-      })
-      .eq("id", actionId);
-      
-    if (error) throw error;
-    
-    // Log the activity
-    const { error: logError } = await supabase
-      .from('activity_logs')
-      .insert({
-        user_id: user.id,
-        task_id: actionId,
-        completed: true,
-        timestamp: currentTime
-      });
-      
-    if (logError) throw logError;
   };
 
   // Get current conversation title
@@ -1576,68 +1199,106 @@ When displaying goals or actions to the user, present them in a clean, numbered 
       prePrompt: 'You are a helpful AI assistant for a goal-tracking application called "My M8". Your job is to help users manage their goals and actions, provide encouragement, and answer questions.'
     };
     
-    if (!user) return defaultConfig;
-    
     try {
-      // Use the get_user_llm_config RPC function
-      const { data: configData, error: configError } = await supabase.rpc('get_user_llm_config');
+      // Use the config manager instead of supabase
+      const config = getConfig();
       
-      if (configError) {
-        // Fallback to using profile data
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('nickname, assistant_toughness')
-          .eq('id', user.id)
-          .single();
-          
-        if (profileError) {
-          return defaultConfig;
-        }
-        
-        // Create a basic pre-prompt using profile data
-        const name = profileData.nickname || defaultConfig.name;
-        const personality = profileData.assistant_toughness || 'balanced';
-        
-        let personalityPrompt = '';
-        switch (personality) {
-          case 'gentle':
-            personalityPrompt = 'Be gentle, supportive, and understanding. Use encouraging language.';
-            break;
-          case 'balanced':
-            personalityPrompt = 'Balance support with accountability. Gently remind the user of their commitments.';
-            break;
-          case 'firm':
-            personalityPrompt = 'Hold the user accountable. Remind them of their goals and commitments firmly.';
-            break;
-          case 'tough':
-            personalityPrompt = 'Be tough on excuses. Call out procrastination and push the user towards their goals firmly.';
-            break;
-          default:
-            personalityPrompt = 'Be supportive and helpful.';
-        }
-        
-        const prePrompt = `You are a helpful AI assistant for a goal-tracking application. Your name is ${name}. ${personalityPrompt}`;
-        
-        return {
-          name,
-          personality,
-          prePrompt
-        };
+      // Generate the personality prompt based on personality type
+      let personalityPrompt = '';
+      const personality = config.personality_type || defaultConfig.personality;
+      
+      switch (personality) {
+        case 'gentle':
+          personalityPrompt = 'Be gentle, supportive, and understanding. Use encouraging language.';
+          break;
+        case 'friendly':
+          personalityPrompt = 'Be friendly, warm and casual. Use conversational language and light humor.';
+          break;
+        case 'balanced':
+          personalityPrompt = 'Balance support with accountability. Gently remind the user of their commitments.';
+          break;
+        case 'firm':
+          personalityPrompt = 'Hold the user accountable. Remind them of their goals and commitments firmly.';
+          break;
+        case 'sarcastic':
+          personalityPrompt = 'Be sarcastic and witty. Use humor to motivate the user, but be careful not to be too harsh.';
+          break;
+        case 'tough':
+          personalityPrompt = 'Be tough on excuses. Call out procrastination and push the user towards their goals firmly.';
+          break;
+        default:
+          personalityPrompt = 'Be supportive and helpful.';
       }
       
-      // Parse the RPC response and use it
-      const config = configData as LLMConfig || {};
+      // Create the pre-prompt
+      const name = config.assistant_name || defaultConfig.name;
+      const prePrompt = `You are a helpful AI assistant for a goal-tracking application. Your name is ${name}. ${personalityPrompt}`;
       
       return {
-        name: config.assistant_name || defaultConfig.name,
-        personality: config.personality_type || defaultConfig.personality,
-        prePrompt: config.pre_prompt || defaultConfig.prePrompt
+        name: name,
+        personality: personality,
+        prePrompt: prePrompt
       };
     } catch (error) {
       console.error('Error getting assistant config:', error);
       return defaultConfig;
     }
   };
+
+  // Function to load available voices for speech synthesis
+  const loadVoices = () => {
+    try {
+      const availableVoices = window.speechSynthesis.getVoices();
+      console.log(`Voices loaded: ${availableVoices.length}`);
+      return availableVoices;
+    } catch (error) {
+      console.error("Error loading voices:", error);
+      return [];
+    }
+  };
+
+  // Load voice settings from config
+  useEffect(() => {
+    try {
+      const config = getConfig();
+      // Enable voice if the user had previously enabled it
+      if (config.voice_enabled !== undefined) {
+        setIsVoiceEnabled(config.voice_enabled);
+      } else if (config.voice_service && config.voice_service !== 'none') {
+        // Fallback to checking if a voice service is selected
+        setIsVoiceEnabled(true);
+      }
+      
+      // Pre-load voices for browser speech synthesis
+      loadVoices();
+      
+      // Some browsers need an event handler to load voices
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
+    } catch (error) {
+      console.error('Error loading voice settings:', error);
+    }
+  }, []);
+
+  // Initialize speech recognition when component loads
+  useEffect(() => {
+    // Check if speech recognition is supported
+    const isSpeechRecognitionSupported = 
+      'SpeechRecognition' in window || 
+      'webkitSpeechRecognition' in window;
+    
+    if (!isSpeechRecognitionSupported) {
+      console.log("Speech recognition is not supported in this browser");
+    }
+    
+    // Clean up any active speech recognition on unmount
+    return () => {
+      if (isListening) {
+        stopListening();
+      }
+    };
+  }, []);
 
   return (
     <Layout>
@@ -2019,10 +1680,10 @@ When displaying goals or actions to the user, present them in a clean, numbered 
                     variant="outline"
                     size="icon"
                     onClick={toggleVoiceMode}
-                    title={voiceEnabled ? "Disable voice responses" : "Enable voice responses"}
-                    className={`${voiceEnabled ? 'bg-primary/10' : ''}`}
+                    title={isVoiceEnabled ? "Disable voice responses" : "Enable voice responses"}
+                    className={`${isVoiceEnabled ? 'bg-primary/10' : ''}`}
                   >
-                    {voiceEnabled ? (
+                    {isVoiceEnabled ? (
                       <Volume2 className="h-4 w-4" />
                     ) : (
                       <VolumeX className="h-4 w-4" />

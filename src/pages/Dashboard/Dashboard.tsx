@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { BarChart, ListTodo, Plus, CheckCircle2, Bot } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
+import { getConfig } from "@/lib/configManager";
 
 interface Goal {
   id: string;
@@ -134,38 +135,10 @@ const Dashboard = () => {
     };
 
     const fetchAssistantName = async () => {
-      if (!user) return;
-      
       try {
-        // Use the get_user_llm_config function instead of direct table access
-        const { data, error } = await supabase.rpc('get_user_llm_config');
-
-        if (error) {
-          console.error("Error fetching assistant config:", error);
-          // Fallback to profile data
-          const { data: profileData, error: profileError } = await supabase
-            .from("profiles")
-            .select("nickname")
-            .eq("id", user.id)
-            .single();
-            
-          if (profileError) {
-            console.error("Error fetching profile nickname:", profileError);
-            setAssistantName("M8"); // Default fallback
-            return;
-          }
-          
-          // Use nickname as assistant name if available, otherwise default
-          if (profileData && profileData.nickname) {
-            setAssistantName(profileData.nickname);
-          } else {
-            setAssistantName("M8"); // Default name
-          }
-          return;
-        }
+        // Use the config manager to get the assistant name
+        const config = getConfig();
         
-        // Parse the JSON data
-        const config = data as any;
         if (config && config.assistant_name) {
           setAssistantName(config.assistant_name);
         } else {
