@@ -52,15 +52,15 @@ app.use(express.raw({ type: 'application/octet-stream', limit: '10mb' }));
 app.use(cors());
 
 // Add routes
-app.use('/tts', ttsRouter);
+app.use('/.netlify/functions/api/tts', ttsRouter);
 
 // Add a simple test endpoint
-app.get('/test', (req, res) => {
+app.get('/.netlify/functions/api/test', (req, res) => {
   return res.json({ message: 'API is working!' });
 });
 
 // Add audio format conversion endpoint
-app.post('/convert-audio', async (req, res) => {
+app.post('/.netlify/functions/api/convert-audio', async (req, res) => {
   try {
     console.log('Audio conversion request received');
     
