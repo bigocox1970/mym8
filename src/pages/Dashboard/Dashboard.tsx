@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/lib/supabase";
-import { BarChart, ListTodo, Plus, CheckCircle2, Bot } from "lucide-react";
+import { BarChart, ListTodo, Plus, CheckCircle2, Bot, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Link } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import { getConfig } from "@/lib/configManager";
@@ -43,6 +44,7 @@ const Dashboard = () => {
     monthly: { total: 0, completed: 0, percentage: 0 }
   });
   const [assistantName, setAssistantName] = useState<string | null>(null);
+  const [isGoalsOpen, setIsGoalsOpen] = useState(false);
 
   useEffect(() => {
     const fetchGoals = async () => {
@@ -166,6 +168,41 @@ const Dashboard = () => {
         </div>
 
         <div className="space-y-6">
+          {/* AI Assistant Section */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="h-5 w-5" />
+                  AI Assistant
+                </CardTitle>
+                <CardDescription>Your personal goal coach</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                Chat with {assistantName || "your AI assistant"} to help manage goals, track actions, or get motivation.
+              </p>
+              <div className="space-y-2">
+                <p className="text-sm">Try asking:</p>
+                <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                  <li>What actions do I need to complete today?</li>
+                  <li>Create a new goal for me to exercise more</li>
+                  <li>Add a weekly action to my sleep better goal</li>
+                  <li>Give me some motivation to stay on track</li>
+                </ul>
+              </div>
+              <div className="flex justify-end mt-4">
+                <Link to="/assistant">
+                  <Button className="flex items-center gap-2">
+                    <Bot className="h-4 w-4" />
+                    Talk to Assistant
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Progress Section */}
           <Card>
             <CardHeader>
@@ -228,95 +265,67 @@ const Dashboard = () => {
 
           {/* Goals Section */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <ListTodo className="h-5 w-5" />
-                  Your Goals
-                </CardTitle>
-                <CardDescription>Recent goals you've set</CardDescription>
-              </div>
-              <Link to="/goals/new">
-                <Button size="sm">
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Goal
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <p>Loading your goals...</p>
-              ) : goals.length > 0 ? (
-                <ul className="space-y-2">
-                  {goals.map((goal) => (
-                    <li key={goal.id} className="p-3 border rounded-md hover:bg-muted/50 transition-colors">
-                      <Link to={`/goals/${goal.id}`} className="block">
-                        <p className="font-medium">{goal.goal_text}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Created: {new Date(goal.created_at).toLocaleDateString()}
-                        </p>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-center py-6">
-                  <p className="text-muted-foreground mb-4">You haven't set any goals yet</p>
-                  <Link to="/goals/new">
-                    <Button size="sm" variant="outline">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Your First Goal
-                    </Button>
-                  </Link>
+            <Collapsible open={isGoalsOpen} onOpenChange={setIsGoalsOpen}>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CollapsibleTrigger className="flex items-center gap-2 hover:opacity-80">
+                    <CardTitle className="flex items-center gap-2">
+                      <ListTodo className="h-5 w-5" />
+                      Your Goals
+                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isGoalsOpen ? 'rotate-180' : ''}`} />
+                    </CardTitle>
+                  </CollapsibleTrigger>
+                  <CardDescription>Recent goals you've set</CardDescription>
                 </div>
-              )}
-              
-              {goals.length > 0 && (
-                <div className="flex justify-end mt-4">
-                  <Link to="/goals">
-                    <Button variant="outline" size="sm" className="text-xs">
-                      <ListTodo className="mr-1 h-3 w-3" />
-                      View All Goals
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* AI Assistant Section */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Bot className="h-5 w-5" />
-                  AI Assistant
-                </CardTitle>
-                <CardDescription>Your personal goal coach</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">
-                Chat with {assistantName || "your AI assistant"} to help manage goals, track actions, or get motivation.
-              </p>
-              <div className="space-y-2">
-                <p className="text-sm">Try asking:</p>
-                <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                  <li>What actions do I need to complete today?</li>
-                  <li>Create a new goal for me to exercise more</li>
-                  <li>Add a weekly action to my sleep better goal</li>
-                  <li>Give me some motivation to stay on track</li>
-                </ul>
-              </div>
-              <div className="flex justify-end mt-4">
-                <Link to="/assistant">
-                  <Button className="flex items-center gap-2">
-                    <Bot className="h-4 w-4" />
-                    Talk to Assistant
+                <Link to="/goals/new">
+                  <Button size="sm">
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Goal
                   </Button>
                 </Link>
-              </div>
-            </CardContent>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent>
+                  {loading ? (
+                    <p>Loading your goals...</p>
+                  ) : goals.length > 0 ? (
+                    <ul className="space-y-2">
+                      {goals.map((goal) => (
+                        <li key={goal.id} className="p-3 border rounded-md hover:bg-muted/50 transition-colors">
+                          <Link to={`/goals/${goal.id}`} className="block">
+                            <p className="font-medium">{goal.goal_text}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Created: {new Date(goal.created_at).toLocaleDateString()}
+                            </p>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-center py-6">
+                      <p className="text-muted-foreground mb-4">You haven't set any goals yet</p>
+                      <Link to="/goals/new">
+                        <Button size="sm" variant="outline">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Your First Goal
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                  
+                  {goals.length > 0 && (
+                    <div className="flex justify-end mt-4">
+                      <Link to="/goals">
+                        <Button variant="outline" size="sm" className="text-xs">
+                          <ListTodo className="mr-1 h-3 w-3" />
+                          View All Goals
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
           </Card>
         </div>
       </div>

@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
-import { Sparkles, ArrowRight, ArrowLeft, Bot, Heart, Check, X } from "lucide-react";
+import { Sparkles, ArrowRight, ArrowLeft, Bot, Heart, Check, X, Loader } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { updateConfig } from "@/lib/configManager";
 
@@ -64,6 +64,15 @@ const VOICE_OPTIONS = [
   { value: "neutral", label: "Gender-neutral" },
 ];
 
+// Define an interface for a Goal
+interface Goal {
+  id: string;
+  user_id: string;
+  goal_text: string;
+  description: string | null;
+  created_at?: string;
+}
+
 const SetupWizard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -83,6 +92,9 @@ const SetupWizard = () => {
   const [completed, setCompleted] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [redirecting, setRedirecting] = useState(false);
+  const [keepExistingData, setKeepExistingData] = useState(false);
+  const [loadingExistingData, setLoadingExistingData] = useState(false);
+  const [existingGoals, setExistingGoals] = useState<Goal[]>([]);
 
   useEffect(() => {
     // Check if user has already completed the wizard
@@ -93,13 +105,55 @@ const SetupWizard = () => {
       if (forceRun) return;
 
       try {
+        // Fetch the user's profile data including their selected issues and preferences
         const { data, error } = await supabase
           .from("profiles")
-          .select("wizard_completed")
+          .select("wizard_completed, selected_issues, other_issue, nickname, assistant_toughness")
           .eq("id", user.id)
           .single();
 
         if (error) throw error;
+
+        // Check localStorage for the keep_existing_data preference
+        const keepDataPref = localStorage.getItem('wizard_keep_existing_data');
+        if (keepDataPref === 'true') {
+          setKeepExistingData(true);
+          
+          // Load existing selections if available
+          if (data) {
+            // Load selected issues
+            if (data.selected_issues && Array.isArray(data.selected_issues)) {
+              setSelectedIssues(data.selected_issues);
+            }
+            
+            // Load other issue text
+            if (data.other_issue) {
+              setOtherIssue(data.other_issue);
+              // Make sure 'other' is selected if there's text
+              if (!selectedIssues.includes('other')) {
+                setSelectedIssues(prev => [...prev, 'other']);
+              }
+            }
+            
+            // Load nickname
+            if (data.nickname) {
+              setUserNickname(data.nickname);
+            }
+            
+            // Load toughness preference
+            if (data.assistant_toughness) {
+              setToughness(data.assistant_toughness);
+            }
+          }
+          
+          // Load AI assistant preferences
+          loadAssistantPreferences();
+          
+          // Also load existing goals
+          loadExistingGoals();
+        } else {
+          setKeepExistingData(false);
+        }
 
         if (data && data.wizard_completed) {
           // User has already completed the wizard
@@ -112,6 +166,131 @@ const SetupWizard = () => {
 
     checkWizardStatus();
   }, [user, navigate, forceRun]);
+  
+  // Load existing goals when keepExistingData is set to true
+  useEffect(() => {
+    if (keepExistingData && user) {
+      loadExistingGoals();
+    }
+  }, [keepExistingData, user]);
+  
+  // Function to load the user's existing goals
+  const loadExistingGoals = async () => {
+    if (!user) return;
+    
+    try {
+      setLoadingExistingData(true);
+      
+      // Check if goals table exists first
+      const { error: goalsExistError } = await supabase
+        .from("goals")
+        .select("count")
+        .limit(1);
+        
+      // If table doesn't exist, just return without error
+      if (goalsExistError) {
+        console.log("Goals table doesn't exist yet, skipping load");
+        return;
+      }
+      
+      // Fetch user's existing goals
+      const { data: goals, error } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', user.id);
+        
+      if (error) throw error;
+      
+      if (goals && goals.length > 0) {
+        setExistingGoals(goals as Goal[]);
+        
+        // Map existing goals to predefined goals for selection
+        const mappedGoals = mapGoalsToSelections(goals as Goal[]);
+        setSelectedGoals(mappedGoals.selectedGoals);
+        
+        // If there's a custom goal that doesn't match predefined goals
+        if (mappedGoals.customGoal) {
+          setSelectedGoals(prev => [...prev, 'other']);
+          setOtherGoal(mappedGoals.customGoal);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading existing goals (continuing with defaults):", error);
+    } finally {
+      setLoadingExistingData(false);
+    }
+  };
+  
+  // Function to load assistant preferences
+  const loadAssistantPreferences = async () => {
+    if (!user) return;
+    
+    try {
+      // Use the configManager to get settings instead of direct DB access
+      const currentConfig = await supabase
+        .from('user_settings')
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('key', 'config')
+        .single();
+        
+      if (currentConfig?.data?.value) {
+        const config = currentConfig.data.value;
+        
+        // Set assistant name if available
+        if (config.assistant_name) {
+          setAssistantName(config.assistant_name);
+        }
+        
+        // Set personality type if available
+        if (config.personality_type) {
+          setPersonality(config.personality_type);
+        }
+        
+        // Set voice gender if available
+        if (config.voice_gender) {
+          setVoiceGender(config.voice_gender);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading assistant preferences (continuing with defaults):", error);
+      // Don't throw the error, just continue with defaults
+    }
+  };
+
+  // Map existing goals to the predefined goals list
+  const mapGoalsToSelections = (goals: Goal[]) => {
+    const result = {
+      selectedGoals: [] as string[],
+      customGoal: ''
+    };
+    
+    // Create a map of lowercase goal text to goal IDs for easier matching
+    const goalMap = GOALS.reduce((acc, goal) => {
+      acc[goal.label.toLowerCase()] = goal.id;
+      return acc;
+    }, {} as Record<string, string>);
+    
+    // Check each user goal against our predefined goals
+    goals.forEach(goal => {
+      const goalTextLower = goal.goal_text.toLowerCase();
+      
+      // If the goal matches one of our predefined goals, select it
+      if (goalMap[goalTextLower]) {
+        if (!result.selectedGoals.includes(goalMap[goalTextLower])) {
+          result.selectedGoals.push(goalMap[goalTextLower]);
+        }
+      } else {
+        // If it's a custom goal, save it
+        // We just take the first custom goal we find
+        if (!result.customGoal) {
+          result.customGoal = goal.goal_text;
+        }
+      }
+    });
+    
+    return result;
+  };
 
   const handleIssueToggle = (issueId: string) => {
     setSelectedIssues(prev => 
@@ -193,34 +372,39 @@ const SetupWizard = () => {
     setIsSubmitting(true);
 
     try {
-      // Create a list of initial goals based on selections
-      const initialGoalsList = selectedGoals
-        .filter(id => id !== "other")
-        .map(id => {
-          const goal = GOALS.find(g => g.id === id);
-          return {
+      // Only create goals if user didn't choose to keep existing data
+      if (!keepExistingData) {
+        // Create a list of initial goals based on selections
+        const initialGoalsList = selectedGoals
+          .filter(id => id !== "other")
+          .map(id => {
+            const goal = GOALS.find(g => g.id === id);
+            return {
+              user_id: user.id,
+              goal_text: goal ? goal.label : "",
+              description: `This goal was created as part of your initial setup.`
+            };
+          });
+
+        // Add other goal if specified
+        if (selectedGoals.includes("other") && otherGoal.trim()) {
+          initialGoalsList.push({
             user_id: user.id,
-            goal_text: goal ? goal.label : "",
-            description: `This goal was created as part of your initial setup.`
-          };
-        });
+            goal_text: otherGoal.trim(),
+            description: "This goal was created as part of your initial setup."
+          });
+        }
 
-      // Add other goal if specified
-      if (selectedGoals.includes("other") && otherGoal.trim()) {
-        initialGoalsList.push({
-          user_id: user.id,
-          goal_text: otherGoal.trim(),
-          description: "This goal was created as part of your initial setup."
-        });
-      }
+        // Insert goals
+        if (initialGoalsList.length > 0) {
+          const { error: goalsError } = await supabase
+            .from("goals")
+            .insert(initialGoalsList);
 
-      // Insert goals
-      if (initialGoalsList.length > 0) {
-        const { error: goalsError } = await supabase
-          .from("goals")
-          .insert(initialGoalsList);
-
-        if (goalsError) throw goalsError;
+          if (goalsError) throw goalsError;
+        }
+      } else {
+        console.log("Keeping existing goals and actions as requested");
       }
 
       // Create pre-prompt based on personality, toughness, and using proper names
@@ -289,6 +473,9 @@ const SetupWizard = () => {
         .eq("id", user.id);
 
       if (profileError) throw profileError;
+
+      // Clear the localStorage flag as it's no longer needed
+      localStorage.removeItem('wizard_keep_existing_data');
 
       // Mark wizard as completed
       setCompleted(true);
@@ -373,35 +560,46 @@ const SetupWizard = () => {
             <CardHeader>
               <CardTitle className="text-2xl font-bold">Pick your initial goals</CardTitle>
               <CardDescription>
-                Select at least three goals to get started with
+                {keepExistingData 
+                  ? "Review your current goals or add new ones"
+                  : "Select at least three goals to get started with"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {GOALS.map((goal) => (
-                  <div key={goal.id} className="flex items-center space-x-2">
-                    <Checkbox 
-                      id={`goal-${goal.id}`} 
-                      checked={selectedGoals.includes(goal.id)}
-                      onCheckedChange={() => handleGoalToggle(goal.id)}
-                    />
-                    <Label htmlFor={`goal-${goal.id}`} className="cursor-pointer">
-                      {goal.label}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-              {selectedGoals.includes("other") && (
-                <div className="mt-4">
-                  <Label htmlFor="other-goal">Please specify:</Label>
-                  <Input
-                    id="other-goal"
-                    value={otherGoal}
-                    onChange={(e) => setOtherGoal(e.target.value)}
-                    placeholder="Describe your custom goal"
-                    className="mt-1"
-                  />
+              {loadingExistingData ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader className="h-8 w-8 animate-spin text-primary mr-2" />
+                  <span>Loading your existing goals...</span>
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {GOALS.map((goal) => (
+                      <div key={goal.id} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`goal-${goal.id}`} 
+                          checked={selectedGoals.includes(goal.id)}
+                          onCheckedChange={() => handleGoalToggle(goal.id)}
+                        />
+                        <Label htmlFor={`goal-${goal.id}`} className="cursor-pointer">
+                          {goal.label}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedGoals.includes("other") && (
+                    <div className="mt-4">
+                      <Label htmlFor="other-goal">Please specify:</Label>
+                      <Input
+                        id="other-goal"
+                        value={otherGoal}
+                        onChange={(e) => setOtherGoal(e.target.value)}
+                        placeholder="Describe your custom goal"
+                        className="mt-1"
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </>

@@ -3,32 +3,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Bot, CheckCircle } from "lucide-react";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-
-// Import from configuration files
-import { AI_MODELS, DEFAULT_AI_MODEL } from "@/config/ai";
-import { 
-  VOICE_SERVICES, 
-  VOICE_TYPES, 
-  ELEVENLABS_VOICES, 
-  GOOGLE_VOICES,
-  AZURE_VOICES,
-  AMAZON_VOICES,
-  OPENAI_VOICES,
-  DEFAULT_VOICE_SETTINGS 
-} from "@/config/voice";
-import { PERSONALITY_PROMPTS, generateFullPrompt } from "@/config/prompts";
+import { Loader2, Bot } from "lucide-react";
 import { getConfig, updateConfig, initConfig } from "@/lib/configManager";
 
-// Define personality types from our prompts configuration
-const PERSONALITY_TYPES = Object.keys(PERSONALITY_PROMPTS).map(key => ({
-  value: key,
-  label: key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')
-}));
+// Import sub-components
+import { SubscriptionInfo } from "./AISettings/SubscriptionInfo";
+import { GeneralAISettings } from "./AISettings/GeneralAISettings";
+import { VoiceSettings } from "./AISettings/VoiceSettings";
+import { VoiceTester } from "./AISettings/VoiceTester";
+
+// Import types and defaults
+import { AI_MODELS, DEFAULT_AI_MODEL } from "@/config/ai";
+import { 
+  DEFAULT_VOICE_SETTINGS 
+} from "@/config/voice";
 
 const AISettings = () => {
   const { user } = useAuth();
@@ -165,158 +153,6 @@ const AISettings = () => {
     }
   };
 
-  // Function to render the appropriate voice options based on selected service
-  const renderVoiceServiceOptions = () => {
-    switch (voiceService) {
-      case "browser":
-        return (
-          <div className="space-y-2 mb-4">
-            <Label htmlFor="voice-select" className="text-base font-medium">
-              Browser Voice Type
-            </Label>
-            <Select value={voiceType} onValueChange={setVoiceType}>
-              <SelectTrigger id="voice-select" className="w-full">
-                <SelectValue placeholder="Select voice type" />
-              </SelectTrigger>
-              <SelectContent>
-                {VOICE_TYPES.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              Choose the voice type for your assistant's speech
-            </p>
-          </div>
-        );
-
-      case "elevenlabs":
-        return (
-          <div className="space-y-2 mb-4">
-            <Label htmlFor="elevenlabs-voice-select" className="text-base font-medium">
-              ElevenLabs Voice
-            </Label>
-            <Select value={elevenlabsVoice} onValueChange={setElevenlabsVoice}>
-              <SelectTrigger id="elevenlabs-voice-select" className="w-full">
-                <SelectValue placeholder="Select ElevenLabs voice" />
-              </SelectTrigger>
-              <SelectContent>
-                {ELEVENLABS_VOICES.map((voice) => (
-                  <SelectItem key={voice.value} value={voice.value}>
-                    {voice.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              Choose which ElevenLabs voice to use
-            </p>
-          </div>
-        );
-
-      case "google":
-        return (
-          <div className="space-y-2 mb-4">
-            <Label htmlFor="google-voice-select" className="text-base font-medium">
-              Google Cloud Voice
-            </Label>
-            <Select value={googleVoice} onValueChange={setGoogleVoice}>
-              <SelectTrigger id="google-voice-select" className="w-full">
-                <SelectValue placeholder="Select Google voice" />
-              </SelectTrigger>
-              <SelectContent>
-                {GOOGLE_VOICES.map((voice) => (
-                  <SelectItem key={voice.value} value={voice.value}>
-                    {voice.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              Choose which Google Cloud TTS voice to use
-            </p>
-          </div>
-        );
-
-      case "azure":
-        return (
-          <div className="space-y-2 mb-4">
-            <Label htmlFor="azure-voice-select" className="text-base font-medium">
-              Azure Voice
-            </Label>
-            <Select value={azureVoice} onValueChange={setAzureVoice}>
-              <SelectTrigger id="azure-voice-select" className="w-full">
-                <SelectValue placeholder="Select Azure voice" />
-              </SelectTrigger>
-              <SelectContent>
-                {AZURE_VOICES.map((voice) => (
-                  <SelectItem key={voice.value} value={voice.value}>
-                    {voice.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              Choose which Azure TTS voice to use
-            </p>
-          </div>
-        );
-
-      case "amazon":
-        return (
-          <div className="space-y-2 mb-4">
-            <Label htmlFor="amazon-voice-select" className="text-base font-medium">
-              Amazon Polly Voice
-            </Label>
-            <Select value={amazonVoice} onValueChange={setAmazonVoice}>
-              <SelectTrigger id="amazon-voice-select" className="w-full">
-                <SelectValue placeholder="Select Amazon voice" />
-              </SelectTrigger>
-              <SelectContent>
-                {AMAZON_VOICES.map((voice) => (
-                  <SelectItem key={voice.value} value={voice.value}>
-                    {voice.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              Choose which Amazon Polly voice to use
-            </p>
-          </div>
-        );
-
-      case "openai":
-        return (
-          <div className="space-y-2 mb-4">
-            <Label htmlFor="openai-voice-select" className="text-base font-medium">
-              OpenAI Voice
-            </Label>
-            <Select value={openaiVoice} onValueChange={setOpenaiVoice}>
-              <SelectTrigger id="openai-voice-select" className="w-full">
-                <SelectValue placeholder="Select OpenAI voice" />
-              </SelectTrigger>
-              <SelectContent>
-                {OPENAI_VOICES.map((voice) => (
-                  <SelectItem key={voice.value} value={voice.value}>
-                    {voice.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              Choose which OpenAI TTS voice to use
-            </p>
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -326,180 +162,101 @@ const AISettings = () => {
   }
 
   return (
-    <Card className="w-full shadow-md">
-      <CardHeader>
-        <CardTitle className="text-2xl flex items-center gap-2">
-          <Bot className="h-6 w-6" />
-          AI Assistant Settings
-        </CardTitle>
-        <CardDescription>
-          Configure your AI assistant's behavior and voice
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          {/* Subscription info */}
-          <div className="bg-muted/50 p-4 rounded-lg mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-medium">Current Subscription</h3>
-              <Badge variant={subscription.level === 'free' ? "outline" : "default"}>
-                {subscription.level.charAt(0).toUpperCase() + subscription.level.slice(1)}
-              </Badge>
-            </div>
-            <p className="text-sm mb-2">Available voice services:</p>
-            <div className="flex flex-wrap gap-2">
-              {availableServices.map(service => {
-                const serviceName = VOICE_SERVICES.find(s => s.value === service)?.label || service;
-                return (
-                  <Badge key={service} variant="secondary" className="flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" />
-                    {serviceName}
-                  </Badge>
-                );
-              })}
-            </div>
-          </div>
+    <>
+      <Card className="w-full shadow-md">
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <Bot className="h-6 w-6" />
+            AI Assistant Settings
+          </CardTitle>
+          <CardDescription>
+            Configure your AI assistant's behavior and voice
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {/* Subscription info */}
+            <SubscriptionInfo 
+              subscription={subscription}
+              availableServices={availableServices}
+            />
 
-          {/* Main settings */}
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="enable-ai"
-                checked={enableAI}
-                onCheckedChange={setEnableAI}
+            {/* Main settings */}
+            <div className="space-y-4">
+              {/* General AI settings */}
+              <GeneralAISettings
+                enableAI={enableAI}
+                setEnableAI={setEnableAI}
+                selectedModel={selectedModel}
+                setSelectedModel={setSelectedModel}
+                subscription={subscription}
+                assistantName={assistantName}
+                setAssistantName={setAssistantName}
+                personalityType={personalityType}
+                setPersonalityType={setPersonalityType}
               />
-              <Label htmlFor="enable-ai">Enable AI Assistant</Label>
-            </div>
-            
-            {/* Assistant Model Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="model-select" className="text-base font-medium">
-                AI Model
-              </Label>
-              <Select 
-                value={selectedModel} 
-                onValueChange={setSelectedModel}
-                disabled={!subscription.models.includes(selectedModel)}
-              >
-                <SelectTrigger id="model-select" className="w-full">
-                  <SelectValue placeholder="Select AI model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {AI_MODELS.map((model) => (
-                    <SelectItem 
-                      key={model.value} 
-                      value={model.value}
-                      disabled={!subscription.models.includes(model.value)}
-                    >
-                      {model.label}
-                      {!subscription.models.includes(model.value) && " (Upgrade required)"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                Choose which AI model to use for your assistant
-              </p>
-            </div>
-            
-            {/* Assistant Name */}
-            <div className="space-y-2">
-              <Label htmlFor="assistant-name" className="text-base font-medium">
-                Assistant Name
-              </Label>
-              <input
-                id="assistant-name"
-                type="text"
-                value={assistantName}
-                onChange={(e) => setAssistantName(e.target.value)}
-                className="w-full p-2 border rounded-md"
-                placeholder="Enter a name for your assistant"
+                
+              {/* Voice Settings */}
+              <VoiceSettings
+                voiceService={voiceService}
+                setVoiceService={setVoiceService}
+                voiceType={voiceType}
+                setVoiceType={setVoiceType}
+                elevenlabsVoice={elevenlabsVoice}
+                setElevenlabsVoice={setElevenlabsVoice}
+                googleVoice={googleVoice}
+                setGoogleVoice={setGoogleVoice}
+                azureVoice={azureVoice}
+                setAzureVoice={setAzureVoice}
+                amazonVoice={amazonVoice}
+                setAmazonVoice={setAmazonVoice}
+                openaiVoice={openaiVoice}
+                setOpenaiVoice={setOpenaiVoice}
+                availableServices={availableServices}
               />
-              <p className="text-sm text-muted-foreground">
-                Personalize your assistant by giving it a name
-              </p>
-            </div>
-            
-            {/* Personality Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="personality-select" className="text-base font-medium">
-                Personality Type
-              </Label>
-              <Select value={personalityType} onValueChange={setPersonalityType}>
-                <SelectTrigger id="personality-select" className="w-full">
-                  <SelectValue placeholder="Select personality type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PERSONALITY_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                Choose how your assistant should interact with you
-              </p>
-            </div>
               
-            {/* Voice Settings */}
-            <div className="pt-4 border-t border-border">
-              <h3 className="text-lg font-medium mb-4">Voice Settings</h3>
-              
-              {/* Voice Service Selection */}
-              <div className="space-y-2 mb-4">
-                <Label htmlFor="voice-service-select" className="text-base font-medium">
-                  Voice Service
-                </Label>
-                <Select 
-                  value={voiceService} 
-                  onValueChange={setVoiceService}
-                  disabled={!availableServices.includes(voiceService)}
-                >
-                  <SelectTrigger id="voice-service-select" className="w-full">
-                    <SelectValue placeholder="Select voice service" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {VOICE_SERVICES.map((service) => (
-                      <SelectItem 
-                        key={service.value} 
-                        value={service.value}
-                        disabled={!availableServices.includes(service.value)}
-                      >
-                        {service.label}
-                        {!availableServices.includes(service.value) && " (Upgrade required)"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  Choose which service to use for text-to-speech
+              {/* API Base URL Display */}
+              <div className="pt-4 border-t border-border">
+                <h3 className="text-base font-medium mb-2">API Information</h3>
+                <div className="bg-muted p-2 rounded text-sm font-mono overflow-x-auto">
+                  <p id="api-base-url">{import.meta.env.VITE_API_BASE_URL || '/.netlify/functions/api'}</p>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  API endpoint used for TTS and other services
                 </p>
               </div>
               
-              {/* Render voice service specific options */}
-              {renderVoiceServiceOptions()}
+              {/* Test Voice Service */}
+              <VoiceTester
+                voiceService={voiceService}
+                voiceType={voiceType}
+                elevenlabsVoice={elevenlabsVoice}
+                googleVoice={googleVoice}
+                azureVoice={azureVoice}
+                amazonVoice={amazonVoice}
+                openaiVoice={openaiVoice}
+              />
+              
+              {/* Save Button */}
+              <Button 
+                onClick={handleSave} 
+                disabled={isSaving}
+                className="w-full mt-4"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Settings"
+                )}
+              </Button>
             </div>
-            
-            {/* Save Button */}
-            <Button 
-              onClick={handleSave} 
-              disabled={isSaving} 
-              className="w-full mt-4"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Settings"
-              )}
-            </Button>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </>
   );
 };
 

@@ -18,12 +18,12 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 # YOU NEED TO REPLACE THIS WITH YOUR ACTUAL OPENAI API KEY
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 OPENROUTER_API_KEY=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
-VITE_API_BASE_URL=http://localhost:8888/.netlify/functions/api
+VITE_API_BASE_URL=https://mym8.netlify.app/.netlify/functions/api
 `;
 
 writeFileSync(join(__dirname, '.env.development'), envContent.trim(), 'utf8');
 
 console.log('\n✅ Development environment set up successfully');
 console.log('\n⚠️ IMPORTANT: Edit .env.development and add your OPENAI_API_KEY');
-console.log('\n🚀 Run "npm run local" to start the development server with Netlify functions');
-console.log('\n🔗 Then visit: http://localhost:8888\n');
+console.log('\n🚀 Run "npm run local" or "start-dev.bat" to start the development server');
+console.log('\n🔗 Then visit: http://localhost:8082\n');

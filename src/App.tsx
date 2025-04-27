@@ -25,6 +25,7 @@ import ActionsList from "./pages/Actions/ActionsList";
 import ActivityLog from "./pages/Logs/ActivityLog";
 import AIAssistant from "./pages/AI/AIAssistant";
 import SetupWizard from './pages/Wizard/SetupWizard';
+import TestDelete from "./pages/Tools/TestDelete";
 
 // Create a VerificationSuccess component
 const VerificationSuccess = () => {
@@ -128,6 +129,13 @@ const App = () => (
             
             {/* Wizard */}
             <Route path="/wizard" element={<ProtectedRoute><SetupWizard /></ProtectedRoute>} />
+            
+            {/* Tools routes */}
+            <Route path="/tools/delete" element={
+              <ProtectedRoute>
+                <TestDelete />
+              </ProtectedRoute>
+            } />
             
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />

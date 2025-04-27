@@ -80,7 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Redirect new users to wizard
         if (window.location.pathname !== '/wizard') {
           setTimeout(() => {
-            window.location.href = `${API_BASE_URL}/wizard`;
+            window.location.href = '/wizard';
           }, 500);
         }
         
@@ -90,7 +90,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Check if we should redirect to wizard for existing users who haven't completed it
       if (data && data.wizard_completed === false && window.location.pathname !== '/wizard') {
         setTimeout(() => {
-          window.location.href = `${API_BASE_URL}/wizard`;
+          window.location.href = '/wizard';
         }, 500);
       }
       

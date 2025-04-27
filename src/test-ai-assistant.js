@@ -37,7 +37,7 @@ const adminSupabase = createClient(supabaseUrl, serviceRoleKey, {
 });
 
 // API URL
-const API_URL = process.env.VITE_API_BASE_URL || 'http://localhost:8888/.netlify/functions/api';
+const API_URL = process.env.VITE_API_BASE_URL || 'http://localhost:9000/.netlify/functions/api';
 
 // Test user ID (we'll create a test user if needed)
 let testUserId;

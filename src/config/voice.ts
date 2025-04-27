@@ -71,13 +71,13 @@ export const OPENAI_VOICES = [
 
 // Default voice settings
 export const DEFAULT_VOICE_SETTINGS = {
-  voiceService: "browser",
+  voiceService: "openai",
   voiceType: "female",
   elevenlabsVoice: "rachel",
   googleVoice: "en-US-Neural2-F",
   azureVoice: "en-US-JennyNeural",
   amazonVoice: "Joanna",
-  openaiVoice: "nova",
+  openaiVoice: "alloy",
 };
 
 // ElevenLabs voice ID mapping (for API calls)
@@ -98,4 +98,4 @@ export const ELEVENLABS_VOICE_IDS = {
 export function getElevenLabsVoiceId(voiceName: string): string {
   return ELEVENLABS_VOICE_IDS[voiceName as keyof typeof ELEVENLABS_VOICE_IDS] || 
          ELEVENLABS_VOICE_IDS.rachel;
-} 
+}

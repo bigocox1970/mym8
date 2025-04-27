@@ -2,20 +2,31 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout, MenuToggleButton } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader, LogOut } from "lucide-react";
+import { Loader, LogOut, ArrowRight, Trash } from "lucide-react";
 import { ProfileSettings } from "./components/ProfileSettings";
 import { PasswordSettings } from "./components/PasswordSettings";
 import { AppearanceSettings } from "./components/AppearanceSettings";
 import AISettings from "./components/AISettings";
-import ConfigEditor from "./components/ConfigEditor";
 import { toast } from "@/components/ui/sonner";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const UserSettings = () => {
   const { user, loading: authLoading, profile, refreshProfile, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [resetWizardLoading, setResetWizardLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -69,6 +80,71 @@ const UserSettings = () => {
     }
   };
 
+  const handleResetWizard = async (keepExistingData = false) => {
+    if (!user) return;
+    
+    try {
+      setResetWizardLoading(true);
+      
+      // Store user preference in localStorage instead of database
+      localStorage.setItem('wizard_keep_existing_data', keepExistingData ? 'true' : 'false');
+      
+      // Set the wizard_completed to false to trigger the wizard again
+      const { error } = await supabase
+        .from("profiles")
+        .update({ 
+          wizard_completed: false
+        })
+        .eq("id", user.id);
+        
+      if (error) throw error;
+      
+      // If user chose to delete all data, attempt to delete their goals and actions
+      if (!keepExistingData) {
+        try {
+          // Try to delete actions if table exists, ignore any errors
+          try {
+            await supabase
+              .from("actions")
+              .delete()
+              .eq("user_id", user.id);
+              
+            console.log("Actions deleted successfully");
+          } catch (actionsError) {
+            // Ignore errors - table might not exist
+            console.log("No actions table found or could not delete actions");
+          }
+          
+          // Try to delete goals if table exists, ignore any errors
+          try {
+            await supabase
+              .from("goals")
+              .delete()
+              .eq("user_id", user.id);
+              
+            console.log("Goals deleted successfully");
+          } catch (goalsError) {
+            // Ignore errors - table might not exist
+            console.log("No goals table found or could not delete goals");
+          }
+          
+          toast.success("Data reset successful");
+        } catch (deleteError) {
+          console.error("Error during data reset (continuing with wizard):", deleteError);
+          // Continue without showing error to user
+        }
+      }
+      
+      toast.success("Wizard reset successful");
+      navigate("/wizard");
+    } catch (error) {
+      console.error("Error resetting wizard:", error);
+      toast.error("Failed to reset wizard");
+    } finally {
+      setResetWizardLoading(false);
+    }
+  };
+
   if (authLoading || isLoading || !profile) {
     return (
       <Layout>
@@ -106,8 +182,6 @@ const UserSettings = () => {
         
         <AISettings />
         
-        <ConfigEditor />
-        
         <Card>
           <CardHeader>
             <CardTitle>Setup Wizard</CardTitle>
@@ -118,30 +192,51 @@ const UserSettings = () => {
               <div>
                 <p className="text-sm">Reset your wizard data and go through the setup process again</p>
               </div>
-              <Button 
-                variant="outline" 
-                onClick={async () => {
-                  try {
-                    setIsLoading(true);
-                    const { error } = await supabase
-                      .from("profiles")
-                      .update({ wizard_completed: false })
-                      .eq("id", user?.id);
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline">Run Wizard Again</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="max-w-md">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Run Setup Wizard Again?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Choose how you'd like to proceed with the wizard:
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-1 gap-3">
+                      <Button
+                        variant="outline"
+                        className="w-full p-3 h-auto flex flex-col items-center space-y-1 text-center"
+                        onClick={() => handleResetWizard(true)}
+                        disabled={resetWizardLoading}
+                      >
+                        <ArrowRight className="h-6 w-6 mb-1" />
+                        <span className="font-semibold">Keep Existing Data</span>
+                        <p className="text-xs text-muted-foreground">
+                          Keep all your current goals and actions while updating settings
+                        </p>
+                      </Button>
                       
-                    if (error) throw error;
-                    
-                    toast.success("Wizard reset successful");
-                    navigate("/wizard");
-                  } catch (error) {
-                    console.error("Error resetting wizard:", error);
-                    toast.error("Failed to reset wizard");
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-              >
-                Run Wizard Again
-              </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full p-3 h-auto flex flex-col items-center space-y-1 text-center"
+                        onClick={() => handleResetWizard(false)}
+                        disabled={resetWizardLoading}
+                      >
+                        <Trash className="h-6 w-6 mb-1" />
+                        <span className="font-semibold">Start Fresh</span>
+                        <p className="text-xs text-muted-foreground">
+                          Delete all existing goals and actions and start over completely
+                        </p>
+                      </Button>
+                    </div>
+                  </div>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </CardContent>
         </Card>

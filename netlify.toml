@@ -20,3 +20,8 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[dev]
+  targetPort = 8083
+  port = 8888
+  command = "npm run dev:local"

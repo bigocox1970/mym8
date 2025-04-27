@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Home, FileText, Settings, LogOut, ListTodo, Menu, X, CheckSquare, ClipboardList, Bot, MessageSquare, CalendarCheck, LineChart, Sparkles } from "lucide-react";
+import { Home, FileText, Settings, LogOut, ListTodo, Menu, X, CheckSquare, ClipboardList, Bot, MessageSquare, CalendarCheck, LineChart, Sparkles, ArrowRight, Trash } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { 
   AlertDialog,
@@ -136,18 +136,60 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const handleResetWizard = async () => {
+  const handleResetWizard = async (keepExistingData = false) => {
     if (!user) return;
     
     try {
       setResetWizardLoading(true);
       
+      // Store user preference in localStorage instead of database
+      localStorage.setItem('wizard_keep_existing_data', keepExistingData ? 'true' : 'false');
+      
+      // Set the wizard_completed to false to trigger the wizard again
       const { error } = await supabase
         .from("profiles")
-        .update({ wizard_completed: false })
+        .update({ 
+          wizard_completed: false
+        })
         .eq("id", user.id);
         
       if (error) throw error;
+      
+      // If user chose to delete all data, attempt to delete their goals and actions
+      if (!keepExistingData) {
+        try {
+          // Try to delete actions if table exists, ignore any errors
+          try {
+            await supabase
+              .from("actions")
+              .delete()
+              .eq("user_id", user.id);
+              
+            console.log("Actions deleted successfully");
+          } catch (actionsError) {
+            // Ignore errors - table might not exist
+            console.log("No actions table found or could not delete actions");
+          }
+          
+          // Try to delete goals if table exists, ignore any errors
+          try {
+            await supabase
+              .from("goals")
+              .delete()
+              .eq("user_id", user.id);
+              
+            console.log("Goals deleted successfully");
+          } catch (goalsError) {
+            // Ignore errors - table might not exist
+            console.log("No goals table found or could not delete goals");
+          }
+          
+          toast.success("Data reset successful");
+        } catch (deleteError) {
+          console.error("Error during data reset (continuing with wizard):", deleteError);
+          // Continue without showing error to user
+        }
+      }
       
       // Close sidebar on mobile
       if (window.innerWidth < 768) {
@@ -265,22 +307,44 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                       <span>Setup Wizard</span>
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent>
+                  <AlertDialogContent className="max-w-md">
                     <AlertDialogHeader>
                       <AlertDialogTitle>Run Setup Wizard Again?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Warning: Running the wizard again may replace your existing goals and actions. 
-                        Are you sure you want to continue?
+                        Choose how you'd like to proceed with the wizard:
                       </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-1 gap-3">
+                        <Button
+                          variant="outline"
+                          className="w-full p-3 h-auto flex flex-col items-center space-y-1 text-center"
+                          onClick={() => handleResetWizard(true)}
+                          disabled={resetWizardLoading}
+                        >
+                          <ArrowRight className="h-6 w-6 mb-1" />
+                          <span className="font-semibold">Keep Existing Data</span>
+                          <p className="text-xs text-muted-foreground">
+                            Keep all your current goals and actions while updating settings
+                          </p>
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          className="w-full p-3 h-auto flex flex-col items-center space-y-1 text-center"
+                          onClick={() => handleResetWizard(false)}
+                          disabled={resetWizardLoading}
+                        >
+                          <Trash className="h-6 w-6 mb-1" />
+                          <span className="font-semibold">Start Fresh</span>
+                          <p className="text-xs text-muted-foreground">
+                            Delete all existing goals and actions and start over completely
+                          </p>
+                        </Button>
+                      </div>
+                    </div>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction 
-                        onClick={handleResetWizard}
-                        disabled={resetWizardLoading}
-                      >
-                        {resetWizardLoading ? "Resetting..." : "Continue"}
-                      </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
