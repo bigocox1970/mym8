@@ -1,26 +1,10 @@
 /**
  * API Service
- * This file handles all external API communication through a secure backend proxy.
- * API keys are stored and managed on the server, not in the client.
+ * This file handles all external API communication directly from the client.
  */
 
 import { toast } from '@/components/ui/sonner';
 import { supabase } from '@/lib/supabase';
-
-// Base URL for the backend API
-// In development, this could point to a local server
-// In production, this should point to your deployed backend
-const getApiBaseUrl = () => {
-  // In development, use the environment variable if specified, or a relative URL that works with any port
-  if (import.meta.env.DEV) {
-    return import.meta.env.VITE_API_BASE_URL || '/.netlify/functions/api';
-  }
-  
-  // For production, use a relative URL
-  return '/.netlify/functions/api';
-};
-
-const API_BASE_URL = getApiBaseUrl();
 
 // Define interfaces for the API data types
 interface Goal {
@@ -62,88 +46,36 @@ export async function textToSpeech(
   }
 ): Promise<Blob | string> {
   try {
-    // Special handling for browser TTS - handled directly in the client
+    // Only handle non-browser TTS services here
     if (service === 'browser') {
-      return new Promise((resolve, reject) => {
-        if (!window.speechSynthesis) {
-          reject(new Error('Browser does not support speech synthesis'));
-          return;
-        }
-        
-        try {
-          // Set up SpeechSynthesis
-          const utterance = new SpeechSynthesisUtterance(text);
-          
-          // Get available voices
-          let voices = window.speechSynthesis.getVoices();
-          
-          const setupVoice = () => {
-            // Find voice by gender
-            const gender = options.gender || 'female';
-            
-            // Try to find a matching voice
-            const matchingVoices = voices.filter(voice => {
-              // Try to match by gender if available in the name
-              const voiceName = voice.name.toLowerCase();
-              if (gender === 'female') {
-                return !voiceName.includes('male') || voiceName.includes('female');
-              } else {
-                return voiceName.includes('male') && !voiceName.includes('female');
-              }
-            });
-            
-            // Use a matching voice or fall back to the first available
-            utterance.voice = matchingVoices[0] || voices[0];
-            
-            // Speak the text directly
-            window.speechSynthesis.speak(utterance);
-          };
-          
-          // If voices aren't loaded yet, wait for them
-          if (voices.length === 0) {
-            window.speechSynthesis.onvoiceschanged = () => {
-              voices = window.speechSynthesis.getVoices();
-              setupVoice();
-            };
-          } else {
-            setupVoice();
-          }
-          
-          // Return empty blob for API compatibility
-          resolve(new Blob([], { type: 'audio/mpeg' }));
-        } catch (err) {
-          console.error('Error with browser TTS:', err);
-          reject(new Error('Failed to generate speech with browser TTS'));
-        }
+      throw new Error('Browser TTS should be handled in the client component');
+    }
+
+    // Handle OpenAI TTS
+    if (service === 'openai') {
+      const response = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'tts-1',
+          voice: options.voice || 'alloy',
+          input: text
+        })
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate speech');
+      }
+
+      return await response.blob();
     }
 
-    // Get auth token
-    const token = await getAuthToken();
-
-    // Make request to backend service
-    const response = await fetch(`${API_BASE_URL}/tts`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        text,
-        service,
-        options
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to generate speech');
-    }
-
-    // Return the audio blob
-    return await response.blob();
+    throw new Error(`Unsupported TTS service: ${service}`);
   } catch (error) {
     console.error('TTS API error:', error);
-    toast.error(`Failed to generate speech: ${error instanceof Error ? error.message : String(error)}`);
     throw error;
   }
 }
@@ -168,45 +100,71 @@ export async function processMessage(
   refresh?: boolean;
 }> {
   try {
-    console.log('Sending request to:', `${API_BASE_URL}/chat`);
-    console.log('With message:', message);
-    
-    // Get the current user's ID
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-    
-    // Send the full context to the API
-    const response = await fetch(`${API_BASE_URL}/chat`, {
+    // Format the conversation history for the API
+    const messages = context.conversation?.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    })) || [];
+
+    // Add the current message
+    messages.push({
+      role: 'user',
+      content: message
+    });
+
+    // Add system message with context
+    const systemMessage = {
+      role: 'system',
+      content: `You are a helpful AI assistant. Here is some context about the user:
+Goals: ${context.goals?.map(g => g.goal_text).join(', ') || 'None'}
+Actions: ${context.actions?.map(a => a.title).join(', ') || 'None'}`
+    };
+
+    // Make direct API call to OpenAI
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        message: message,
-        goals: context.goals || [],
-        actions: context.actions || [],
-        conversation: context.conversation || [],
-        userId: userId // Include the user ID for handling function calls
+        model: 'gpt-4',
+        messages: [systemMessage, ...messages],
+        temperature: 0.7,
+        max_tokens: 1000
       })
     });
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('Server error response:', errorData);
+      console.error('OpenAI error response:', errorData);
       throw new Error('Failed to process message');
     }
 
-    return await response.json();
+    const data = await response.json();
+    const aiResponse = data.choices[0].message.content;
+
+    // Parse the response for any special actions
+    const actionMatch = aiResponse.match(/\[ACTION:([^\]]+)\]/);
+    const navigateMatch = aiResponse.match(/\[NAVIGATE:([^\]]+)\]/);
+    const refreshMatch = aiResponse.match(/\[REFRESH\]/);
+
+    return {
+      message: aiResponse.replace(/\[ACTION:[^\]]+\]|\[NAVIGATE:[^\]]+\]|\[REFRESH\]/g, '').trim(),
+      action: actionMatch ? actionMatch[1] : undefined,
+      navigate: navigateMatch ? navigateMatch[1] : undefined,
+      refresh: !!refreshMatch
+    };
   } catch (error) {
-    console.error('LLM API error:', error);
-    toast.error('Failed to process message');
+    console.error('Message processing error:', error);
+    toast.error(`Failed to process message: ${error instanceof Error ? error.message : String(error)}`);
     throw error;
   }
 }
 
 /**
- * Get the user's subscription details
- * @returns The user's subscription level and available services
+ * Get user subscription details
+ * @returns Subscription information
  */
 export async function getSubscription(): Promise<{
   level: string;
@@ -214,52 +172,11 @@ export async function getSubscription(): Promise<{
   maxTokens: number;
   models: string[];
 }> {
-  try {
-    // Get Supabase access token for authentication
-    const token = await getAuthToken();
-
-    const response = await fetch(`${API_BASE_URL}/subscription`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to get subscription details');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Subscription API error:', error);
-    // Return free tier as fallback
-    return {
-      level: 'free',
-      services: ['browser'],
-      maxTokens: 1000,
-      models: ['gpt-3.5-turbo']
-    };
-  }
-}
-
-/**
- * Gets the authentication token from Supabase
- */
-async function getAuthToken(): Promise<string> {
-  try {
-    // Get the current session from Supabase
-    const { data } = await supabase.auth.getSession();
-    
-    if (!data.session) {
-      console.log('No active Supabase session, using development token');
-      // For development, return a placeholder token
-      return 'dev-token';
-    }
-    
-    // Return the access token from the session
-    return data.session.access_token;
-  } catch (error) {
-    console.error('Error getting auth token:', error);
-    // Return development token for local testing
-    return 'dev-token';
-  }
+  // For now, return a default subscription since we're using direct API calls
+  return {
+    level: 'free',
+    services: ['openai'],
+    maxTokens: 1000,
+    models: ['gpt-4']
+  };
 } 

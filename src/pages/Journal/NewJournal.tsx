@@ -5,8 +5,43 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
-import { Mic, Square, Play, Save } from "lucide-react";
+import { Mic, Square, Play, Save, Volume2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { processMessage } from "@/lib/api";
+import { getConfig } from "@/lib/config";
+
+// Add SpeechRecognition type definitions
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionError extends Event {
+  error: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives?: number;
+  start(): void;
+  stop(): void;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: SpeechRecognitionError) => void;
+  onend: () => void;
+}
+
+// Extend Window interface
+declare global {
+  interface Window {
+    SpeechRecognition?: {
+      new (): SpeechRecognition;
+    };
+    webkitSpeechRecognition?: {
+      new (): SpeechRecognition;
+    };
+  }
+}
 
 const NewJournal = () => {
   const { user } = useAuth();
@@ -17,65 +52,88 @@ const NewJournal = () => {
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
-  const mockTranscribe = async (audioBlob: Blob): Promise<string> => {
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    return "This is a simulated transcription of your audio recording. In a real application, this would be the actual text from your voice recording, transcribed by a service like OpenAI Whisper API, Google Speech-to-Text, or similar.";
-  };
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      setMediaRecorder(recorder);
-      
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data);
+      // Check if speech recognition is supported
+      if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
+        toast.error("Speech recognition is not supported in your browser");
+        return;
+      }
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+
+      // Configure recognition
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      // Handle results
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0])
+          .map(result => result.transcript)
+          .join('');
+
+        setContent(prev => {
+          if (prev.trim()) {
+            return `${prev}\n\n${transcript}`;
+          }
+          return transcript;
+        });
+      };
+
+      // Handle errors
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          toast.error("Microphone access denied. Please enable microphone permissions.");
+        } else {
+          toast.error("Speech recognition failed. Please try again.");
         }
+        setIsRecording(false);
       };
-      
-      recorder.onstop = async () => {
-        setAudioChunks(chunks);
-        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-        transcribeAudio(audioBlob);
-      };
-      
-      recorder.start();
+
+      // Start recognition
+      recognition.start();
       setIsRecording(true);
       toast.success("Recording started");
     } catch (error) {
-      console.error("Error accessing microphone:", error);
-      toast.error("Could not access your microphone");
+      console.error("Error starting speech recognition:", error);
+      toast.error("Failed to start speech recognition");
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorder && isRecording) {
-      mediaRecorder.stop();
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
       setIsRecording(false);
-      mediaRecorder.stream.getTracks().forEach(track => track.stop());
       toast.info("Recording stopped");
     }
   };
 
-  const transcribeAudio = async (audioBlob: Blob) => {
+  const getAiAssistance = async () => {
+    if (!content.trim()) {
+      toast.error("Please write something first to get AI assistance");
+      return;
+    }
+
     setIsTranscribing(true);
     try {
-      const transcription = await mockTranscribe(audioBlob);
-      
-      setContent(prev => {
-        if (prev.trim()) {
-          return `${prev}\n\n${transcription}`;
-        }
-        return transcription;
+      const response = await processMessage(content, {
+        goals: [],
+        actions: [],
+        conversation: []
       });
-      
-      toast.success("Audio transcribed successfully");
+
+      setContent(response.message);
+      toast.success("AI has provided some insights");
     } catch (error) {
-      console.error("Transcription error:", error);
-      toast.error("Failed to transcribe audio");
+      console.error("AI processing error:", error);
+      toast.error("Failed to get AI assistance");
     } finally {
       setIsTranscribing(false);
     }
@@ -99,19 +157,53 @@ const NewJournal = () => {
         .from("journal_entries")
         .insert({
           user_id: user.id,
-          content: content.trim(),
+          content: content
         })
-        .select();
-        
+        .select()
+        .single();
+
       if (error) throw error;
-      
+
       toast.success("Journal entry saved successfully");
-      navigate(`/journal/${data[0].id}`);
+      navigate("/journal");
     } catch (error) {
       console.error("Error saving entry:", error);
-      toast.error("Failed to save your journal entry");
+      toast.error("Failed to save journal entry");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const readAloud = () => {
+    if (!content.trim()) {
+      toast.error("No content to read");
+      return;
+    }
+
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(content);
+      const voices = window.speechSynthesis.getVoices();
+      
+      // Get voice configuration from settings
+      const config = getConfig();
+      const selectedVoiceName = config.tts.voice === 'male' ? 'Alex' : 'Samantha';
+      
+      // Find the configured voice
+      const selectedVoice = voices.find(voice => 
+        voice.name.includes(selectedVoiceName) || 
+        (config.tts.voice === 'male' ? voice.name.includes('Male') : voice.name.includes('Female'))
+      );
+      
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+      
+      // Set speech rate from config
+      utterance.rate = config.tts.rate;
+      
+      window.speechSynthesis.speak(utterance);
+    } else {
+      toast.error("Text-to-speech is not supported in your browser");
     }
   };
 
@@ -120,52 +212,49 @@ const NewJournal = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">New Journal Entry</h1>
-          <div className="space-x-2">
-            <Button 
-              variant={isRecording ? "destructive" : "outline"} 
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={readAloud}
+              disabled={!content.trim()}
+            >
+              <Volume2 className="mr-2 h-4 w-4" />
+              Read Aloud
+            </Button>
+            <Button onClick={saveEntry} disabled={isSaving}>
+              {isSaving ? (
+                <Play className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Save Entry
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Your Entry</h2>
+            <Button
+              variant="outline"
+              size="icon"
               onClick={isRecording ? stopRecording : startRecording}
               disabled={isTranscribing}
             >
               {isRecording ? (
-                <>
-                  <Square className="mr-2 h-4 w-4" />
-                  Stop Recording
-                </>
+                <Square className="h-4 w-4 text-red-500" />
               ) : (
-                <>
-                  <Mic className="mr-2 h-4 w-4" />
-                  Start Recording
-                </>
+                <Mic className="h-4 w-4" />
               )}
             </Button>
-            
-            <Button 
-              onClick={saveEntry} 
-              disabled={!content.trim() || isSaving || isTranscribing}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {isSaving ? "Saving..." : "Save Entry"}
-            </Button>
           </div>
-        </div>
-        
-        {isTranscribing && (
-          <div className="bg-blue-50 text-blue-700 p-4 rounded-md animate-pulse">
-            Transcribing your recording... Please wait.
-          </div>
-        )}
-        
-        <div className="border rounded-md p-1">
           <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Start typing or record your thoughts..."
-            className="min-h-[300px] resize-none border-0 focus-visible:ring-0"
+            placeholder="Write your thoughts here..."
+            className="min-h-[400px]"
+            disabled={isTranscribing}
           />
-        </div>
-        
-        <div className="text-sm text-gray-500">
-          <p>Tip: Record your thoughts by clicking the "Start Recording" button or type directly in the text area.</p>
         </div>
       </div>
     </Layout>

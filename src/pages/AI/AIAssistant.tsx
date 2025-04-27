@@ -649,6 +649,19 @@ const AIAssistant = () => {
       return;
     }
     
+    // Get voice configuration
+    const config = getConfig();
+    const voiceService = config.voice_service || 'browser';
+    const selectedVoiceName = config.voice_gender === 'male' ? 'Alex' : 'Samantha';
+    
+    // Stop any existing speech first
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      // Add a small delay to ensure previous speech is fully cancelled
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
     // iOS requires user interaction before audio can play
     // Create a "dummy" utterance to unlock audio on iOS
     const unlockAudio = () => {
@@ -670,149 +683,61 @@ const AIAssistant = () => {
     // Mobile browsers require user interaction before audio can play
     // This ensures we have a flag to track user interaction
     if (!window.speechSynthesisHasInteracted) {
-      console.log("First user interaction, initializing speech synthesis");
       window.speechSynthesisHasInteracted = true;
-    }
-    
-    // If already speaking, stop current speech first
-    if (isSpeaking) {
-      stopSpeaking();
-      // Add a small delay to ensure previous speech is cancelled
-      await new Promise(resolve => setTimeout(resolve, 100));
     }
     
     try {
       setIsSpeaking(true);
       
-      // Detect if running on iOS (which has more restrictions)
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as unknown as { MSStream: boolean }).MSStream;
-      if (isIOS) {
-        console.log("iOS device detected, using special handling");
-      }
-      
-      // Get the voice configuration from settings
-      const config = getConfig();
-      const voiceService = config.voice_service || 'browser';
-      
-      // Log the selected voice service
-      console.log("Using voice service:", voiceService);
-
-      // For services requiring a backend, use browser TTS for now
-      if (voiceService !== 'browser') {
-        console.log(`${voiceService} TTS service requires a backend implementation. Using browser TTS instead.`);
-      }
-
-      // Use browser's built-in speech synthesis
+      // Create utterance
       const utterance = new SpeechSynthesisUtterance(text);
       
-      // Set voice based on preference
-      const voiceType = config.voice_gender || 'female';
-      
-      // Get all available voices
-      const availableVoices = window.speechSynthesis.getVoices();
-      console.log(`Available voices: ${availableVoices.length}`);
-      
-      // If no voices available yet, wait a moment and try again (mobile browsers often load voices asynchronously)
-      if (availableVoices.length === 0) {
-        console.log("No voices available yet, waiting...");
-        // Wait a bit and try again
-        setTimeout(() => {
-          console.log("Retrying speech after delay");
-          const updatedVoices = window.speechSynthesis.getVoices();
-          console.log(`Voices loaded after delay: ${updatedVoices.length}`);
-          
-          // Force reload voices on some mobile browsers
-          if (updatedVoices.length === 0) {
-            window.speechSynthesis.onvoiceschanged = () => {
-              console.log("Voices changed event triggered");
-              // Try one more time with the new voices
-              speakText(text);
-            };
-            return;
-          }
-          
-          if (updatedVoices.length > 0) {
-            // Try speaking again with the loaded voices
-            speakText(text);
-          } else {
-            // If still no voices, try with default voice
-            const fallbackUtterance = new SpeechSynthesisUtterance(text);
-            window.speechSynthesis.speak(fallbackUtterance);
-          }
-        }, 1000);
-        return;
-      }
-      
-      // Find an appropriate voice - prioritize mobile native voices for better performance
-      let voice;
-      
-      // For iOS, prioritize Samantha (female) or Alex (male) voices
-      if (isIOS) {
-        if (voiceType === 'male') {
-          voice = availableVoices.find(v => v.name.includes('Alex')) || 
-                 availableVoices.find(v => v.name.includes('Male') || v.name.includes('male'));
-        } else {
-          voice = availableVoices.find(v => v.name.includes('Samantha')) || 
-                 availableVoices.find(v => v.name.includes('Female') || v.name.includes('female'));
-        }
-      } else {
-        // For other devices
-        if (voiceType === 'male') {
-          voice = availableVoices.find(v => v.name.includes('Male') || v.name.includes('male'));
-        } else {
-          voice = availableVoices.find(v => v.name.includes('Female') || v.name.includes('female'));
+      // Set voice based on configuration
+      if (voiceService === 'browser') {
+        const voices = window.speechSynthesis.getVoices();
+        const selectedVoice = voices.find(v => v.name === selectedVoiceName);
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
         }
       }
       
-      // Set the voice if found
-      if (voice) {
-        console.log(`Selected voice: ${voice.name}`);
-        utterance.voice = voice;
-      } else {
-        console.log('No matching voice found, using default voice');
-      }
-      
-      // Configure the utterance
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-      
-      // Special handling for iOS
-      if (isIOS) {
-        // iOS has issues with longer texts
-        // Split text into smaller chunks if needed (adjust based on testing)
-        if (text.length > 200) {
-          const chunks = text.match(/.{1,200}(?:\s|$)/g) || [];
-          console.log(`Text too long for iOS, split into ${chunks.length} chunks`);
-          
-          // Speak first chunk and queue the rest
-          let currentChunk = 0;
-          
-          const speakNextChunk = () => {
-            if (currentChunk < chunks.length) {
-              const chunkUtterance = new SpeechSynthesisUtterance(chunks[currentChunk]);
-              if (voice) chunkUtterance.voice = voice;
-              
-              chunkUtterance.onend = () => {
-                currentChunk++;
-                speakNextChunk();
-              };
-              
-              chunkUtterance.onerror = (error) => {
-                console.error(`Chunk ${currentChunk} speech error:`, error);
-                currentChunk++;
-                speakNextChunk();
-              };
-              
-              window.speechSynthesis.speak(chunkUtterance);
-            } else {
-              setIsSpeaking(false);
+      // iOS has a limit on utterance length, so we need to split long texts
+      if (navigator.userAgent.match(/iPhone|iPad|iPod/i)) {
+        const chunks = text.match(/[^.!?]+[.!?]+/g) || [text];
+        let currentChunkIndex = 0;
+        
+        const speakNextChunk = () => {
+          if (currentChunkIndex < chunks.length) {
+            const chunkUtterance = new SpeechSynthesisUtterance(chunks[currentChunkIndex]);
+            if (utterance.voice) {
+              chunkUtterance.voice = utterance.voice;
             }
-          };
-          
-          speakNextChunk();
-          return;
-        }
+            
+            chunkUtterance.onend = () => {
+              currentChunkIndex++;
+              if (currentChunkIndex < chunks.length) {
+                speakNextChunk();
+              } else {
+                setIsSpeaking(false);
+              }
+            };
+            
+            chunkUtterance.onerror = (error) => {
+              console.error('Speech synthesis error:', error);
+              if (error.error !== 'interrupted' && error.error !== 'canceled') {
+                toast.error("Speech synthesis failed.");
+              }
+              setIsSpeaking(false);
+            };
+            
+            window.speechSynthesis.speak(chunkUtterance);
+          } else {
+            setIsSpeaking(false);
+          }
+        };
+        
+        speakNextChunk();
+        return;
       }
       
       // When speech ends
@@ -901,11 +826,11 @@ const AIAssistant = () => {
   useEffect(() => {
     if (isVoiceEnabled && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
-      if (lastMessage.role === 'assistant') {
+      if (lastMessage.role === 'assistant' && !isSpeaking) {
         speakText(lastMessage.content);
       }
     }
-  }, [messages, isVoiceEnabled]);
+  }, [messages, isVoiceEnabled, isSpeaking]);
 
   // Start speech recognition
   const startListening = () => {
