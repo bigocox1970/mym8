@@ -17,7 +17,7 @@ app.use(cors());
 app.use(express.raw({ type: '*/*', limit: '10mb' }));
 
 // Handle all routes with a single handler for simplicity
-app.all('/', async (req, res) => {
+app.all('/.netlify/functions/audio-convert', async (req, res) => {
   try {
     console.log('Audio conversion request received');
     console.log(`Request method: ${req.method}`);
