@@ -10,7 +10,6 @@ import { getConfig, updateConfig, initConfig } from "@/lib/configManager";
 import { SubscriptionInfo } from "./AISettings/SubscriptionInfo";
 import { GeneralAISettings } from "./AISettings/GeneralAISettings";
 import { VoiceSettings } from "./AISettings/VoiceSettings";
-import VoiceTester from "./AISettings/VoiceTester";
 
 // Import types and defaults
 import { AI_MODELS, DEFAULT_AI_MODEL } from "@/config/ai";
@@ -225,17 +224,6 @@ const AISettings = () => {
                   API endpoint used for TTS and other services
                 </p>
               </div>
-              
-              {/* Test Voice Service */}
-              <VoiceTester
-                voiceService={voiceService}
-                voiceType={voiceType}
-                elevenlabsVoice={elevenlabsVoice}
-                googleVoice={googleVoice}
-                azureVoice={azureVoice}
-                amazonVoice={amazonVoice}
-                openaiVoice={openaiVoice}
-              />
               
               {/* Save Button */}
               <Button 
