@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { SettingsProvider } from "@/contexts/SettingsContext";
+import { SnackbarProvider } from "@/contexts/SnackbarContext";
 
 // Pages
 import Login from "./pages/Auth/Login";
@@ -26,6 +28,7 @@ import ActivityLog from "./pages/Logs/ActivityLog";
 import AIAssistant from "./pages/AI/AIAssistant";
 import SetupWizard from './pages/Wizard/SetupWizard';
 import TestDelete from "./pages/Tools/TestDelete";
+import TTSTest from "./pages/Tools/TTSTest";
 
 // Create a VerificationSuccess component
 const VerificationSuccess = () => {
@@ -89,59 +92,60 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<Navigate to="/login" />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/verification-success" element={<VerificationSuccess />} />
-            
-            {/* Protected routes */}
-            <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/journal" element={<ProtectedRoute><JournalList /></ProtectedRoute>} />
-            <Route path="/journal/new" element={<ProtectedRoute><NewJournal /></ProtectedRoute>} />
-            <Route path="/journal/:id" element={<ProtectedRoute><JournalDetail /></ProtectedRoute>} />
-            <Route path="/journal/edit/:id" element={<ProtectedRoute><EditJournal /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
-            
-            {/* Admin routes */}
-            <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
-            
-            {/* Goals routes */}
-            <Route path="/goals" element={<ProtectedRoute><GoalsList /></ProtectedRoute>} />
-            <Route path="/goals/new" element={<ProtectedRoute><NewGoal /></ProtectedRoute>} />
-            <Route path="/goals/:id" element={<ProtectedRoute><GoalDetail /></ProtectedRoute>} />
-            <Route path="/goals/:id/edit" element={<ProtectedRoute><EditGoal /></ProtectedRoute>} />
-            
-            {/* Actions routes */}
-            <Route path="/actions" element={<ProtectedRoute><ActionsList /></ProtectedRoute>} />
-            
-            {/* Log routes */}
-            <Route path="/logs" element={<ProtectedRoute><ActivityLog /></ProtectedRoute>} />
-            
-            {/* AI Assistant */}
-            <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
-            
-            {/* Wizard */}
-            <Route path="/wizard" element={<ProtectedRoute><SetupWizard /></ProtectedRoute>} />
-            
-            {/* Tools routes */}
-            <Route path="/tools/delete" element={
-              <ProtectedRoute>
-                <TestDelete />
-              </ProtectedRoute>
-            } />
-            
-            {/* Catch-all route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <SettingsProvider>
+        <SnackbarProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<Navigate to="/login" />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/verification-success" element={<VerificationSuccess />} />
+                
+                {/* Protected routes */}
+                <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/journal" element={<ProtectedRoute><JournalList /></ProtectedRoute>} />
+                <Route path="/journal/new" element={<ProtectedRoute><NewJournal /></ProtectedRoute>} />
+                <Route path="/journal/:id" element={<ProtectedRoute><JournalDetail /></ProtectedRoute>} />
+                <Route path="/journal/edit/:id" element={<ProtectedRoute><EditJournal /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
+                
+                {/* Admin routes */}
+                <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
+                
+                {/* Goals routes */}
+                <Route path="/goals" element={<ProtectedRoute><GoalsList /></ProtectedRoute>} />
+                <Route path="/goals/new" element={<ProtectedRoute><NewGoal /></ProtectedRoute>} />
+                <Route path="/goals/:id" element={<ProtectedRoute><GoalDetail /></ProtectedRoute>} />
+                <Route path="/goals/:id/edit" element={<ProtectedRoute><EditGoal /></ProtectedRoute>} />
+                
+                {/* Actions routes */}
+                <Route path="/actions" element={<ProtectedRoute><ActionsList /></ProtectedRoute>} />
+                
+                {/* Log routes */}
+                <Route path="/logs" element={<ProtectedRoute><ActivityLog /></ProtectedRoute>} />
+                
+                {/* AI Assistant */}
+                <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
+                
+                {/* Wizard */}
+                <Route path="/wizard" element={<ProtectedRoute><SetupWizard /></ProtectedRoute>} />
+                
+                {/* Tools routes */}
+                <Route path="/tools/delete" element={<ProtectedRoute><TestDelete /></ProtectedRoute>} />
+                <Route path="/tools/tts" element={<ProtectedRoute><TTSTest /></ProtectedRoute>} />
+                
+                {/* Catch-all route */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </SnackbarProvider>
+      </SettingsProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

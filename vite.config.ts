@@ -7,7 +7,7 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 9000,
+    port: 8083,
     proxy: {
       // Proxy API requests to the Netlify server
       '/.netlify/functions/api': {

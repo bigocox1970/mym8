@@ -62,9 +62,6 @@ export async function textToSpeech(
   }
 ): Promise<Blob | string> {
   try {
-    console.log(`TTS Request - Service: ${service}, Voice: ${options.voice}, Gender: ${options.gender || 'not specified'}`);
-    console.log(`Text to convert (first 50 chars): "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
-    
     // Special handling for browser TTS - handled directly in the client
     if (service === 'browser') {
       return new Promise((resolve, reject) => {
@@ -112,121 +109,38 @@ export async function textToSpeech(
             setupVoice();
           }
           
-          // Create a tiny audio blob to return for API compatibility
-          // This is a minimal MP3 file (essentially empty/silent)
-          const silentMp3 = new Uint8Array([
-            0xFF, 0xE3, 0x18, 0xC4, 0x00, 0x00, 0x00, 0x03, 0x48, 0x00, 0x00, 0x00,
-            0x00, 0x4C, 0x41, 0x4D, 0x45, 0x33, 0x2E, 0x39, 0x39, 0x2E, 0x35, 0x55,
-            0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55
-          ]);
-          
-          // Return a small audio blob so the API is compatible with other TTS services
-          resolve(new Blob([silentMp3], { type: 'audio/mpeg' }));
+          // Return empty blob for API compatibility
+          resolve(new Blob([], { type: 'audio/mpeg' }));
         } catch (err) {
           console.error('Error with browser TTS:', err);
-          
-          // Still try to speak with a fallback
-          try {
-            const fallbackUtterance = new SpeechSynthesisUtterance(text);
-            window.speechSynthesis.speak(fallbackUtterance);
-            
-            // Return empty blob as fallback
-            resolve(new Blob([], { type: 'audio/mpeg' }));
-          } catch (speakErr) {
-            console.error('Failed to use direct speech:', speakErr);
-            reject(new Error('Failed to generate speech with browser TTS'));
-          }
+          reject(new Error('Failed to generate speech with browser TTS'));
         }
       });
     }
-    
-    // Get Supabase access token for authentication
+
+    // Get auth token
     const token = await getAuthToken();
-    console.log(`Auth token obtained: ${token ? 'Yes' : 'No'}`);
 
-    // Log the request URL
-    const requestUrl = `${API_BASE_URL}/tts`;
-    console.log(`Making TTS request to: ${requestUrl}`);
-    
-    // Create request body with debugging info
-    const requestBody = {
-      text,
-      service,
-      options
-    };
-    console.log(`Request payload: ${JSON.stringify(requestBody)}`);
-
-    // Make request to backend proxy instead of directly to TTS services
-    const response = await fetch(requestUrl, {
+    // Make request to backend service
+    const response = await fetch(`${API_BASE_URL}/tts`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify({
+        text,
+        service,
+        options
+      })
     });
 
-    console.log(`Response status: ${response.status}`);
-    
     if (!response.ok) {
-      const responseText = await response.text();
-      console.error(`TTS API error response (${response.status}): ${responseText}`);
-      
-      let errorMessage = 'Failed to generate speech';
-      try {
-        // Try to parse as JSON
-        const error = JSON.parse(responseText);
-        errorMessage = error.message || error.error || errorMessage;
-      } catch (e) {
-        // If not JSON, use the text as-is
-        errorMessage = responseText || errorMessage;
-      }
-      
-      throw new Error(errorMessage);
+      throw new Error('Failed to generate speech');
     }
 
-    // Check response type
-    const contentType = response.headers.get('Content-Type');
-    console.log(`Response Content-Type: ${contentType}`);
-
-    // Return audio blob for browser playback
-    const blob = await response.blob();
-    console.log(`Received blob size: ${blob.size} bytes, type: ${blob.type}`);
-    
-    // Special handling for OpenAI audio, which might have format issues
-    if (service === 'openai') {
-      try {
-        console.log('Processing OpenAI audio for playback compatibility');
-        
-        // Pass the audio blob through our dedicated audio conversion function
-        const audioConversionEndpoint = `${API_BASE_URL.replace('/api', '')}/audio-convert`;
-        console.log(`Using audio conversion endpoint: ${audioConversionEndpoint}`);
-        
-        const conversionResponse = await fetch(audioConversionEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/octet-stream',
-          },
-          body: blob
-        });
-        
-        if (!conversionResponse.ok) {
-          console.error(`Audio conversion failed: ${conversionResponse.status} ${conversionResponse.statusText}`);
-          return blob; // Return original blob if conversion fails
-        }
-        
-        const convertedBlob = await conversionResponse.blob();
-        console.log(`Converted audio: ${convertedBlob.size} bytes, type: ${convertedBlob.type}`);
-        
-        return convertedBlob;
-      } catch (err) {
-        console.error('Error handling OpenAI audio:', err);
-        // Return the original blob if processing failed
-        return blob;
-      }
-    }
-    
-    return blob;
+    // Return the audio blob
+    return await response.blob();
   } catch (error) {
     console.error('TTS API error:', error);
     toast.error(`Failed to generate speech: ${error instanceof Error ? error.message : String(error)}`);

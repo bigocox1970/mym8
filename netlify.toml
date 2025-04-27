@@ -14,9 +14,10 @@
   status = 200
 
 [[redirects]]
-  from = "/audio-convert"
+  from = "/.netlify/functions/audio-convert"
   to = "/.netlify/functions/audio-convert"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/*"

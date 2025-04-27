@@ -10,7 +10,7 @@ import { getConfig, updateConfig, initConfig } from "@/lib/configManager";
 import { SubscriptionInfo } from "./AISettings/SubscriptionInfo";
 import { GeneralAISettings } from "./AISettings/GeneralAISettings";
 import { VoiceSettings } from "./AISettings/VoiceSettings";
-import { VoiceTester } from "./AISettings/VoiceTester";
+import VoiceTester from "./AISettings/VoiceTester";
 
 // Import types and defaults
 import { AI_MODELS, DEFAULT_AI_MODEL } from "@/config/ai";
