@@ -37,6 +37,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import { PageHeader } from "@/components/PageHeader";
 
 type FrequencyFilter = "all" | "morning" | "afternoon" | "evening" | "daily" | "weekly" | "monthly";
 
@@ -315,74 +316,68 @@ const ActionsList = () => {
 
   return (
     <Layout>
-      <div className="w-full">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Actions</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {isEditMode ? (
-              <>
+      <div className="space-y-6">
+        <PageHeader title="Actions">
+          {isEditMode ? (
+            <>
+              <Button 
+                onClick={handleToggleEditMode}
+                variant="outline"
+                size="sm"
+              >
+                <Check className="sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Done</span>
+              </Button>
+              {selectedActions.length > 0 && (
                 <Button 
-                  onClick={handleToggleEditMode}
-                  variant="outline"
+                  variant="destructive"
                   size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
                 >
-                  <Check className="sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Done</span>
+                  <Trash2 className="sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Delete</span>
+                  {selectedActions.length > 0 && <span className="ml-1">({selectedActions.length})</span>}
                 </Button>
-                {selectedActions.length > 0 && (
-                  <Button 
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setShowDeleteDialog(true)}
-                  >
-                    <Trash2 className="sm:mr-2 h-4 w-4" />
-                    <span className="hidden sm:inline">Delete</span>
-                    {selectedActions.length > 0 && <span className="ml-1">({selectedActions.length})</span>}
-                  </Button>
-                )}
-              </>
-            ) : (
-              <>
-                <Select
-                  value={frequencyFilter}
-                  onValueChange={(value) => setFrequencyFilter(value as FrequencyFilter)}
-                >
-                  <SelectTrigger className="w-[150px]">
-                    <Filter className="mr-2 h-4 w-4" />
-                    <SelectValue placeholder="Filter by frequency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="morning">Morning</SelectItem>
-                    <SelectItem value="afternoon">Afternoon</SelectItem>
-                    <SelectItem value="evening">Evening</SelectItem>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  onClick={handleToggleEditMode}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Edit className="sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Edit</span>
-                </Button>
-                <Button 
-                  onClick={handleNewActionClick}
-                  size="sm"
-                >
-                  <ListPlus className="sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">New Action</span>
-                </Button>
-              </>
-            )}
-            <MenuToggleButton />
-          </div>
-        </div>
+              )}
+            </>
+          ) : (
+            <>
+              <Select
+                value={frequencyFilter}
+                onValueChange={(value) => setFrequencyFilter(value as FrequencyFilter)}
+              >
+                <SelectTrigger className="w-[150px]">
+                  <Filter className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Filter by frequency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="morning">Morning</SelectItem>
+                  <SelectItem value="afternoon">Afternoon</SelectItem>
+                  <SelectItem value="evening">Evening</SelectItem>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={handleToggleEditMode}
+                variant="outline"
+                size="sm"
+              >
+                <Edit className="sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Edit</span>
+              </Button>
+              <Button 
+                onClick={handleNewActionClick}
+                size="sm"
+              >
+                <ListPlus className="sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">New Action</span>
+              </Button>
+            </>
+          )}
+        </PageHeader>
 
         {/* Goal Selection Dialog */}
         <Dialog open={showGoalDialog} onOpenChange={setShowGoalDialog}>
@@ -526,11 +521,17 @@ const ActionsList = () => {
         </AlertDialog>
 
         {isLoading ? (
-          <div className="text-center py-8">Loading your actions...</div>
+          <Card>
+            <CardContent className="py-6">
+              <p className="text-center">Loading your actions...</p>
+            </CardContent>
+          </Card>
         ) : isError ? (
-          <div className="text-center py-8 text-red-500">
-            Error loading actions. Please try again.
-          </div>
+          <Card>
+            <CardContent className="py-6">
+              <p className="text-center text-red-500">Error loading actions. Please try again.</p>
+            </CardContent>
+          </Card>
         ) : filteredActions.length > 0 ? (
           <div className="space-y-8">
             {/* Daily Actions */}
@@ -569,7 +570,7 @@ const ActionsList = () => {
                             ) : null}
                             <div className="flex-1">
                               <div className="flex justify-between items-start">
-                                <div>
+                                <div className="flex-1">
                                   <label
                                     htmlFor={`action-${action.id}`}
                                     className={`text-lg font-medium leading-none ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
@@ -586,19 +587,26 @@ const ActionsList = () => {
                                       </span>
                                     )}
                                   </label>
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    {action.frequency.charAt(0).toUpperCase() + action.frequency.slice(1)} action
-                                  </p>
+                                  <div className="mt-2">
+                                    <Link to={`/goals/${action.goal_id}`} className="text-sm font-medium text-primary hover:underline">
+                                      Goal: {action.goal_text}
+                                    </Link>
+                                  </div>
                                   {action.description && (
                                     <p className="mt-2 text-sm">{action.description}</p>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <Link to={`/goals/${action.goal_id}`} className="text-sm text-primary hover:underline">
-                                    {action.goal_text}
-                                  </Link>
+                                <div className="text-right flex flex-col h-full">
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">
+                                      {action.frequency.charAt(0).toUpperCase() + action.frequency.slice(1)} action
+                                    </p>
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      Created on {new Date(action.created_at).toLocaleDateString()}
+                                    </div>
+                                  </div>
                                   {!isEditMode && (
-                                    <>
+                                    <div className="flex gap-2 mt-auto pt-3 justify-end">
                                       <Button 
                                         variant={action.completed ? "default" : "outline"}
                                         size="sm"
@@ -615,12 +623,9 @@ const ActionsList = () => {
                                       >
                                         <Edit className="h-4 w-4" />
                                       </Button>
-                                    </>
+                                    </div>
                                   )}
                                 </div>
-                              </div>
-                              <div className="mt-2 text-sm text-muted-foreground">
-                                Created on {new Date(action.created_at).toLocaleDateString()}
                               </div>
                             </div>
                           </div>
@@ -662,7 +667,7 @@ const ActionsList = () => {
                             ) : null}
                             <div className="flex-1">
                               <div className="flex justify-between items-start">
-                                <div>
+                                <div className="flex-1">
                                   <label
                                     htmlFor={`action-${action.id}`}
                                     className={`text-lg font-medium leading-none ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
@@ -679,19 +684,26 @@ const ActionsList = () => {
                                       </span>
                                     )}
                                   </label>
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    Weekly action
-                                  </p>
+                                  <div className="mt-2">
+                                    <Link to={`/goals/${action.goal_id}`} className="text-sm font-medium text-primary hover:underline">
+                                      Goal: {action.goal_text}
+                                    </Link>
+                                  </div>
                                   {action.description && (
                                     <p className="mt-2 text-sm">{action.description}</p>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <Link to={`/goals/${action.goal_id}`} className="text-sm text-primary hover:underline">
-                                    {action.goal_text}
-                                  </Link>
+                                <div className="text-right flex flex-col h-full">
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">
+                                      Weekly action
+                                    </p>
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      Created on {new Date(action.created_at).toLocaleDateString()}
+                                    </div>
+                                  </div>
                                   {!isEditMode && (
-                                    <>
+                                    <div className="flex gap-2 mt-auto pt-3 justify-end">
                                       <Button 
                                         variant={action.completed ? "default" : "outline"}
                                         size="sm"
@@ -708,12 +720,9 @@ const ActionsList = () => {
                                       >
                                         <Edit className="h-4 w-4" />
                                       </Button>
-                                    </>
+                                    </div>
                                   )}
                                 </div>
-                              </div>
-                              <div className="mt-2 text-sm text-muted-foreground">
-                                Created on {new Date(action.created_at).toLocaleDateString()}
                               </div>
                             </div>
                           </div>
@@ -753,7 +762,7 @@ const ActionsList = () => {
                             ) : null}
                             <div className="flex-1">
                               <div className="flex justify-between items-start">
-                                <div>
+                                <div className="flex-1">
                                   <label
                                     htmlFor={`action-${action.id}`}
                                     className={`text-lg font-medium leading-none ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
@@ -770,19 +779,26 @@ const ActionsList = () => {
                                       </span>
                                     )}
                                   </label>
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    Monthly action
-                                  </p>
+                                  <div className="mt-2">
+                                    <Link to={`/goals/${action.goal_id}`} className="text-sm font-medium text-primary hover:underline">
+                                      Goal: {action.goal_text}
+                                    </Link>
+                                  </div>
                                   {action.description && (
                                     <p className="mt-2 text-sm">{action.description}</p>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <Link to={`/goals/${action.goal_id}`} className="text-sm text-primary hover:underline">
-                                    {action.goal_text}
-                                  </Link>
+                                <div className="text-right flex flex-col h-full">
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">
+                                      Monthly action
+                                    </p>
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      Created on {new Date(action.created_at).toLocaleDateString()}
+                                    </div>
+                                  </div>
                                   {!isEditMode && (
-                                    <>
+                                    <div className="flex gap-2 mt-auto pt-3 justify-end">
                                       <Button 
                                         variant={action.completed ? "default" : "outline"}
                                         size="sm"
@@ -799,12 +815,9 @@ const ActionsList = () => {
                                       >
                                         <Edit className="h-4 w-4" />
                                       </Button>
-                                    </>
+                                    </div>
                                   )}
                                 </div>
-                              </div>
-                              <div className="mt-2 text-sm text-muted-foreground">
-                                Created on {new Date(action.created_at).toLocaleDateString()}
                               </div>
                             </div>
                           </div>

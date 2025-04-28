@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { PageHeader } from "@/components/PageHeader";
 
 type Goal = {
   id: string;
@@ -101,65 +102,62 @@ const GoalsList = () => {
 
   return (
     <Layout>
-      <div className="w-full">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Goals</h1>
-            <p className="text-muted-foreground">
-              Set and track your personal goals
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {isEditMode ? (
-              <>
+      <div className="space-y-6">
+        <PageHeader title="Goals">
+          {isEditMode ? (
+            <>
+              <Button 
+                onClick={handleToggleEditMode}
+                variant="outline"
+                size="sm"
+              >
+                <Check className="sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Done</span>
+              </Button>
+              {selectedGoals.length > 0 && (
                 <Button 
-                  onClick={handleToggleEditMode}
-                  variant="outline"
+                  variant="destructive"
                   size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
                 >
-                  <Check className="sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Done</span>
+                  <Trash2 className="sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Delete</span>
+                  {selectedGoals.length > 0 && <span className="ml-1">({selectedGoals.length})</span>}
                 </Button>
-                {selectedGoals.length > 0 && (
-                  <Button 
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setShowDeleteDialog(true)}
-                  >
-                    <Trash2 className="sm:mr-2 h-4 w-4" />
-                    <span className="hidden sm:inline">Delete</span>
-                    {selectedGoals.length > 0 && <span className="ml-1">({selectedGoals.length})</span>}
-                  </Button>
-                )}
-              </>
-            ) : (
-              <>
-                <Button
-                  onClick={handleToggleEditMode}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Edit className="sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Edit</span>
+              )}
+            </>
+          ) : (
+            <>
+              <Button
+                onClick={handleToggleEditMode}
+                variant="outline"
+                size="sm"
+              >
+                <Edit className="sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Edit</span>
+              </Button>
+              <Link to="/goals/new">
+                <Button size="sm">
+                  <ListPlus className="sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">New Goal</span>
                 </Button>
-                <Link to="/goals/new">
-                  <Button size="sm">
-                    <ListPlus className="sm:mr-2 h-4 w-4" />
-                    <span className="hidden sm:inline">New Goal</span>
-                  </Button>
-                </Link>
-              </>
-            )}
-            <MenuToggleButton />
-          </div>
-        </div>
+              </Link>
+            </>
+          )}
+        </PageHeader>
 
         {isLoading ? (
-          <div className="text-center py-8">Loading your goals...</div>
+          <Card>
+            <CardContent className="py-6">
+              <p className="text-center">Loading your goals...</p>
+            </CardContent>
+          </Card>
         ) : isError ? (
-          <div className="text-center py-8 text-red-500">
-            Error loading goals. Please try again.
-          </div>
+          <Card>
+            <CardContent className="py-6">
+              <p className="text-center text-red-500">Error loading goals. Please try again.</p>
+            </CardContent>
+          </Card>
         ) : goals && goals.length > 0 ? (
           <div className="space-y-6">
             {goals.map((goal) => (

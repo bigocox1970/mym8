@@ -2,10 +2,10 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout, MenuToggleButton } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
-import { FileText, Plus, Search, Mic, Edit, Trash2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { FileText, Plus, Search, Mic, Edit, Trash2, Check } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { PageHeader } from "@/components/PageHeader";
 
 interface JournalEntry {
   id: string;
@@ -35,6 +36,7 @@ const JournalList = () => {
   const [selectedEntries, setSelectedEntries] = useState<string[]>([]);
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchEntries();
@@ -77,9 +79,27 @@ const JournalList = () => {
     });
   };
 
-  const filteredEntries = entries.filter(entry => 
-    entry.content?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEntries = entries.filter(entry => {
+    const searchLower = searchTerm.toLowerCase();
+    // Search in content
+    if (entry.content?.toLowerCase().includes(searchLower)) {
+      return true;
+    }
+    
+    // Search in formatted dates (day, month, date, year)
+    const formattedDate = formatDate(entry.created_at).toLowerCase();
+    if (formattedDate.includes(searchLower)) {
+      return true;
+    }
+    
+    // Also search in raw date (for YYYY-MM-DD format searches)
+    const rawDate = entry.created_at.toLowerCase();
+    if (rawDate.includes(searchLower)) {
+      return true;
+    }
+    
+    return false;
+  });
 
   const handleToggleEditMode = () => {
     setIsEditMode(!isEditMode);
@@ -134,54 +154,64 @@ const JournalList = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Journal Entries</h1>
-          <div className="flex items-center gap-2">
-            {isEditMode ? (
-              <>
-                <Button 
-                  variant="destructive" 
-                  onClick={handleDeleteSelected}
-                  disabled={selectedEntries.length === 0}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Selected
+        <PageHeader title="Journal">
+          {isEditMode ? (
+            <>
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteSelected}
+                disabled={selectedEntries.length === 0}
+                size="sm"
+              >
+                <Trash2 className="sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Delete</span>
+                {selectedEntries.length > 0 && <span className="ml-1">({selectedEntries.length})</span>}
+              </Button>
+              <Button variant="outline" onClick={() => setIsEditMode(false)} size="sm">
+                <Check className="sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Done</span>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditMode(true)}
+                size="sm"
+              >
+                <Edit className="sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Edit</span>
+              </Button>
+              <Link to="/journal/new">
+                <Button size="sm">
+                  <Plus className="sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">New Entry</span>
                 </Button>
-                <Button variant="outline" onClick={handleToggleEditMode}>
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <>
-                <Link to="/journal/new">
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Entry
-                  </Button>
-                </Link>
-                <Button variant="outline" onClick={handleToggleEditMode}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-                <MenuToggleButton />
-              </>
-            )}
-          </div>
-        </div>
+              </Link>
+            </>
+          )}
+        </PageHeader>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <Input
-            placeholder="Search journal entries..."
-            className="pl-10"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+        {!isEditMode && (
+          <div className="relative mb-6">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search by keyword, day, month, year..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 bg-background"
+            />
+          </div>
+        )}
 
         <div className="space-y-4">
           {loading ? (
-            <p>Loading your journal entries...</p>
+            <Card>
+              <CardContent className="py-6">
+                <p className="text-center">Loading your journal entries...</p>
+              </CardContent>
+            </Card>
           ) : filteredEntries.length > 0 ? (
             filteredEntries.map((entry) => (
               <Card key={entry.id} className={`hover:shadow-md transition-shadow ${isEditMode && selectedEntries.includes(entry.id) ? 'ring-2 ring-primary' : ''}`}>
@@ -250,17 +280,22 @@ const JournalList = () => {
               </Card>
             ))
           ) : (
-            <div className="text-center py-12">
-              <FileText className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-1">No journal entries yet</h3>
-              <p className="text-gray-500 mb-4">Start recording your thoughts and reflections</p>
-              <Link to="/journal/new">
-                <Button>
-                  <Mic className="mr-2 h-4 w-4" />
-                  Create Your First Entry
-                </Button>
-              </Link>
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>No journal entries yet</CardTitle>
+                <CardDescription>
+                  Start recording your thoughts and reflections
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link to="/journal/new">
+                  <Button>
+                    <Mic className="mr-2 h-4 w-4" />
+                    Create Your First Entry
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
