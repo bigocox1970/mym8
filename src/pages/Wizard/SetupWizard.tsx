@@ -29,6 +29,21 @@ const ISSUES = [
   { id: "other", label: "Other" }
 ];
 
+// Map issues to appropriate goal text
+const ISSUE_TO_GOAL_MAP = {
+  "depression": "Help with depression",
+  "anxiety": "Help with anxiety",
+  "lethargy": "Improve energy levels",
+  "anger": "Better anger management",
+  "procrastination": "Reduce procrastination",
+  "focus": "Improve focus and concentration",
+  "stress": "Reduce stress",
+  "sleep": "Better sleep",
+  "motivation": "Increase motivation",
+  "habits": "Break unhealthy habits",
+  "other": "Custom goal" // Will be replaced with the actual text from otherIssue
+};
+
 const GOALS = [
   { id: "better_sleep", label: "Better sleep" },
   { id: "improve_mood", label: "Improve mood" },
@@ -49,6 +64,10 @@ const PERSONALITY_TYPES = [
   { value: "gentle", label: "Gentle and understanding" },
   { value: "sarcastic", label: "Slightly sarcastic but to the point" },
   { value: "no_prisoners", label: "Take no prisoners" },
+  { value: "alan_watts", label: "Alan Watts - Philosophical, reflective, Zen-inspired" },
+  { value: "earl_nightingale", label: "Earl Nightingale - Motivational, success-oriented, inspirational" },
+  { value: "wayne_dyer", label: "Wayne Dyer - Spiritual, self-empowerment, positive thinking" },
+  { value: "esther_hicks", label: "Esther Hicks - Law of attraction, spiritual well-being, alignment" },
 ];
 
 const TOUGHNESS_LEVELS = [
@@ -82,8 +101,6 @@ const SetupWizard = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
   const [otherIssue, setOtherIssue] = useState("");
-  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
-  const [otherGoal, setOtherGoal] = useState("");
   const [assistantName, setAssistantName] = useState("M8");
   const [userNickname, setUserNickname] = useState("");
   const [personality, setPersonality] = useState("gentle");
@@ -206,12 +223,12 @@ const SetupWizard = () => {
         
         // Map existing goals to predefined goals for selection
         const mappedGoals = mapGoalsToSelections(goals as Goal[]);
-        setSelectedGoals(mappedGoals.selectedGoals);
+        setSelectedIssues(mappedGoals.selectedGoals);
         
         // If there's a custom goal that doesn't match predefined goals
         if (mappedGoals.customGoal) {
-          setSelectedGoals(prev => [...prev, 'other']);
-          setOtherGoal(mappedGoals.customGoal);
+          setSelectedIssues(prev => [...prev, 'other']);
+          setOtherIssue(mappedGoals.customGoal);
         }
       }
     } catch (error) {
@@ -301,7 +318,7 @@ const SetupWizard = () => {
   };
 
   const handleGoalToggle = (goalId: string) => {
-    setSelectedGoals(prev => 
+    setSelectedIssues(prev => 
       prev.includes(goalId) 
         ? prev.filter(id => id !== goalId) 
         : [...prev, goalId]
@@ -309,51 +326,37 @@ const SetupWizard = () => {
   };
 
   const getProgressPercentage = () => {
-    return (step / 7) * 100;
+    return (step / 6) * 100;
   };
 
   const validateCurrentStep = () => {
     switch (step) {
-      case 1: // Issues
-        return selectedIssues.length > 0;
-      case 2: // Goals
-        return selectedGoals.length >= 3 || (selectedGoals.length > 0 && selectedGoals.includes("other") && otherGoal.trim());
-      case 3: // Assistant name
-        return assistantName.trim().length > 0;
-      case 4: // User nickname
-        return true; // Optional
-      case 5: // Personality
-        return !!personality;
-      case 6: // Voice gender
-        return !!voiceGender;
-      case 7: // Toughness
-        return !!toughness;
-      default:
+      case 1:
+        // At least one issue must be selected
+        if (selectedIssues.length === 0) return false;
+        // If "other" is selected, the text field must not be empty
+        if (selectedIssues.includes("other") && !otherIssue.trim()) return false;
         return true;
+      case 2: // Now this is the Assistant Name step (previously step 3)
+        return assistantName.trim() !== "";
+      case 3: // Was step 4, no validation needed
+        return true;
+      case 4: // Was step 5
+        return personality !== "";
+      case 5: // Was step 6
+        return voiceGender !== "";
+      case 6: // Was step 7
+        return toughness !== "";
+      default:
+        return false;
     }
   };
 
   const nextStep = () => {
-    if (validateCurrentStep()) {
-      if (step < 7) {
-        setStep(step + 1);
-      } else {
-        handleSubmit();
-      }
-    } else {
-      switch (step) {
-        case 1:
-          toast.error("Please select at least one issue");
-          break;
-        case 2:
-          toast.error("Please select at least three goals");
-          break;
-        case 3:
-          toast.error("Please enter a name for your assistant");
-          break;
-        default:
-          toast.error("Please complete all required fields");
-      }
+    if (step < 6) {
+      setStep(step + 1);
+    } else if (validateCurrentStep()) {
+      handleSubmit();
     }
   };
 
@@ -363,134 +366,93 @@ const SetupWizard = () => {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!user) {
-      toast.error("You must be logged in to complete the wizard");
-      return;
-    }
-
-    setIsSubmitting(true);
-
+  // Function to create goals based on selected issues
+  const createGoalsFromIssues = async () => {
+    if (!user || selectedIssues.length === 0) return [];
+    
     try {
-      // Only create goals if user didn't choose to keep existing data
-      if (!keepExistingData) {
-        // Create a list of initial goals based on selections
-        const initialGoalsList = selectedGoals
-          .filter(id => id !== "other")
-          .map(id => {
-            const goal = GOALS.find(g => g.id === id);
-            return {
-              user_id: user.id,
-              goal_text: goal ? goal.label : "",
-              description: `This goal was created as part of your initial setup.`
-            };
-          });
-
-        // Add other goal if specified
-        if (selectedGoals.includes("other") && otherGoal.trim()) {
-          initialGoalsList.push({
-            user_id: user.id,
-            goal_text: otherGoal.trim(),
-            description: "This goal was created as part of your initial setup."
-          });
-        }
-
-        // Insert goals
-        if (initialGoalsList.length > 0) {
-          const { error: goalsError } = await supabase
-            .from("goals")
-            .insert(initialGoalsList);
-
-          if (goalsError) throw goalsError;
-        }
-      } else {
-        console.log("Keeping existing goals and actions as requested");
-      }
-
-      // Create pre-prompt based on personality, toughness, and using proper names
-      const basePrompt = `You are a helpful AI assistant for a goal-tracking application. Your name is ${assistantName}. You should refer to the user as ${userNickname || "the user"}. You're here to help with: ${selectedIssues.map(id => ISSUES.find(i => i.id === id)?.label).join(", ")}${otherIssue ? `, ${otherIssue}` : ""}.`;
+      const goals: { user_id: string; goal_text: string; description: string | null }[] = [];
       
-      let personalityPrompt = "";
-      switch (personality) {
-        case "direct":
-          personalityPrompt = "Be direct, clear, and straightforward in your responses.";
-          break;
-        case "gentle":
-          personalityPrompt = "Be gentle, supportive, and understanding. Use encouraging language.";
-          break;
-        case "sarcastic":
-          personalityPrompt = "Be slightly sarcastic but helpful. Add a touch of wit and humor to your responses.";
-          break;
-        case "no_prisoners":
-          personalityPrompt = "Be incredibly direct, no-nonsense, and brutally honest. Cut through excuses.";
-          break;
-      }
-
-      let toughnessPrompt = "";
-      switch (toughness) {
-        case "gentle":
-          toughnessPrompt = "Focus on support and compassion. Be understanding of the user's challenges.";
-          break;
-        case "balanced":
-          toughnessPrompt = "Balance support with accountability. Gently remind the user of their commitments.";
-          break;
-        case "firm":
-          toughnessPrompt = "Hold the user accountable. Remind them of their goals and commitments firmly.";
-          break;
-        case "tough":
-          toughnessPrompt = "Be tough on excuses. Call out procrastination and push the user towards their goals firmly.";
-          break;
-      }
-
-      const fullPrompt = `${basePrompt} ${personalityPrompt} ${toughnessPrompt}`;
-
-      // Try to save AI assistant preferences
-      try {
-        // Use our config manager instead of supabase directly
-        await updateConfig({
-          assistant_name: assistantName,
-          personality_type: personality,
-          voice_gender: voiceGender
-        });
+      // Create a goal for each selected issue
+      for (const issueId of selectedIssues) {
+        let goalText = ISSUE_TO_GOAL_MAP[issueId as keyof typeof ISSUE_TO_GOAL_MAP] || `Help with ${issueId}`;
         
-        console.log("AI preferences saved successfully");
-      } catch (configError) {
-        // Log but don't throw error for config issues
-        console.error("Error saving config (continuing with setup):", configError);
-        // We'll still continue with the wizard completion
+        // For "other" issue, use the text provided by the user
+        if (issueId === "other" && otherIssue.trim()) {
+          goalText = `Help with ${otherIssue.trim()}`;
+        }
+        
+        goals.push({
+          user_id: user.id,
+          goal_text: goalText,
+          description: `This goal was automatically created to help you with ${issueId === "other" ? otherIssue : ISSUES.find(i => i.id === issueId)?.label.toLowerCase() || issueId}.`
+        });
       }
+      
+      // Insert the goals into the database
+      const { data, error } = await supabase
+        .from("goals")
+        .insert(goals)
+        .select();
+      
+      if (error) throw error;
+      
+      return data as Goal[];
+    } catch (error) {
+      console.error("Error creating goals from issues:", error);
+      toast.error("Failed to create goals");
+      return [];
+    }
+  };
 
-      // Update user profile with preferences and mark wizard as completed
-      const { error: profileError } = await supabase
+  const handleSubmit = async () => {
+    if (!user) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Create goals based on selected issues
+      const createdGoals = await createGoalsFromIssues();
+      
+      // Convert selected issues to array for database storage
+      const issuesArray = selectedIssues.map(id => id);
+      
+      // Save wizard data to profile
+      const { error } = await supabase
         .from("profiles")
         .update({
           wizard_completed: true,
+          selected_issues: issuesArray,
+          other_issue: selectedIssues.includes("other") ? otherIssue : null,
           nickname: userNickname || null,
-          selected_issues: selectedIssues,
-          other_issue: otherIssue || null,
           assistant_toughness: toughness
         })
         .eq("id", user.id);
-
-      if (profileError) throw profileError;
-
-      // Clear the localStorage flag as it's no longer needed
-      localStorage.removeItem('wizard_keep_existing_data');
-
+        
+      if (error) throw error;
+      
+      // Save assistant preferences
+      await updateConfig({
+        assistant_name: assistantName,
+        personality_type: personality,
+        voice_gender: voiceGender
+      });
+      
+      // Show success message with goals created
+      if (createdGoals.length > 0) {
+        const goalsList = createdGoals.map(goal => `"${goal.goal_text}"`).join(", ");
+        toast.success(`Created ${createdGoals.length} goals: ${goalsList}`);
+      }
+      
       // Mark wizard as completed
       setCompleted(true);
-      setCountdown(10);
       
-      // Start countdown timer
+      // Start countdown to dashboard
       const countdownInterval = setInterval(() => {
         setCountdown(prev => {
           if (prev <= 1) {
             clearInterval(countdownInterval);
-            setRedirecting(true);
-            // Navigate to dashboard after countdown reaches 0
-            setTimeout(() => {
-              navigate("/dashboard");
-            }, 500);
+            navigate("/dashboard");
             return 0;
           }
           return prev - 1;
@@ -519,9 +481,9 @@ const SetupWizard = () => {
         return (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl font-bold">How can MyM8 help you?</CardTitle>
+              <CardTitle className="text-2xl font-bold">Can MyM8 help you with any of the following?</CardTitle>
               <CardDescription>
-                Select the issues you'd like help with (select all that apply)
+                Select the issues you'd like help with (select all that apply). MyM8 will automatically create goals for you based on your selections.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -558,56 +520,6 @@ const SetupWizard = () => {
         return (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl font-bold">Pick your initial goals</CardTitle>
-              <CardDescription>
-                {keepExistingData 
-                  ? "Review your current goals or add new ones"
-                  : "Select at least three goals to get started with"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {loadingExistingData ? (
-                <div className="flex justify-center items-center py-8">
-                  <Loader className="h-8 w-8 animate-spin text-primary mr-2" />
-                  <span>Loading your existing goals...</span>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {GOALS.map((goal) => (
-                      <div key={goal.id} className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={`goal-${goal.id}`} 
-                          checked={selectedGoals.includes(goal.id)}
-                          onCheckedChange={() => handleGoalToggle(goal.id)}
-                        />
-                        <Label htmlFor={`goal-${goal.id}`} className="cursor-pointer">
-                          {goal.label}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  {selectedGoals.includes("other") && (
-                    <div className="mt-4">
-                      <Label htmlFor="other-goal">Please specify:</Label>
-                      <Input
-                        id="other-goal"
-                        value={otherGoal}
-                        onChange={(e) => setOtherGoal(e.target.value)}
-                        placeholder="Describe your custom goal"
-                        className="mt-1"
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </>
-        );
-      case 3:
-        return (
-          <>
-            <CardHeader>
               <CardTitle className="text-2xl font-bold">Name your assistant</CardTitle>
               <CardDescription>
                 What would you like to call your MyM8?
@@ -632,7 +544,7 @@ const SetupWizard = () => {
             </CardContent>
           </>
         );
-      case 4:
+      case 3:
         return (
           <>
             <CardHeader>
@@ -660,7 +572,7 @@ const SetupWizard = () => {
             </CardContent>
           </>
         );
-      case 5:
+      case 4:
         return (
           <>
             <CardHeader>
@@ -683,7 +595,7 @@ const SetupWizard = () => {
             </CardContent>
           </>
         );
-      case 6:
+      case 5:
         return (
           <>
             <CardHeader>
@@ -709,7 +621,7 @@ const SetupWizard = () => {
             </CardContent>
           </>
         );
-      case 7:
+      case 6:
         return (
           <>
             <CardHeader>
@@ -788,7 +700,7 @@ const SetupWizard = () => {
           <div className="mb-6">
             <Progress value={getProgressPercentage()} className="h-2" />
             <p className="text-sm text-muted-foreground mt-2">
-              Step {step} of 7
+              Step {step} of 6
             </p>
           </div>
 
@@ -809,7 +721,7 @@ const SetupWizard = () => {
               >
                 {isSubmitting ? (
                   <>Processing...</>
-                ) : step === 7 ? (
+                ) : step === 6 ? (
                   <>
                     Complete
                     <Check className="ml-2 h-4 w-4" />
