@@ -236,16 +236,14 @@ const AIAssistant = () => {
   return (
     <Layout>
       <div className="w-full h-[calc(100vh-4rem)] flex flex-col">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+        <div className="flex justify-between items-center mb-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">MyM8 {assistantName}</h1>
             <p className="text-sm sm:text-base text-muted-foreground">
               Chat with {assistantName} your goal tracking AI assistant
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <MenuToggleButton />
-          </div>
+          <MenuToggleButton />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2 sm:gap-4 flex-1 min-h-0">
