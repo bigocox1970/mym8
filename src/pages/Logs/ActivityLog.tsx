@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Calendar, Filter, RefreshCcw, CheckCircle2, Clock, X, SkipForward } from "lucide-react";
+import { Search, Calendar, Filter, CheckCircle2, Clock, X, SkipForward } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -56,7 +56,6 @@ const ActivityLog = () => {
   const [frequencyFilter, setFrequencyFilter] = useState<"all" | Frequency>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [dateRange, setDateRange] = useState("all"); // all, today, week, month
-  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -208,13 +207,6 @@ const ActivityLog = () => {
     }).format(date);
   };
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchLogItems().finally(() => {
-      setRefreshing(false);
-    });
-  };
-
   const hasActiveFilters = searchTerm || frequencyFilter !== "all" || dateRange !== "all" || statusFilter !== "all";
 
   const clearFilters = () => {
@@ -235,15 +227,6 @@ const ActivityLog = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              onClick={handleRefresh} 
-              variant="outline" 
-              disabled={refreshing}
-              className="flex items-center gap-1"
-            >
-              <RefreshCcw className="h-4 w-4" />
-              <span>{refreshing ? "Refreshing..." : "Refresh"}</span>
-            </Button>
             <MenuToggleButton />
           </div>
         </div>
@@ -414,8 +397,7 @@ const ActivityLog = () => {
                     Clear Filters
                   </Button>
                 ) : (
-                  <Button variant="outline" onClick={handleRefresh}>
-                    <RefreshCcw className="mr-2 h-4 w-4" />
+                  <Button variant="outline" onClick={fetchLogItems}>
                     Refresh
                   </Button>
                 )}
