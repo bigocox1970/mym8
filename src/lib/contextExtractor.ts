@@ -67,11 +67,24 @@ export async function analyzeConversation(userId: string, messages: Message[]): 
     }
 
     // Extract highlights from meaningful messages
-    const userMessages = messages.filter(m => m.role === 'user');
-    for (const message of userMessages) {
-      if (isSignificantMessage(message.content)) {
-        const truncatedMessage = message.content.substring(0, 100) + (message.content.length > 100 ? '...' : '');
-        await addUserConversationHighlight(userId, truncatedMessage);
+    for (let i = 0; i < messages.length; i++) {
+      const message = messages[i];
+      
+      if (message.role === 'user' && isSignificantMessage(message.content)) {
+        // Save the user message
+        const truncatedUserMessage = message.content.substring(0, 100) + (message.content.length > 100 ? '...' : '');
+        await addUserConversationHighlight(userId, truncatedUserMessage);
+        
+        // If there's an assistant response following this message, save that too
+        if (i + 1 < messages.length && messages[i + 1].role === 'assistant') {
+          const assistantResponse = messages[i + 1].content;
+          
+          // Extract a meaningful summary from the assistant response
+          const assistantSummary = extractAssistantSummary(assistantResponse);
+          if (assistantSummary) {
+            await addUserConversationHighlight(userId, `Assistant: ${assistantSummary}`);
+          }
+        }
       }
     }
   } catch (error) {
@@ -85,7 +98,7 @@ export async function analyzeConversation(userId: string, messages: Message[]): 
  * @returns True if message is significant
  */
 function isSignificantMessage(content: string): boolean {
-  if (!content || content.length < 30) return false;
+  if (!content || content.length < 15) return false;
   
   // Look for personal pronouns and statements
   const personalPhrases = ['I am', 'I\'m', 'I have', 'I\'ve', 'I want', 'I need', 'I feel', 'My'];
@@ -93,7 +106,34 @@ function isSignificantMessage(content: string): boolean {
     content.toLowerCase().includes(phrase.toLowerCase())
   );
   
-  return hasPersonalPhrases;
+  // Look for questions and requests
+  const questionPatterns = [
+    /\?$/, // Ends with question mark
+    /^(can|could|would|will|how|what|when|where|why|who|is|are)/i, // Starts with question words
+    /help me/i, // Help requests
+  ];
+  const hasQuestions = questionPatterns.some(pattern => pattern.test(content));
+  
+  // Look for learning/education related terms
+  const learningTerms = ['learn', 'learning', 'study', 'teach', 'education', 'course', 'training'];
+  const hasLearningTerms = learningTerms.some(term =>
+    content.toLowerCase().includes(term)  
+  );
+  
+  // Look for goal/project related terms
+  const goalTerms = ['goal', 'plan', 'project', 'build', 'create', 'develop', 'start', 'code', 'programming', 'app', 'application'];
+  const hasGoalTerms = goalTerms.some(term =>
+    content.toLowerCase().includes(term)
+  );
+  
+  // Check for commands or clear intentions
+  const intentPatterns = [
+    /^(show|tell|find|get|update|give|list)/i, // Command-like starts
+    /\b(update|progress|status)\b/i, // Status requests
+  ];
+  const hasIntentions = intentPatterns.some(pattern => pattern.test(content));
+  
+  return hasPersonalPhrases || hasQuestions || hasLearningTerms || hasGoalTerms || hasIntentions;
 }
 
 /**
@@ -249,4 +289,25 @@ async function extractPreferences(userId: string, content: string): Promise<void
       }
     }
   }
+}
+
+/**
+ * Extract a meaningful summary from assistant responses
+ * @param content Assistant message content
+ * @returns A summarized version of the response or null
+ */
+function extractAssistantSummary(content: string): string | null {
+  if (!content || content.length < 10) return null;
+  
+  // Try to get the first meaningful sentence
+  const sentences = content.split(/[.!?]+/);
+  const firstSentence = sentences[0]?.trim();
+  
+  if (firstSentence && firstSentence.length > 10) {
+    // Truncate if too long
+    return firstSentence.substring(0, 100) + (firstSentence.length > 100 ? '...' : '');
+  }
+  
+  // If we can't get a good first sentence, just truncate the content
+  return content.substring(0, 100) + (content.length > 100 ? '...' : '');
 }

@@ -1461,3 +1461,35 @@ export async function saveMessage(
 function generateHistoryAnalysisResponse(): string {
   return "I've analyzed your past conversations and updated my understanding of your preferences, interests, and personal information. This will help me provide more personalized responses in the future. If you notice I'm missing anything important about you, feel free to let me know directly.";
 }
+
+/**
+ * Analyze all user conversations to extract context
+ * @param userId User ID
+ * @returns Promise resolving to boolean indicating success
+ */
+export async function analyzeAllUserConversations(userId: string): Promise<boolean> {
+  try {
+    if (!userId) return false;
+    
+    // Get up to 200 past messages
+    const pastMessages = await getConversationHistory(userId, 200);
+    
+    if (pastMessages && pastMessages.length > 0) {
+      console.log(`Analyzing ${pastMessages.length} past conversations for user ${userId}`);
+      
+      // Analyze in batches of 10 messages for more context
+      for (let i = 0; i < pastMessages.length; i += 10) {
+        const batch = pastMessages.slice(i, i + 10);
+        await analyzeConversation(userId, batch);
+      }
+      
+      return true;
+    } else {
+      console.log("No past messages found to analyze");
+      return false;
+    }
+  } catch (error) {
+    console.error("Error analyzing all user conversations:", error);
+    return false;
+  }
+}
