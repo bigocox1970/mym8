@@ -64,6 +64,25 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
       return;
     }
     
+    // Check if we've had user interaction already (for mobile autoplay)
+    const hasUserInteracted = window.localStorage.getItem('voice_user_interacted') === 'true';
+    const mobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    // If on mobile and no user interaction, prompt for it immediately
+    if (mobileDevice && !hasUserInteracted) {
+      toast.error("Voice responses require user interaction on mobile devices.", {
+        action: {
+          label: "Enable Voice",
+          onClick: () => {
+            window.localStorage.setItem('voice_user_interacted', 'true');
+            // Try again after user interaction
+            setTimeout(() => speakText(text), 100);
+          }
+        }
+      });
+      return;
+    }
+    
     const voiceService = config.voice_service || 'browser';
     let voice = 'alloy';
     if (voiceService === 'openai') voice = config.openai_voice || 'alloy';
@@ -242,6 +261,25 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
       // Split text into chunks for more reliable processing
       const textChunks = splitTextIntoChunks(text);
       let chunkIndex = 0;
+      const preloadedBlobs: {[index: number]: Blob} = {};
+      
+      // Function to preload a chunk
+      const preloadChunk = async (index: number) => {
+        if (index >= textChunks.length) return null;
+        
+        try {
+          const chunk = textChunks[index];
+          const audioBlob = await textToSpeech(chunk, voiceService, { voice });
+          preloadedBlobs[index] = audioBlob as Blob;
+          return audioBlob;
+        } catch (error) {
+          console.error(`Error preloading chunk ${index}:`, error);
+          return null;
+        }
+      };
+      
+      // Start preloading the first chunk
+      preloadChunk(0);
       
       const playNextChunk = async () => {
         if (chunkIndex >= textChunks.length) {
@@ -250,35 +288,30 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
         }
         
         try {
+          // Start preloading the next chunk
+          if (chunkIndex + 1 < textChunks.length) {
+            preloadChunk(chunkIndex + 1);
+          }
+          
           const chunk = textChunks[chunkIndex];
           console.log(`Playing TTS chunk ${chunkIndex + 1}/${textChunks.length} (${chunk.length} chars)`);
           
-          const audioBlob = await textToSpeech(chunk, voiceService, { voice });
-          const audioUrl = URL.createObjectURL(audioBlob as Blob);
-          const audio = new Audio();
+          // Use preloaded blob if available, otherwise fetch it
+          let audioBlob: Blob;
+          if (preloadedBlobs[chunkIndex]) {
+            audioBlob = preloadedBlobs[chunkIndex];
+            delete preloadedBlobs[chunkIndex]; // Free memory
+          } else {
+            audioBlob = await textToSpeech(chunk, voiceService, { voice }) as Blob;
+          }
           
-          // Wait for audio to be fully loaded before playing
-          await new Promise((resolve, reject) => {
-            audio.addEventListener('canplaythrough', resolve, { once: true });
-            audio.addEventListener('error', reject, { once: true });
-            
-            // Set the audio source after adding event listeners
-            audio.src = audioUrl;
-            
-            // For iOS Safari
-            audio.crossOrigin = 'anonymous';
-            
-            // Ensure we don't get stuck if canplaythrough never fires
-            const timeout = setTimeout(() => {
-              console.log("Canplaythrough timeout - trying to play anyway");
-              resolve(null);
-            }, 5000);
-            
-            // Clear timeout when resolved
-            audio.addEventListener('canplaythrough', () => clearTimeout(timeout), { once: true });
-            audio.addEventListener('error', () => clearTimeout(timeout), { once: true });
-          });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
           
+          // For iOS Safari
+          audio.crossOrigin = 'anonymous';
+          
+          // Set audio events
           audio.onended = () => {
             URL.revokeObjectURL(audioUrl);
             chunkIndex++;
@@ -293,33 +326,33 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
             playNextChunk();
           };
           
-          try {
-            // Play with error handling
-            await audio.play().catch(error => {
-              console.warn("Initial play failed, retrying after user interaction:", error);
+          // Just try to play directly
+          const playPromise = audio.play();
+          
+          // Only handle errors
+          if (playPromise !== undefined) {
+            playPromise.catch(error => {
+              console.warn("Audio play error:", error);
               
-              // If autoplay fails (common on mobile), we'll need user interaction
-              if (error.name === 'NotAllowedError') {
-                toast.error("Audio playback requires interaction. Tap to enable.", {
+              // Only show toast on the first failed chunk
+              if (chunkIndex === 0 && error.name === 'NotAllowedError') {
+                toast.error("Audio autoplay blocked. Tap Play to enable voice responses.", {
                   action: {
                     label: "Play",
                     onClick: () => {
-                      audio.play().catch(e => {
-                        console.error("Retry play failed:", e);
-                        throw e;
-                      });
+                      // Store user interaction for future
+                      window.localStorage.setItem('voice_user_interacted', 'true');
+                      audio.play().catch(e => console.error("Retry play failed:", e));
                     }
                   }
                 });
               } else {
-                throw error;
+                // For other chunks, just move on
+                URL.revokeObjectURL(audioUrl);
+                chunkIndex++;
+                playNextChunk();
               }
             });
-          } catch (playError) {
-            console.error("Play error:", playError);
-            URL.revokeObjectURL(audioUrl);
-            chunkIndex++;
-            playNextChunk();
           }
         } catch (error) {
           console.error(`Error processing TTS chunk ${chunkIndex + 1}:`, error);
@@ -339,10 +372,14 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
   
   // Stop speaking
   const stopSpeaking = () => {
+    // Stop browser TTS
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
-      setIsSpeaking(false);
     }
+    
+    // For API-based TTS, we need to set isSpeaking to false
+    // This will prevent the next chunk from playing in the recursive chain
+    setIsSpeaking(false);
   };
   
   // Toggle voice response mode
