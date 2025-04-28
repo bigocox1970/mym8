@@ -145,7 +145,6 @@ const JournalDetail = () => {
         return;
       }
       // Use API-based TTS
-      toast("Generating speech...");
       let audioBlob;
       try {
         audioBlob = await textToSpeech(entry.content, service, { voice });

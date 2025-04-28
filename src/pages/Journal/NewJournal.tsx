@@ -73,17 +73,16 @@ const NewJournal = () => {
 
       // Handle results
       recognition.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0])
-          .map(result => result.transcript)
-          .join('');
-
-        setContent(prev => {
-          if (prev.trim()) {
-            return `${prev}\n\n${transcript}`;
-          }
-          return transcript;
-        });
+        const lastResult = event.results[event.results.length - 1];
+        if (lastResult.isFinal) {
+          const transcript = lastResult[0].transcript;
+          setContent(prev => {
+            if (prev.trim()) {
+              return `${prev} ${transcript}`.trim();
+            }
+            return transcript;
+          });
+        }
       };
 
       // Handle errors

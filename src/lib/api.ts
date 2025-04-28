@@ -92,6 +92,7 @@ export async function processMessage(
     goals?: Goal[];
     actions?: Action[];
     conversation?: Message[];
+    userNickname?: string;
   }
 ): Promise<{
   message: string;
@@ -116,8 +117,11 @@ export async function processMessage(
     const systemMessage = {
       role: 'system',
       content: `You are a helpful AI assistant. Here is some context about the user:
+User's name: ${context.userNickname || 'Unknown'}
 Goals: ${context.goals?.map(g => g.goal_text).join(', ') || 'None'}
-Actions: ${context.actions?.map(a => a.title).join(', ') || 'None'}`
+Actions: ${context.actions?.map(a => a.title).join(', ') || 'None'}
+
+When the user mentions their name or refers to themselves, use their name "${context.userNickname}" in your responses if available.`
     };
 
     // Make direct API call to OpenAI
@@ -179,4 +183,4 @@ export async function getSubscription(): Promise<{
     maxTokens: 1000,
     models: ['gpt-4']
   };
-} 
+}
