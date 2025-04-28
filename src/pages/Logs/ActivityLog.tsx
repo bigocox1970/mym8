@@ -232,7 +232,7 @@ const ActivityLog = () => {
         </div>
 
         <div className="flex flex-wrap gap-3 mb-6">
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search actions or goals..."
@@ -353,34 +353,38 @@ const ActivityLog = () => {
                       <div>
                         <h3 className="font-medium">
                           {item.action_title}
-                          {item.completed && (
-                            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 font-medium">
-                              Completed
-                            </span>
-                          )}
-                          {item.skipped && (
-                            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100 font-medium">
-                              Skipped
-                            </span>
-                          )}
-                          {!item.completed && !item.skipped && (
-                            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100 font-medium">
-                              Uncompleted
-                            </span>
-                          )}
                         </h3>
                         <div className="flex items-center gap-2 mt-1">
                           <p className="text-sm text-muted-foreground">
                             {item.goal_title}
                           </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <time className="text-sm text-muted-foreground">
+                          {formatDate(item.timestamp)}
+                        </time>
+                        <div className="mt-1 flex gap-2">
+                          {item.completed && (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 font-medium">
+                              Completed
+                            </span>
+                          )}
+                          {item.skipped && (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100 font-medium">
+                              Skipped
+                            </span>
+                          )}
+                          {!item.completed && !item.skipped && (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100 font-medium">
+                              Uncompleted
+                            </span>
+                          )}
                           <Badge variant="secondary" className="text-xs">
                             {item.frequency}
                           </Badge>
                         </div>
                       </div>
-                      <time className="text-sm text-muted-foreground">
-                        {formatDate(item.timestamp)}
-                      </time>
                     </div>
                   </div>
                 ))}
