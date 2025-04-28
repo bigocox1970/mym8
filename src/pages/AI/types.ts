@@ -52,6 +52,7 @@ export interface Goal {
   id: string;
   goal_text: string;
   description: string | null;
+  notes: string | null;
 }
 
 export interface Action {
