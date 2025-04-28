@@ -27,7 +27,7 @@ export function ChatHeader({
   onDeleteConversation
 }: ChatHeaderProps) {
   return (
-    <CardHeader className="px-2 sm:px-4 py-2 sm:py-3 flex flex-row items-center justify-between border-b shrink-0 bg-background/95 dark:bg-background/90 backdrop-blur-sm">
+    <CardHeader className="px-2 sm:px-4 py-2 sm:py-3 flex flex-row items-center justify-between shrink-0 bg-background/95 dark:bg-background/90 backdrop-blur-sm">
       <div className="flex items-center gap-2">
         <Bot className="h-5 w-5" />
         <CardTitle className="text-base">

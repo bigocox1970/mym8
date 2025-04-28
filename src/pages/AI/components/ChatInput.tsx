@@ -25,7 +25,7 @@ export function ChatInput({
   toggleListening
 }: ChatInputProps) {
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm border-t p-2 sm:p-3 shadow-md z-10">
+    <div className="p-2 sm:p-3">
       <form onSubmit={onSubmit} className="w-full flex flex-col space-y-2">
         <div className="flex gap-2">
           <Textarea

@@ -260,33 +260,44 @@ const AIAssistant = () => {
             onDeleteConversations={handleDeleteMultipleConversations}
           />
 
-          {/* Main chat area */}
-          <Card className={cn(
-            "border-none shadow-md flex flex-col h-full relative overflow-hidden bg-background/95 dark:bg-background/90",
-            showChatHistory ? "hidden md:flex md:col-span-3" : "md:col-span-3"
+          {/* Main chat area - Fixed layout with sticky header and footer */}
+          <div className={cn(
+            "md:col-span-3",
+            showChatHistory ? "hidden md:block" : ""
           )}>
-            <ChatHeader
-              title={getCurrentConversationTitle()}
-              showChatHistory={showChatHistory}
-              setShowChatHistory={setShowChatHistory}
-              onNewConversation={() => setShowNewConversationDialog(true)}
-              onClearConversation={clearCurrentConversation}
-              onDeleteConversation={() => setShowDeleteDialog(true)}
-            />
-            
-            <ChatMessages messages={messages} />
-            
-            <ChatInput
-              input={input}
-              setInput={setInput}
-              isProcessing={isProcessing}
-              onSubmit={handleSubmit}
-              isVoiceEnabled={isVoiceEnabled}
-              toggleVoiceMode={toggleVoiceMode}
-              isListening={isListening}
-              toggleListening={toggleListening}
-            />
-          </Card>
+            <Card className="border-none shadow-md flex flex-col h-full relative overflow-hidden bg-background/95 dark:bg-background/90">
+              {/* Sticky header */}
+              <div className="sticky top-0 z-10 bg-background/95 dark:bg-background/90 border-b">
+                <ChatHeader
+                  title={getCurrentConversationTitle()}
+                  showChatHistory={showChatHistory}
+                  setShowChatHistory={setShowChatHistory}
+                  onNewConversation={() => setShowNewConversationDialog(true)}
+                  onClearConversation={clearCurrentConversation}
+                  onDeleteConversation={() => setShowDeleteDialog(true)}
+                />
+              </div>
+              
+              {/* Scrollable message area with fixed height */}
+              <div className="flex-1 overflow-y-auto" style={{ height: 'calc(100vh - 14rem)' }}>
+                <ChatMessages messages={messages} />
+              </div>
+              
+              {/* Sticky footer */}
+              <div className="sticky bottom-0 z-10 bg-background border-t">
+                <ChatInput
+                  input={input}
+                  setInput={setInput}
+                  isProcessing={isProcessing}
+                  onSubmit={handleSubmit}
+                  isVoiceEnabled={isVoiceEnabled}
+                  toggleVoiceMode={toggleVoiceMode}
+                  isListening={isListening}
+                  toggleListening={toggleListening}
+                />
+              </div>
+            </Card>
+          </div>
         </div>
       </div>
       
