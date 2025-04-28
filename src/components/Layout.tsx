@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Home, FileText, Settings, LogOut, ListTodo, Menu, X, CheckSquare, ClipboardList, Bot, MessageSquare, CalendarCheck, LineChart, Sparkles, ArrowRight, Trash } from "lucide-react";
+import { Home, FileText, Settings, LogOut, ListTodo, Menu, X, CheckSquare, ClipboardList, Bot, MessageSquare, CalendarCheck, LineChart, Sparkles, ArrowRight, Trash, HelpCircle } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { 
   AlertDialog,
@@ -295,6 +295,16 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                   >
                     <Bot className="mr-2 h-4 w-4" />
                     <span>AI Assistant</span>
+                  </Button>
+                </Link>
+                <Link to="/help">
+                  <Button 
+                    variant={isActive("/help") ? "default" : "ghost"} 
+                    className="w-full justify-start"
+                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
+                  >
+                    <HelpCircle className="mr-2 h-4 w-4" />
+                    <span>Help & AI Guide</span>
                   </Button>
                 </Link>
                 <AlertDialog>

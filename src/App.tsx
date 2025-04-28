@@ -29,6 +29,7 @@ import AIAssistant from "./pages/AI/AIAssistant";
 import SetupWizard from './pages/Wizard/SetupWizard';
 import TestDelete from "./pages/Tools/TestDelete";
 import TTSTest from "./pages/Tools/TTSTest";
+import HelpPage from "./pages/Help/HelpPage";
 
 // Create a VerificationSuccess component
 const VerificationSuccess = () => {
@@ -131,6 +132,9 @@ const App = () => (
                 
                 {/* AI Assistant */}
                 <Route path="/assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
+                
+                {/* Help Page */}
+                <Route path="/help" element={<ProtectedRoute><HelpPage /></ProtectedRoute>} />
                 
                 {/* Wizard */}
                 <Route path="/wizard" element={<ProtectedRoute><SetupWizard /></ProtectedRoute>} />
