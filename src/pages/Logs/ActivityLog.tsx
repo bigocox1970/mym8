@@ -219,7 +219,7 @@ const ActivityLog = () => {
   return (
     <Layout>
       <div className="w-full">
-        <div className="flex justify-between items-center mb-6">
+        <div className="w-full flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Activity Log</h1>
             <p className="text-muted-foreground">
@@ -231,8 +231,8 @@ const ActivityLog = () => {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-3 mb-6">
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
+        <div className="w-full flex flex-col gap-3 mb-6">
+          <div className="relative w-full">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search actions or goals..."
@@ -242,63 +242,65 @@ const ActivityLog = () => {
             />
           </div>
           
-          <Select
-            value={frequencyFilter}
-            onValueChange={(value) => setFrequencyFilter(value as typeof frequencyFilter)}
-          >
-            <SelectTrigger className="w-[150px]">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Frequency" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Frequencies</SelectItem>
-              <SelectItem value="morning">Morning</SelectItem>
-              <SelectItem value="afternoon">Afternoon</SelectItem>
-              <SelectItem value="evening">Evening</SelectItem>
-              <SelectItem value="daily">Daily</SelectItem>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Select
-            value={statusFilter}
-            onValueChange={(value) => setStatusFilter(value as StatusFilter)}
-          >
-            <SelectTrigger className="w-[150px]">
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="skipped">Skipped</SelectItem>
-              <SelectItem value="uncompleted">Uncompleted</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Select
-            value={dateRange}
-            onValueChange={(value) => setDateRange(value)}
-          >
-            <SelectTrigger className="w-[150px]">
-              <Calendar className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Date Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Time</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="week">Past Week</SelectItem>
-              <SelectItem value="month">Past Month</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          {hasActiveFilters && (
-            <Button variant="ghost" onClick={clearFilters} className="flex items-center gap-1">
-              <X className="h-4 w-4" />
-              <span>Clear Filters</span>
-            </Button>
-          )}
+          <div className="flex gap-2">
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+            >
+              <SelectTrigger className="w-[150px]">
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="skipped">Skipped</SelectItem>
+                <SelectItem value="uncompleted">Uncompleted</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select
+              value={dateRange}
+              onValueChange={(value) => setDateRange(value)}
+            >
+              <SelectTrigger className="w-[150px]">
+                <Calendar className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="All Time" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">Past Week</SelectItem>
+                <SelectItem value="month">Past Month</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select
+              value={frequencyFilter}
+              onValueChange={(value) => setFrequencyFilter(value as typeof frequencyFilter)}
+            >
+              <SelectTrigger className="w-[150px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Frequency" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Frequencies</SelectItem>
+                <SelectItem value="morning">Morning</SelectItem>
+                <SelectItem value="afternoon">Afternoon</SelectItem>
+                <SelectItem value="evening">Evening</SelectItem>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {hasActiveFilters && (
+              <Button variant="ghost" onClick={clearFilters} className="flex items-center gap-1">
+                <X className="h-4 w-4" />
+                <span>Clear Filters</span>
+              </Button>
+            )}
+          </div>
         </div>
 
         {hasActiveFilters && (
