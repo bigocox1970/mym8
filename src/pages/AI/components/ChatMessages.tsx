@@ -36,8 +36,8 @@ export function ChatMessages({ messages }: ChatMessagesProps) {
   }, [messages]);
 
   return (
-    <div className="flex-1 overflow-y-auto no-scrollbar">
-      <div className="p-2 sm:p-4 space-y-3 sm:space-y-4">
+    <div className="h-full overflow-y-auto no-scrollbar">
+      <div className="p-2 sm:p-4 space-y-3 sm:space-y-4 min-h-full">
         {messages.map((message) => (
           <div
             key={message.id}

@@ -235,7 +235,7 @@ const AIAssistant = () => {
 
   return (
     <Layout>
-      <div className="w-full h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+      <div className="w-full h-[calc(100vh-4rem)] flex flex-col">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">MyM8 {assistantName}</h1>
@@ -248,7 +248,7 @@ const AIAssistant = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 sm:gap-4 flex-1 overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 sm:gap-4 flex-1 min-h-0">
           {/* Conversations sidebar */}
           <ChatHistory
             conversations={conversations}
@@ -262,10 +262,10 @@ const AIAssistant = () => {
 
           {/* Main chat area - Fixed layout with sticky header and footer */}
           <div className={cn(
-            "md:col-span-3",
-            showChatHistory ? "hidden md:block" : ""
+            "md:col-span-3 flex flex-col h-[calc(100vh-10rem)] relative",
+            showChatHistory ? "hidden md:flex" : "flex"
           )}>
-            <Card className="border-none shadow-md flex flex-col h-full relative overflow-hidden bg-background/95 dark:bg-background/90">
+            <Card className="border-none shadow-md flex flex-col flex-1 relative overflow-hidden bg-background/95 dark:bg-background/90">
               {/* Sticky header */}
               <div className="sticky top-0 z-10 bg-background/95 dark:bg-background/90 border-b">
                 <ChatHeader
@@ -278,13 +278,13 @@ const AIAssistant = () => {
                 />
               </div>
               
-              {/* Scrollable message area with fixed height */}
-              <div className="flex-1 overflow-y-auto" style={{ height: 'calc(100vh - 14rem)' }}>
+              {/* Scrollable message area - using flex instead of fixed height */}
+              <div className="flex-1 overflow-y-auto mb-[105px] sm:mb-[120px]">
                 <ChatMessages messages={messages} />
               </div>
               
-              {/* Sticky footer */}
-              <div className="sticky bottom-0 z-10 bg-background border-t">
+              {/* Fixed footer at bottom */}
+              <div className="absolute bottom-0 left-0 right-0 z-10 bg-background border-t">
                 <ChatInput
                   input={input}
                   setInput={setInput}
