@@ -154,9 +154,41 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       setIsSpeaking(true);
-      const selectedVoiceName = config.voice_gender === 'male' ? 'Alex' : 'Samantha';
+      
+      const preferredGender = config.voice_gender || 'female';
       const voices = window.speechSynthesis.getVoices();
-      const selectedVoice = voices.find(v => v.name === selectedVoiceName);
+      
+      // Try to find an appropriate voice
+      let selectedVoice;
+      
+      // First try to find a voice for the user's browser language
+      const browserLang = navigator.language || 'en-US';
+      const langVoices = voices.filter(v => v.lang.startsWith(browserLang.split('-')[0]));
+      
+      // Find a voice matching the preferred gender if possible
+      if (preferredGender === 'male') {
+        selectedVoice = langVoices.find(v => v.name.toLowerCase().includes('male') || 
+                                           v.name.includes('David') || 
+                                           v.name.includes('Tom') || 
+                                           v.name.includes('Daniel'));
+      } else {
+        selectedVoice = langVoices.find(v => v.name.toLowerCase().includes('female') || 
+                                           v.name.includes('Samantha') || 
+                                           v.name.includes('Karen') || 
+                                           v.name.includes('Ava'));
+      }
+      
+      // Fallback to any available voice in the preferred language
+      if (!selectedVoice && langVoices.length > 0) {
+        selectedVoice = langVoices[0];
+      }
+      
+      // Ultimate fallback - just use any available voice
+      if (!selectedVoice && voices.length > 0) {
+        selectedVoice = voices[0];
+      }
+      
+      console.log(`Selected voice: ${selectedVoice?.name || 'default'}`);
       
       // Split text into chunks and queue them for speaking
       const textChunks = splitTextIntoChunks(text);
@@ -169,11 +201,21 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
         }
         
         const utterance = new SpeechSynthesisUtterance(textChunks[chunkIndex]);
-        if (selectedVoice) utterance.voice = selectedVoice;
+        
+        // Set the selected voice if available
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+          utterance.lang = selectedVoice.lang;
+        }
+        
+        // Set pitch and rate for more natural speech
+        utterance.pitch = 1.0;
+        utterance.rate = 1.0;
         
         utterance.onend = () => {
           chunkIndex++;
-          speakNextChunk();
+          // Small delay between chunks for more natural pauses
+          setTimeout(speakNextChunk, 200);
         };
         
         utterance.onerror = (error) => {
@@ -213,7 +255,29 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
           
           const audioBlob = await textToSpeech(chunk, voiceService, { voice });
           const audioUrl = URL.createObjectURL(audioBlob as Blob);
-          const audio = new Audio(audioUrl);
+          const audio = new Audio();
+          
+          // Wait for audio to be fully loaded before playing
+          await new Promise((resolve, reject) => {
+            audio.addEventListener('canplaythrough', resolve, { once: true });
+            audio.addEventListener('error', reject, { once: true });
+            
+            // Set the audio source after adding event listeners
+            audio.src = audioUrl;
+            
+            // For iOS Safari
+            audio.crossOrigin = 'anonymous';
+            
+            // Ensure we don't get stuck if canplaythrough never fires
+            const timeout = setTimeout(() => {
+              console.log("Canplaythrough timeout - trying to play anyway");
+              resolve(null);
+            }, 5000);
+            
+            // Clear timeout when resolved
+            audio.addEventListener('canplaythrough', () => clearTimeout(timeout), { once: true });
+            audio.addEventListener('error', () => clearTimeout(timeout), { once: true });
+          });
           
           audio.onended = () => {
             URL.revokeObjectURL(audioUrl);
@@ -229,7 +293,34 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
             playNextChunk();
           };
           
-          await audio.play();
+          try {
+            // Play with error handling
+            await audio.play().catch(error => {
+              console.warn("Initial play failed, retrying after user interaction:", error);
+              
+              // If autoplay fails (common on mobile), we'll need user interaction
+              if (error.name === 'NotAllowedError') {
+                toast.error("Audio playback requires interaction. Tap to enable.", {
+                  action: {
+                    label: "Play",
+                    onClick: () => {
+                      audio.play().catch(e => {
+                        console.error("Retry play failed:", e);
+                        throw e;
+                      });
+                    }
+                  }
+                });
+              } else {
+                throw error;
+              }
+            });
+          } catch (playError) {
+            console.error("Play error:", playError);
+            URL.revokeObjectURL(audioUrl);
+            chunkIndex++;
+            playNextChunk();
+          }
         } catch (error) {
           console.error(`Error processing TTS chunk ${chunkIndex + 1}:`, error);
           toast.error(`Failed to generate speech for chunk ${chunkIndex + 1}`);
