@@ -221,9 +221,11 @@ export async function createSimpleAction(
     console.log(`Detected frequency "${detectedFrequency}" for action: ${title}`);
     
     let targetGoalId = goalId;
+    let goalMatchScore = 0;
     
     // If no goal ID is provided, find a matching or first available goal
     if (!targetGoalId) {
+      console.log("No goal ID provided, searching for a matching goal...");
       // First, try to find a relevant goal based on the action title
       const { data: goals, error: goalError } = await supabase
         .from('goals')
@@ -234,6 +236,8 @@ export async function createSimpleAction(
         console.error("Goal fetch error:", goalError);
         throw new Error("Failed to find any goals to attach action to");
       }
+      
+      console.log(`Found ${goals?.length || 0} goals for user:`, goals);
       
       if (!goals || goals.length === 0) {
         throw new Error("No goals found to attach action to. Please create a goal first.");
@@ -262,8 +266,26 @@ export async function createSimpleAction(
       }
       
       targetGoalId = bestGoal.id;
-      console.log(`Attaching action to goal "${bestGoal.goal_text}" (ID: ${targetGoalId})`);
+      goalMatchScore = bestScore;
+      console.log(`Selected goal "${bestGoal.goal_text}" (ID: ${targetGoalId}) with match score: ${bestScore}`);
     }
+    
+    // Check if the goal specifically mentions "be happy" and prioritize it for actions related to well-being
+    if (!targetGoalId || goalMatchScore === 0) {
+      console.log("Looking for 'Be Happy' goal as a fallback...");
+      const { data: happyGoals } = await supabase
+        .from('goals')
+        .select('id, goal_text')
+        .eq('user_id', userId)
+        .ilike('goal_text', '%happy%');
+        
+      if (happyGoals && happyGoals.length > 0) {
+        targetGoalId = happyGoals[0].id;
+        console.log(`Found 'Be Happy' goal (ID: ${targetGoalId}) to use for this action`);
+      }
+    }
+    
+    console.log(`Final goal selection: Goal ID ${targetGoalId} for action "${title}"`);
     
     // Use the existing createAction function to create the action
     return createAction(userId, targetGoalId, title, detectedFrequency, description);
