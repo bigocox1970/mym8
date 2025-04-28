@@ -192,7 +192,7 @@ const ProfileContext = () => {
 
   if (loading) {
     return (
-      <div className="container py-8">
+      <div className="w-full py-8">
         <h1 className="text-2xl font-bold mb-6">AI Assistant Profile</h1>
         <div className="space-y-4">
           <Skeleton className="h-12 w-full" />
@@ -204,7 +204,7 @@ const ProfileContext = () => {
   }
 
   return (
-    <div className="container max-w-4xl mx-auto py-8">
+    <div className="w-full py-8">
       <h1 className="text-2xl font-bold mb-2">AI Assistant Profile</h1>
       <p className="mb-6 text-muted-foreground">
         Manage your AI assistant's understanding of your preferences, interests, and personal information.
