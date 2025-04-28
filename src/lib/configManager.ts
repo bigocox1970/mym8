@@ -154,7 +154,17 @@ export async function initConfig(): Promise<void> {
       delete parsedConfig.amazon_api_key;
       delete parsedConfig.openai_api_key;
       
+      // Skip the default M8 assistant name
+      if (parsedConfig.assistant_name === 'M8') {
+        parsedConfig.assistant_name = '';
+      }
+      
       currentConfig = { ...currentConfig, ...parsedConfig };
+    }
+
+    // Also clean up default M8 in current config
+    if (currentConfig.assistant_name === 'M8') {
+      currentConfig.assistant_name = '';
     }
 
     try {
@@ -184,12 +194,12 @@ export async function initConfig(): Promise<void> {
           console.log('Loaded config from Supabase:', currentConfig);
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error loading preferences from Supabase:', error);
       toast.error('Failed to connect to database');
       // Continue with local storage even if Supabase fails
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error initializing config:', error);
   }
 }

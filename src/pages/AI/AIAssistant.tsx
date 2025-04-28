@@ -93,9 +93,22 @@ const AIAssistant = () => {
 
   // Get assistant name from config
   useEffect(() => {
-    const config = getConfig();
-    if (config.assistant_name) {
-      setAssistantName(config.assistant_name);
+    try {
+      const config = getConfig();
+      console.log("Loading assistant name from config:", config.assistant_name);
+      
+      // Skip setting if it's 'M8' or empty
+      if (config.assistant_name && config.assistant_name !== 'M8') {
+        setAssistantName(config.assistant_name);
+      } else {
+        console.log("Skipping default assistant name 'M8'");
+        // Explicitly set to empty to override any previous value
+        setAssistantName("");
+      }
+    } catch (error) {
+      console.error("Error loading assistant name:", error);
+      // Set to empty on error
+      setAssistantName("");
     }
   }, []);
 

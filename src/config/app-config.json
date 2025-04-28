@@ -1,7 +1,7 @@
 {
   "llm_provider": "gpt-4o",
   "enable_ai": true,
-  "assistant_name": "M8",
+  "assistant_name": "",
   "personality_type": "friendly",
   "voice_gender": "female",
   "voice_enabled": true,
