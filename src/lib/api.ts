@@ -189,6 +189,7 @@ export async function createAction(
  * @param title Action title
  * @param frequency Action frequency
  * @param description Optional action description
+ * @param goalContext Optional context about the most recently discussed goal
  * @returns Created action data
  */
 export async function createSimpleAction(
@@ -196,10 +197,11 @@ export async function createSimpleAction(
   title: string,
   frequency: string = 'daily',
   description?: string,
-  goalId?: string
+  goalId?: string,
+  goalContext?: string
 ): Promise<Action | null> {
   try {
-    console.log("Creating simple action:", { userId, title, frequency, goalId });
+    console.log("Creating simple action:", { userId, title, frequency, goalId, goalContext });
     
     // Parse the title for frequency hints if not explicitly provided
     let detectedFrequency = frequency;
@@ -230,11 +232,31 @@ export async function createSimpleAction(
     // If no goal ID is provided, find a matching or first available goal
     if (!targetGoalId) {
       console.log("No goal ID provided, searching for a matching goal...");
-      // First, try to find a relevant goal based on the action title
+      
+      // First, check if we have recent goal context to use
+      if (goalContext) {
+        console.log("Checking for a goal matching the context:", goalContext);
+        // Try to find a goal matching the context provided
+        const { data: contextGoals } = await supabase
+          .from('goals')
+          .select('id, goal_text, created_at')
+          .eq('user_id', userId)
+          .ilike('goal_text', `%${goalContext}%`)
+          .order('created_at', { ascending: false });
+          
+        if (contextGoals && contextGoals.length > 0) {
+          targetGoalId = contextGoals[0].id;
+          console.log(`Found goal matching context: "${contextGoals[0].goal_text}" (ID: ${targetGoalId})`);
+          return createAction(userId, targetGoalId, title, detectedFrequency, description);
+        }
+      }
+      
+      // Get all goals, sorted by most recent first
       const { data: goals, error: goalError } = await supabase
         .from('goals')
-        .select('id, goal_text')
-        .eq('user_id', userId);
+        .select('id, goal_text, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
         
       if (goalError) {
         console.error("Goal fetch error:", goalError);
@@ -247,10 +269,22 @@ export async function createSimpleAction(
         throw new Error("No goals found to attach action to. Please create a goal first.");
       }
       
-      // Try to find a matching goal based on semantic similarity
+      // First try to match goal by looking at the most recent goal (it's likely the one being discussed)
+      const mostRecentGoal = goals[0];
+      console.log(`Most recent goal is "${mostRecentGoal.goal_text}" created at ${mostRecentGoal.created_at}`);
+      
+      // Check if this goal was created within the last hour - if so, it's likely the one being talked about
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      if (mostRecentGoal.created_at > oneHourAgo) {
+        console.log(`Most recent goal was created in the last hour, using it for this action`);
+        targetGoalId = mostRecentGoal.id;
+        return createAction(userId, targetGoalId, title, detectedFrequency, description);
+      }
+      
+      // If no recent goal, try semantic matching
       // This is a simple version that just checks for word overlap
       const words = title.toLowerCase().split(/\s+/);
-      let bestGoal = goals[0];
+      let bestGoal = goals[0]; // Default to most recent goal
       let bestScore = 0;
       
       for (const goal of goals) {
@@ -269,23 +303,34 @@ export async function createSimpleAction(
         }
       }
       
-      targetGoalId = bestGoal.id;
-      goalMatchScore = bestScore;
-      console.log(`Selected goal "${bestGoal.goal_text}" (ID: ${targetGoalId}) with match score: ${bestScore}`);
+      // Only use semantic matching if we have a real match (score > 0)
+      if (bestScore > 0) {
+        targetGoalId = bestGoal.id;
+        goalMatchScore = bestScore;
+        console.log(`Selected goal "${bestGoal.goal_text}" (ID: ${targetGoalId}) with match score: ${bestScore}`);
+        return createAction(userId, targetGoalId, title, detectedFrequency, description);
+      }
+      
+      // If we get here, no good match was found, so just use the most recent goal
+      targetGoalId = mostRecentGoal.id;
+      console.log(`No semantic match found, using most recent goal: "${mostRecentGoal.goal_text}"`);
     }
     
-    // Check if the goal specifically mentions "be happy" and prioritize it for actions related to well-being
-    if (!targetGoalId || goalMatchScore === 0) {
-      console.log("Looking for 'Be Happy' goal as a fallback...");
-      const { data: happyGoals } = await supabase
+    // If we still don't have a goal ID (unlikely), use the first goal as a last resort
+    if (!targetGoalId) {
+      const { data: firstGoal } = await supabase
         .from('goals')
         .select('id, goal_text')
         .eq('user_id', userId)
-        .ilike('goal_text', '%happy%');
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
         
-      if (happyGoals && happyGoals.length > 0) {
-        targetGoalId = happyGoals[0].id;
-        console.log(`Found 'Be Happy' goal (ID: ${targetGoalId}) to use for this action`);
+      if (firstGoal) {
+        targetGoalId = firstGoal.id;
+        console.log(`Falling back to first goal: "${firstGoal.goal_text}"`);
+      } else {
+        throw new Error("No goals found to attach action to. Please create a goal first.");
       }
     }
     
@@ -750,6 +795,7 @@ For creating a goal: [CREATE_GOAL: The goal text here]
 For creating a goal with description: [CREATE_GOAL_WITH_DESCRIPTION: Goal text|description text]
 For creating a goal with description and notes: [CREATE_GOAL_WITH_NOTES: Goal text|description text|notes text]
 For creating an action: [CREATE_ACTION: Action title]
+For creating an action for a specific goal: [CREATE_ACTION_FOR_GOAL: Action title|Goal name]
 For marking an action as complete: [COMPLETE_ACTION: action_id] or [COMPLETE_ACTION_TEXT: action text to search for]
 For deleting a goal: [DELETE_GOAL: goal_id] or [DELETE_GOAL_TEXT: goal text to search for]
 For deleting an action: [DELETE_ACTION: action_id] or [DELETE_ACTION_TEXT: action text to search for]
@@ -816,7 +862,7 @@ Example: If a user says "add an action to exercise", you should ask for clarific
 "I'd be happy to add that action. Could you tell me which goal I should attach 'exercise' to, and how often you want to do this (daily, weekly, etc.)?"
 
 Example: If a user says "add an action to get up early every morning for my happiness goal", you can infer the frequency and goal:
-"I'll add that action to your happiness goal as a morning task. [CREATE_ACTION: Get up early every morning]"
+"I'll add that action to your happiness goal as a morning task. [CREATE_ACTION_FOR_GOAL: Get up early every morning|happiness]"
 
 Example: If a user says "mark my reading action as complete", respond with:
 "I'll mark that action as completed. [COMPLETE_ACTION_TEXT: reading]"
@@ -878,7 +924,10 @@ After gathering motivation and details for a goal, ALWAYS suggest creating speci
 
 Which of these would you like me to set up, or do you have other actions in mind?"
 
-Wait for the user to select which actions they want before creating them. Then create each selected action with the appropriate frequency using [CREATE_ACTION: action title].`
+Wait for the user to select which actions they want before creating them. Then create each selected action with the appropriate frequency using [CREATE_ACTION: action title].
+
+Example: If a user wants to add several actions to a newly created goal, use the specific goal command:
+"I'll add those workout actions to your gym goal. [CREATE_ACTION_FOR_GOAL: Schedule gym sessions in your calendar|gym]`
     };
 
     // Make direct API call to OpenAI
@@ -956,8 +1005,24 @@ Wait for the user to select which actions they want before creating them. Then c
       console.log("CREATE_ACTION match found:", createActionMatch[1]);
       const actionTitle = createActionMatch[1].trim();
       
-      console.log("Attempting to create simple action:", actionTitle);
-      const createdAction = await createSimpleAction(context.userId, actionTitle);
+      // Look for any goal context in the current conversation
+      let goalContext = null;
+      // Check the last few messages for any mention of goals
+      const recentMessages = context.conversation?.slice(-5) || [];
+      for (const msg of recentMessages) {
+        if (msg.content.toLowerCase().includes("goal")) {
+          const goalMatch = msg.content.match(/goal (?:to|for) ([^".,]+)/i) || 
+                           msg.content.match(/([^".,]+) goal/i);
+          if (goalMatch && goalMatch[1]) {
+            goalContext = goalMatch[1].trim();
+            console.log("Found goal context in recent messages:", goalContext);
+            break;
+          }
+        }
+      }
+      
+      console.log("Attempting to create simple action:", actionTitle, "with goal context:", goalContext);
+      const createdAction = await createSimpleAction(context.userId, actionTitle, 'daily', null, undefined, goalContext);
       
       if (createdAction) {
         action = `Action "${actionTitle}" created successfully with frequency: ${createdAction.frequency}`;
@@ -1096,6 +1161,24 @@ Wait for the user to select which actions they want before creating them. Then c
       refresh = true;
     }
 
+    // Check for create action with specific goal command
+    const createActionForGoalMatch = aiResponse.match(/\[CREATE_ACTION_FOR_GOAL: (.*?)\|(.*?)\]/);
+    if (createActionForGoalMatch && context.userId) {
+      const actionTitle = createActionForGoalMatch[1].trim();
+      const goalContext = createActionForGoalMatch[2].trim();
+      console.log("CREATE_ACTION_FOR_GOAL match found:", actionTitle, "for goal:", goalContext);
+      
+      const createdAction = await createSimpleAction(context.userId, actionTitle, 'daily', null, undefined, goalContext);
+      
+      if (createdAction) {
+        action = `Action "${actionTitle}" created successfully for goal "${goalContext}" with frequency: ${createdAction.frequency}`;
+        refresh = true;
+      } else {
+        console.error("Failed to create action for specific goal");
+        action = `Failed to create action "${actionTitle}" for goal "${goalContext}"`;
+      }
+    }
+
     return {
       message: aiResponse
         .replace(/\[ACTION:[^\]]+\]/g, '')
@@ -1105,6 +1188,7 @@ Wait for the user to select which actions they want before creating them. Then c
         .replace(/\[CREATE_GOAL_WITH_DESCRIPTION:[^\]]*\|[^\]]*\]/g, '')
         .replace(/\[CREATE_GOAL_WITH_NOTES:[^\]]*\|[^\]]*\|[^\]]*\]/g, '')
         .replace(/\[CREATE_ACTION:[^\]]+\]/g, '')
+        .replace(/\[CREATE_ACTION_FOR_GOAL:[^\]]*\|[^\]]*\]/g, '')
         .replace(/\[COMPLETE_ACTION:[^\]]+\]/g, '')
         .replace(/\[COMPLETE_ACTION_TEXT:[^\]]+\]/g, '')
         .replace(/\[DELETE_GOAL:[^\]]+\]/g, '')
