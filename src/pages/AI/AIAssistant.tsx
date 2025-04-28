@@ -37,7 +37,7 @@ const AIAssistant = () => {
   const [newConversationTitle, setNewConversationTitle] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const initialLoadRef = useRef(true);
-  const [assistantName, setAssistantName] = useState("AI Assistant");
+  const [assistantName, setAssistantName] = useState("");
   
   // Get user goals and actions using React Query
   const { data: goals = [] } = useQuery({
@@ -238,9 +238,11 @@ const AIAssistant = () => {
       <div className="w-full h-[calc(100vh-4rem)] flex flex-col">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">MyM8 {assistantName}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              MyM8 {assistantName && ` ${assistantName}`}
+            </h1>
             <p className="text-sm sm:text-base text-muted-foreground">
-              Chat with {assistantName} your goal tracking AI assistant
+              Chat with {assistantName ? `${assistantName} your` : "your"} goal tracking AI assistant
             </p>
           </div>
           <MenuToggleButton />
