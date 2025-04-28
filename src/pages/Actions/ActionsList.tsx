@@ -566,13 +566,7 @@ const ActionsList = () => {
                                 checked={selectedActions.includes(action.id)}
                                 onCheckedChange={() => handleToggleSelection(action.id)}
                               />
-                            ) : (
-                              <Checkbox
-                                checked={action.completed}
-                                onCheckedChange={(checked) => handleActionComplete(action.id, checked === true)}
-                                className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
-                              />
-                            )}
+                            ) : null}
                             <div className="flex-1">
                               <div className="flex justify-between items-start">
                                 <div>
@@ -604,14 +598,24 @@ const ActionsList = () => {
                                     {action.goal_text}
                                   </Link>
                                   {!isEditMode && (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon"
-                                      onClick={() => handleEditAction(action)}
-                                      className="h-8 w-8"
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
+                                    <>
+                                      <Button 
+                                        variant={action.completed ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => handleActionComplete(action.id, !action.completed)}
+                                        className="h-8"
+                                      >
+                                        {action.completed ? "Completed" : "Mark Complete"}
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        onClick={() => handleEditAction(action)}
+                                        className="h-8 w-8"
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                    </>
                                   )}
                                 </div>
                               </div>
@@ -655,13 +659,7 @@ const ActionsList = () => {
                                 checked={selectedActions.includes(action.id)}
                                 onCheckedChange={() => handleToggleSelection(action.id)}
                               />
-                            ) : (
-                              <Checkbox
-                                checked={action.completed}
-                                onCheckedChange={(checked) => handleActionComplete(action.id, checked === true)}
-                                className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
-                              />
-                            )}
+                            ) : null}
                             <div className="flex-1">
                               <div className="flex justify-between items-start">
                                 <div>
@@ -693,14 +691,24 @@ const ActionsList = () => {
                                     {action.goal_text}
                                   </Link>
                                   {!isEditMode && (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon"
-                                      onClick={() => handleEditAction(action)}
-                                      className="h-8 w-8"
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
+                                    <>
+                                      <Button 
+                                        variant={action.completed ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => handleActionComplete(action.id, !action.completed)}
+                                        className="h-8"
+                                      >
+                                        {action.completed ? "Completed" : "Mark Complete"}
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        onClick={() => handleEditAction(action)}
+                                        className="h-8 w-8"
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                    </>
                                   )}
                                 </div>
                               </div>
@@ -742,13 +750,7 @@ const ActionsList = () => {
                                 checked={selectedActions.includes(action.id)}
                                 onCheckedChange={() => handleToggleSelection(action.id)}
                               />
-                            ) : (
-                              <Checkbox
-                                checked={action.completed}
-                                onCheckedChange={(checked) => handleActionComplete(action.id, checked === true)}
-                                className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
-                              />
-                            )}
+                            ) : null}
                             <div className="flex-1">
                               <div className="flex justify-between items-start">
                                 <div>
@@ -780,14 +782,24 @@ const ActionsList = () => {
                                     {action.goal_text}
                                   </Link>
                                   {!isEditMode && (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon"
-                                      onClick={() => handleEditAction(action)}
-                                      className="h-8 w-8"
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
+                                    <>
+                                      <Button 
+                                        variant={action.completed ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => handleActionComplete(action.id, !action.completed)}
+                                        className="h-8"
+                                      >
+                                        {action.completed ? "Completed" : "Mark Complete"}
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        onClick={() => handleEditAction(action)}
+                                        className="h-8 w-8"
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                    </>
                                   )}
                                 </div>
                               </div>
