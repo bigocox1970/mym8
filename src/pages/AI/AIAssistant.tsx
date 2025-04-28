@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Layout } from "@/components/Layout";
+import React, { useState, useRef, useEffect, useContext } from "react";
+import { Layout, SidebarContext, MenuToggleButton } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
@@ -28,6 +28,7 @@ import { Message } from "./types";
 
 const AIAssistant = () => {
   const { user, profile } = useAuth();
+  const { toggleSidebar } = useContext(SidebarContext);
   const [input, setInput] = useState("");
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [showNewConversationDialog, setShowNewConversationDialog] = useState(false);
@@ -228,6 +229,7 @@ const AIAssistant = () => {
                 Chat with {assistantName} your goal tracking AI assistant
               </p>
             </div>
+            <MenuToggleButton />
           </div>
         </div>
 
