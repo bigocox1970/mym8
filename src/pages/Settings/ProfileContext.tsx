@@ -25,7 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { X } from "lucide-react";
+import { X, Search } from "lucide-react";
 import { BotIcon, UserIcon } from "lucide-react";
 
 const ProfileContext = () => {
@@ -43,6 +43,8 @@ const ProfileContext = () => {
     value: ""
   });
   const [expandedHighlights, setExpandedHighlights] = useState<Set<number>>(new Set());
+  const [highlightsLoading, setHighlightsLoading] = useState(false);
+  const [highlightFilter, setHighlightFilter] = useState("");
 
   // Load user context on component mount
   useEffect(() => {
@@ -192,31 +194,31 @@ const ProfileContext = () => {
 
   if (loading) {
     return (
-      <div className="container py-8">
-        <h1 className="text-2xl font-bold mb-6">AI Assistant Profile</h1>
-        <div className="space-y-4">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-32 w-full" />
+      <div className="container py-4 sm:py-8">
+        <h1 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-6">AI Assistant Profile</h1>
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-32 sm:h-48 w-full" />
+          <Skeleton className="h-20 sm:h-32 w-full" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container py-8">
-      <h1 className="text-2xl font-bold mb-6">AI Assistant Profile</h1>
-      <p className="mb-6 text-muted-foreground">
+    <div className="container py-4 sm:py-8">
+      <h1 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-6">AI Assistant Profile</h1>
+      <p className="mb-4 sm:mb-6 text-sm sm:text-base text-muted-foreground">
         Manage your AI assistant's understanding of your preferences, interests, and personal information.
         This information helps the assistant provide more personalized responses.
       </p>
 
       <Tabs defaultValue="interests" className="w-full">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex flex-wrap">
           <TabsTrigger value="interests">Interests & Dislikes</TabsTrigger>
-          <TabsTrigger value="personalInfo">Personal Information</TabsTrigger>
+          <TabsTrigger value="personalInfo">Personal Info</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="highlights">Conversation Highlights</TabsTrigger>
+          <TabsTrigger value="highlights">Highlights</TabsTrigger>
         </TabsList>
 
         <TabsContent value="interests">
@@ -399,7 +401,7 @@ const ProfileContext = () => {
 
         <TabsContent value="highlights">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between sticky top-0 bg-card z-10 border-b">
               <div>
                 <CardTitle>Conversation Highlights</CardTitle>
                 <CardDescription>
@@ -410,7 +412,7 @@ const ProfileContext = () => {
               <Button 
                 onClick={async () => {
                   if (user?.id) {
-                    setLoading(true);
+                    setHighlightsLoading(true);
                     // Analyze past conversations to extract more context
                     const analyzed = await analyzeAllUserConversations(user.id);
                     
@@ -425,7 +427,7 @@ const ProfileContext = () => {
                       );
                     }
                     setUserContext(freshContext);
-                    setLoading(false);
+                    setHighlightsLoading(false);
                     
                     if (analyzed) {
                       toast.success("Successfully analyzed past conversations and refreshed highlights");
@@ -440,75 +442,112 @@ const ProfileContext = () => {
                 Refresh Data
               </Button>
             </CardHeader>
-            <CardContent>
-              {userContext?.conversation_highlights && Array.isArray(userContext.conversation_highlights) && userContext.conversation_highlights.length > 0 ? (
-                <div className="space-y-3">
-                  <div className="flex justify-end mb-2">
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={async () => {
-                        if (user?.id && window.confirm("Are you sure you want to clear all conversation highlights?")) {
-                          setLoading(true);
-                          try {
-                            // Update context with empty highlights array
-                            const updated = await updateUserAIContext(user.id, {
-                              conversation_highlights: []
-                            });
-                            
-                            if (updated) {
-                              setUserContext(updated);
-                              toast.success("Cleared all conversation highlights");
-                            }
-                          } catch (error) {
-                            console.error("Error clearing highlights:", error);
-                            toast.error("Failed to clear highlights");
-                          }
-                          setLoading(false);
-                        }
-                      }}
-                    >
-                      Clear All
-                    </Button>
+            <CardContent className="overflow-y-auto max-h-[50vh] sm:max-h-[60vh] pt-0 relative">
+              {highlightsLoading && (
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
+                  <div className="flex flex-col items-center space-y-2">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <p className="text-sm text-muted-foreground">Analyzing conversations...</p>
                   </div>
-                  {userContext.conversation_highlights.map((highlight, index) => {
-                    const isExpanded = expandedHighlights.has(index);
-                    const isLong = highlight.length > 150;
-                    const displayText = isLong && !isExpanded 
-                      ? highlight.substring(0, 150) + "..." 
-                      : highlight;
-                    
-                    return (
-                      <div key={index} className={`p-3 rounded-md ${highlight.startsWith('Assistant:') ? 'bg-muted border-l-4 border-primary ml-4' : 'border'}`}>
-                        <div className="flex items-start gap-2">
-                          {highlight.startsWith('Assistant:') ? (
-                            <BotIcon className="h-4 w-4 mt-1 text-primary" />
-                          ) : (
-                            <UserIcon className="h-4 w-4 mt-1" />
-                          )}
-                          <div className="w-full">
-                            <p className="text-sm whitespace-pre-wrap">{displayText}</p>
-                            {isLong && (
-                              <Button 
-                                variant="link" 
-                                size="sm" 
-                                className="px-0 h-5 text-xs"
-                                onClick={() => toggleHighlight(index)}
-                              >
-                                {isExpanded ? "Show less" : "Show more"}
-                              </Button>
+                </div>
+              )}
+              {userContext?.conversation_highlights && Array.isArray(userContext.conversation_highlights) && userContext.conversation_highlights.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="sticky top-0 py-2 bg-card z-10">
+                    <div className="flex justify-end mb-2">
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={async () => {
+                          if (user?.id && window.confirm("Are you sure you want to clear all conversation highlights?")) {
+                            setLoading(true);
+                            try {
+                              // Update context with empty highlights array
+                              const updated = await updateUserAIContext(user.id, {
+                                conversation_highlights: []
+                              });
+                              
+                              if (updated) {
+                                setUserContext(updated);
+                                toast.success("Cleared all conversation highlights");
+                              }
+                            } catch (error) {
+                              console.error("Error clearing highlights:", error);
+                              toast.error("Failed to clear highlights");
+                            }
+                            setLoading(false);
+                          }
+                        }}
+                      >
+                        Clear All
+                      </Button>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        placeholder="Search highlights..."
+                        value={highlightFilter}
+                        onChange={(e) => setHighlightFilter(e.target.value)}
+                        className="pl-8"
+                      />
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      {highlightFilter && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full"
+                          onClick={() => setHighlightFilter("")}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {userContext.conversation_highlights
+                    .filter(highlight => 
+                      highlightFilter === "" || 
+                      highlight.toLowerCase().includes(highlightFilter.toLowerCase())
+                    )
+                    .map((highlight, index) => {
+                      const isExpanded = expandedHighlights.has(index);
+                      const isLong = highlight.length > 150;
+                      const displayText = isLong && !isExpanded 
+                        ? highlight.substring(0, 150) + "..." 
+                        : highlight;
+                      
+                      // Format the date for consistent display
+                      const dateStr = new Date(Date.now() - (index * 86400000)).toLocaleDateString();
+                      
+                      return (
+                        <div key={index} className={`p-2 rounded-md ${highlight.startsWith('Assistant:') ? 'bg-muted border-l-4 border-primary ml-2' : 'border'}`}>
+                          <div className="flex items-start gap-2">
+                            {highlight.startsWith('Assistant:') ? (
+                              <BotIcon className="h-4 w-4 mt-1 text-primary" />
+                            ) : (
+                              <UserIcon className="h-4 w-4 mt-1" />
                             )}
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {new Date(Date.now() - (index * 86400000)).toLocaleDateString()}
-                            </p>
+                            <div className="w-full">
+                              <p className="text-sm whitespace-pre-wrap mb-1">{displayText}</p>
+                              {isLong && (
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="px-0 h-5 text-xs"
+                                  onClick={() => toggleHighlight(index)}
+                                >
+                                  {isExpanded ? "Show less" : "Show more"}
+                                </Button>
+                              )}
+                              <p className="text-xs text-muted-foreground">
+                                {dateStr}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               ) : (
-                <p className="text-muted-foreground">No conversation highlights recorded yet.</p>
+                <p className="text-muted-foreground pt-2">No conversation highlights recorded yet.</p>
               )}
               <p className="mt-4 text-sm text-muted-foreground">
                 Highlights are automatically saved from your conversations with the assistant.
