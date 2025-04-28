@@ -104,7 +104,7 @@ const GoalsList = () => {
       <div className="w-full">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Your Goals</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Goals</h1>
             <p className="text-muted-foreground">
               Set and track your personal goals
             </p>
@@ -115,17 +115,20 @@ const GoalsList = () => {
                 <Button 
                   onClick={handleToggleEditMode}
                   variant="outline"
+                  size="sm"
                 >
-                  <Check className="mr-2 h-4 w-4" />
-                  Done
+                  <Check className="sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Done</span>
                 </Button>
                 {selectedGoals.length > 0 && (
                   <Button 
                     variant="destructive"
+                    size="sm"
                     onClick={() => setShowDeleteDialog(true)}
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete ({selectedGoals.length})
+                    <Trash2 className="sm:mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">Delete</span>
+                    {selectedGoals.length > 0 && <span className="ml-1">({selectedGoals.length})</span>}
                   </Button>
                 )}
               </>
@@ -134,14 +137,15 @@ const GoalsList = () => {
                 <Button
                   onClick={handleToggleEditMode}
                   variant="outline"
+                  size="sm"
                 >
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  <Edit className="sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Edit</span>
                 </Button>
                 <Link to="/goals/new">
-                  <Button>
-                    <ListPlus className="mr-2 h-4 w-4" />
-                    New Goal
+                  <Button size="sm">
+                    <ListPlus className="sm:mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">New Goal</span>
                   </Button>
                 </Link>
               </>
@@ -160,7 +164,7 @@ const GoalsList = () => {
           <div className="space-y-6">
             {goals.map((goal) => (
               <Card key={goal.id} className="w-full">
-                <CardHeader className="flex flex-row items-start justify-between">
+                <CardHeader className="flex flex-row items-start justify-between pb-2">
                   <div className="flex items-start gap-2">
                     {isEditMode && (
                       <Checkbox 
@@ -170,25 +174,28 @@ const GoalsList = () => {
                       />
                     )}
                     <div>
-                      <CardTitle className="text-xl">{goal.goal_text}</CardTitle>
-                      <CardDescription>
+                      <CardTitle className="text-lg sm:text-xl">{goal.goal_text}</CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">
                         Created on {new Date(goal.created_at).toLocaleDateString()}
                       </CardDescription>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="py-2">
                   {goal.description && (
-                    <p className="text-sm text-muted-foreground">{goal.description}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 sm:line-clamp-none">{goal.description}</p>
                   )}
                 </CardContent>
-                <CardFooter className="flex justify-between">
+                <CardFooter className="flex justify-between pt-2">
                   <Link to={`/goals/${goal.id}`}>
-                    <Button variant="outline">View Details</Button>
+                    <Button variant="outline" size="sm">
+                      <span className="hidden sm:inline">View Details</span>
+                      <span className="inline sm:hidden">View</span>
+                    </Button>
                   </Link>
                   {!isEditMode && (
                     <Link to={`/goals/${goal.id}/edit`}>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
                         <Edit className="h-4 w-4" />
                       </Button>
                     </Link>
