@@ -186,10 +186,11 @@ const Dashboard = () => {
               <div className="space-y-2">
                 <p className="text-sm">Try asking:</p>
                 <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                  <li>Create a goal to quit smoking</li>
+                  <li>Add a note to my fitness goal about staying consistent</li>
                   <li>What actions do I need to complete today?</li>
-                  <li>Create a new goal for me to exercise more</li>
-                  <li>Add a weekly action to my sleep better goal</li>
-                  <li>Give me some motivation to stay on track</li>
+                  <li>Add a weekly action to review my progress</li>
+                  <li>Remind me why my career goal is important to me</li>
                 </ul>
               </div>
               <div className="flex justify-end mt-4">

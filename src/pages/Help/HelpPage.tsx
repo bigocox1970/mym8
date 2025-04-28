@@ -53,10 +53,12 @@ const HelpPage = () => {
                     <div>
                       <h3 className="font-medium">Goals Management</h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Ask the AI to help you create, track, and refine your goals. You can ask for suggestions, clarification, or refinement of your existing goals.
+                        Create, track, and refine your goals with detailed descriptions and notes. The assistant will ask about your motivation and the importance of each goal.
                       </p>
                       <p className="text-sm mt-2 italic">
-                        "Can you help me create a goal for improving my fitness?"
+                        "Create a goal to quit smoking"<br />
+                        "Add a description to my fitness goal that says it's for my health"<br />
+                        "Add this to my work goal notes: This will increase my income"
                       </p>
                     </div>
                   </div>
@@ -71,10 +73,12 @@ const HelpPage = () => {
                     <div>
                       <h3 className="font-medium">Action Planning</h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Get help breaking down your goals into actionable steps. The AI can suggest specific actions with appropriate frequencies.
+                        Get personalized action suggestions based on your specific goals. The assistant can create actions with appropriate frequencies (morning, afternoon, evening, daily, weekly, monthly).
                       </p>
                       <p className="text-sm mt-2 italic">
-                        "What daily actions should I take to learn Spanish?"
+                        "Add a morning action to my sleep goal to wake up at 6 AM"<br />
+                        "What weekly actions should I take for my Spanish learning goal?"<br />
+                        "Mark my reading action as complete"
                       </p>
                     </div>
                   </div>
@@ -89,10 +93,12 @@ const HelpPage = () => {
                     <div>
                       <h3 className="font-medium">Progress Tracking</h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Discuss your progress with the AI. Get insights on your completed actions, skipped tasks, and overall goal advancement.
+                        Discuss your progress with the AI. Get insights on your completed actions, review notes and descriptions for your goals, and track your overall advancement.
                       </p>
                       <p className="text-sm mt-2 italic">
-                        "How am I doing with my coding practice goal?"
+                        "How am I doing with my coding goal?"<br />
+                        "Show me all my goals with their descriptions"<br />
+                        "What actions do I have due today?"
                       </p>
                     </div>
                   </div>
@@ -107,28 +113,32 @@ const HelpPage = () => {
                     <div>
                       <h3 className="font-medium">Motivation & Encouragement</h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        The AI can provide encouragement, motivational tips, and celebrate your wins with you.
+                        The AI can provide personalized encouragement based on your specific goals, motivational tips, and celebrate your wins with you.
                       </p>
                       <p className="text-sm mt-2 italic">
-                        "I'm feeling unmotivated today, can you help me get back on track?"
+                        "I'm feeling unmotivated about my diet goal, any advice?"<br />
+                        "Remind me why my fitness goal is important to me"<br />
+                        "I completed my morning workout, celebrate with me!"
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Scheduling & Reminders */}
+                {/* Goal Modification */}
                 <div className="border rounded-lg p-4 shadow-sm">
                   <div className="flex items-start gap-3">
                     <div className="bg-primary/10 p-2 rounded-full">
                       <Calendar className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-medium">Scheduling Advice</h3>
+                      <h3 className="font-medium">Goal Modification</h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Get suggestions on how to schedule your actions based on their frequency and your lifestyle.
+                        Update your goals with enhanced descriptions and notes. The assistant can help you refine your goals as your needs and priorities change.
                       </p>
                       <p className="text-sm mt-2 italic">
-                        "When should I schedule my weekly review session?"
+                        "Update the description of my reading goal"<br />
+                        "Add to my meditation goal notes that it helps with stress"<br />
+                        "Delete my old workout goal"
                       </p>
                     </div>
                   </div>
@@ -143,10 +153,12 @@ const HelpPage = () => {
                     <div>
                       <h3 className="font-medium">General Knowledge</h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Ask questions about topics related to your goals, personal development, productivity, or general knowledge.
+                        Ask questions about topics related to your goals, personal development, productivity, or general knowledge to support your journey.
                       </p>
                       <p className="text-sm mt-2 italic">
-                        "What are some effective study techniques?"
+                        "What are the health benefits of quitting smoking?"<br />
+                        "Give me some effective study techniques for language learning"<br />
+                        "What are good metrics to track for weight training?"
                       </p>
                     </div>
                   </div>
@@ -226,12 +238,15 @@ const HelpPage = () => {
               <h2 className="text-2xl font-semibold">Tips for Effective AI Interaction</h2>
               
               <ul className="list-disc pl-5 space-y-2">
-                <li>Be specific in your questions and requests</li>
-                <li>Provide context when asking about specific goals or actions</li>
-                <li>Use clear language when asking the AI to help create new goals or actions</li>
-                <li>Try different phrasings if you don't get the response you're looking for</li>
-                <li>For complex requests, break them down into smaller questions</li>
-                <li>Remember that the AI can see your goals and actions, so you can reference them directly</li>
+                <li><strong>Goal Creation:</strong> When creating a goal, the assistant will ask about your motivation and why it's important to you. Be detailed in your responses to create more meaningful goals.</li>
+                <li><strong>Working with Descriptions:</strong> You can ask the assistant to "add a description to my [goal name] goal" or "update the description of my [goal name] goal" to enhance your goals.</li>
+                <li><strong>Adding Notes:</strong> Try phrases like "add a note to my [goal name] goal that says..." or "remind me in my [goal name] goal notes that..."</li>
+                <li><strong>Creating Actions:</strong> Be specific about frequencies (morning, afternoon, evening, daily, weekly, monthly) when creating actions.</li>
+                <li><strong>Referencing Goals:</strong> You can refer to goals by name rather than ID - just mention the goal's name like "my fitness goal" or "my reading goal".</li>
+                <li><strong>Tracking Progress:</strong> Ask "how am I doing with [goal name]" to get updates on specific goals.</li>
+                <li><strong>For Motivation:</strong> Try asking the assistant to "remind me why [goal name] is important to me" when you need motivation.</li>
+                <li><strong>Managing Multiple Goals:</strong> You can ask "show me all my goals" or "what are my current goals" to get an overview.</li>
+                <li><strong>If Something Doesn't Work:</strong> Try rephrasing your request or breaking it into simpler steps.</li>
               </ul>
             </div>
           </CardContent>
