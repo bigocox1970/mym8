@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useContext } from "react";
-import { Layout, SidebarContext, MenuToggleButton } from "@/components/Layout";
+import React, { useState, useRef, useEffect } from "react";
+import { Layout, MenuToggleButton } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
@@ -30,7 +30,6 @@ import { Message } from "./types";
 
 const AIAssistant = () => {
   const { user, profile } = useAuth();
-  const { toggleSidebar } = useContext(SidebarContext);
   const [input, setInput] = useState("");
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [showNewConversationDialog, setShowNewConversationDialog] = useState(false);
@@ -224,21 +223,14 @@ const AIAssistant = () => {
     <Layout>
       <div className="w-full h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
-          <div className="flex items-center w-full justify-between">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">MyM8 {assistantName}</h1>
-              <p className="text-sm sm:text-base text-muted-foreground">
-                Chat with {assistantName} your goal tracking AI assistant
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="md:hidden h-10 w-10 bg-white dark:bg-gray-800"
-              onClick={toggleSidebar}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">MyM8 {assistantName}</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Chat with {assistantName} your goal tracking AI assistant
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <MenuToggleButton />
           </div>
         </div>
 
