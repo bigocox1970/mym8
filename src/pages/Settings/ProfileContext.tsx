@@ -204,16 +204,27 @@ const ProfileContext = () => {
   }
 
   return (
-    <div className="container py-8">
-      <h1 className="text-2xl font-bold mb-6">AI Assistant Profile</h1>
+    <div className="container max-w-4xl mx-auto py-8">
+      <h1 className="text-2xl font-bold mb-2">AI Assistant Profile</h1>
       <p className="mb-6 text-muted-foreground">
         Manage your AI assistant's understanding of your preferences, interests, and personal information.
         This information helps the assistant provide more personalized responses.
       </p>
 
       <Tabs defaultValue="interests" className="w-full">
-        <div className="relative w-full overflow-x-auto mb-4" style={{ msOverflowStyle: 'none' }}>
-          <TabsList className="flex w-max bg-muted rounded-lg p-1">
+        <div className="relative w-full overflow-x-auto mb-4" 
+          style={{ 
+            msOverflowStyle: 'none',
+            scrollbarWidth: 'none'
+          }}>
+          <style dangerouslySetInnerHTML={{
+            __html: `
+            .scrollbar-hide::-webkit-scrollbar {
+              display: none;
+            }
+            `
+          }} />
+          <TabsList className="flex w-max bg-muted rounded-lg p-1 scrollbar-hide">
             <TabsTrigger value="interests" className="px-4 whitespace-nowrap">Interests & Dislikes</TabsTrigger>
             <TabsTrigger value="personalInfo" className="px-4 whitespace-nowrap">Personal Information</TabsTrigger>
             <TabsTrigger value="preferences" className="px-4 whitespace-nowrap">Preferences</TabsTrigger>
@@ -222,7 +233,7 @@ const ProfileContext = () => {
         </div>
 
         <TabsContent value="interests">
-          <Card>
+          <Card className="w-full">
             <CardHeader>
               <CardTitle>Interests & Dislikes</CardTitle>
               <CardDescription>
@@ -290,7 +301,7 @@ const ProfileContext = () => {
         </TabsContent>
 
         <TabsContent value="personalInfo">
-          <Card>
+          <Card className="w-full">
             <CardHeader>
               <CardTitle>Personal Information</CardTitle>
               <CardDescription>
@@ -347,7 +358,7 @@ const ProfileContext = () => {
         </TabsContent>
 
         <TabsContent value="preferences">
-          <Card>
+          <Card className="w-full">
             <CardHeader>
               <CardTitle>Preferences</CardTitle>
               <CardDescription>
@@ -400,7 +411,7 @@ const ProfileContext = () => {
         </TabsContent>
 
         <TabsContent value="highlights">
-          <Card>
+          <Card className="w-full">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>Conversation Highlights</CardTitle>
