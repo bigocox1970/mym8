@@ -9,13 +9,15 @@ interface UseAIProcessingProps {
   actions: Action[] | undefined;
   onRefreshActions?: () => void;
   userNickname?: string;
+  userId?: string;
 }
 
 export function useAIProcessing({
   goals = [],
   actions = [],
   onRefreshActions,
-  userNickname = ""
+  userNickname = "",
+  userId
 }: UseAIProcessingProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -37,7 +39,8 @@ export function useAIProcessing({
         goals: goals || [],
         actions: actions || [],
         conversation: conversationContext.slice(-10), // Send the last 10 messages for context
-        userNickname: userNickname
+        userNickname: userNickname,
+        userId: userId
       });
 
       // Create AI message

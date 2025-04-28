@@ -81,6 +81,388 @@ export async function textToSpeech(
 }
 
 /**
+ * Create a new goal
+ * @param userId User ID
+ * @param goalText Goal text
+ * @param description Optional goal description
+ * @returns Created goal data
+ */
+export async function createGoal(
+  userId: string,
+  goalText: string,
+  description?: string
+): Promise<Goal | null> {
+  try {
+    const { data, error } = await supabase
+      .from('goals')
+      .insert({
+        user_id: userId,
+        goal_text: goalText,
+        description: description || null,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    toast.success(`Goal "${goalText}" created successfully!`);
+    return data as Goal;
+  } catch (error) {
+    console.error('Error creating goal:', error);
+    toast.error(`Failed to create goal: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
+/**
+ * Create a new action
+ * @param userId User ID
+ * @param goalId Goal ID
+ * @param title Action title
+ * @param frequency Action frequency
+ * @param description Optional action description
+ * @returns Created action data
+ */
+export async function createAction(
+  userId: string,
+  goalId: string,
+  title: string,
+  frequency: string = 'daily',
+  description?: string
+): Promise<Action | null> {
+  try {
+    console.log("Creating action:", { userId, goalId, title, frequency, description });
+    
+    // Verify goal exists first
+    const { data: goalCheck, error: goalCheckError } = await supabase
+      .from('goals')
+      .select('id')
+      .eq('id', goalId)
+      .eq('user_id', userId)
+      .single();
+      
+    if (goalCheckError) {
+      console.error("Goal check error:", goalCheckError);
+      throw new Error(`Goal not found with ID: ${goalId}`);
+    }
+    
+    // Create the action
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({
+        user_id: userId,
+        goal_id: goalId,
+        title: title,
+        description: description || null,
+        frequency: frequency,
+        completed: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error("Supabase insert error:", error);
+      throw error;
+    }
+    
+    console.log("Action created successfully:", data);
+    toast.success(`Action "${title}" created successfully!`);
+    return data as Action;
+  } catch (error) {
+    console.error("Error creating action:", error);
+    toast.error(`Failed to create action: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
+/**
+ * Create a new action for the first available goal
+ * This simplified version will find the first goal and attach the action to it
+ * @param userId User ID
+ * @param title Action title
+ * @param frequency Action frequency
+ * @param description Optional action description
+ * @returns Created action data
+ */
+export async function createSimpleAction(
+  userId: string,
+  title: string,
+  frequency: string = 'daily',
+  description?: string,
+  goalId?: string
+): Promise<Action | null> {
+  try {
+    console.log("Creating simple action:", { userId, title, frequency, goalId });
+    
+    // Parse the title for frequency hints if not explicitly provided
+    let detectedFrequency = frequency;
+    const titleLower = title.toLowerCase();
+    
+    // Check for frequency hints in the title - order matters for precedence
+    if (titleLower.includes("every night") || titleLower.includes("bed") || titleLower.includes("sleep") || 
+        titleLower.includes("evening") || titleLower.includes("night") || titleLower.includes("dinner") || 
+        titleLower.includes("pm ")) {
+      detectedFrequency = "evening";
+    } else if (titleLower.includes("morning") || titleLower.includes("wake up") || titleLower.includes("breakfast") || 
+        titleLower.includes("early") || titleLower.includes("am ")) {
+      detectedFrequency = "morning";
+    } else if (titleLower.includes("afternoon") || titleLower.includes("lunch")) {
+      detectedFrequency = "afternoon";
+    } else if (titleLower.includes("weekly") || titleLower.includes("each week") || titleLower.includes("once a week")) {
+      detectedFrequency = "weekly";
+    } else if (titleLower.includes("monthly") || titleLower.includes("each month") || titleLower.includes("once a month")) {
+      detectedFrequency = "monthly";
+    }
+    
+    console.log(`Detected frequency "${detectedFrequency}" for action: ${title}`);
+    
+    let targetGoalId = goalId;
+    
+    // If no goal ID is provided, find a matching or first available goal
+    if (!targetGoalId) {
+      // First, try to find a relevant goal based on the action title
+      const { data: goals, error: goalError } = await supabase
+        .from('goals')
+        .select('id, goal_text')
+        .eq('user_id', userId);
+        
+      if (goalError) {
+        console.error("Goal fetch error:", goalError);
+        throw new Error("Failed to find any goals to attach action to");
+      }
+      
+      if (!goals || goals.length === 0) {
+        throw new Error("No goals found to attach action to. Please create a goal first.");
+      }
+      
+      // Try to find a matching goal based on semantic similarity
+      // This is a simple version that just checks for word overlap
+      const words = title.toLowerCase().split(/\s+/);
+      let bestGoal = goals[0];
+      let bestScore = 0;
+      
+      for (const goal of goals) {
+        const goalText = goal.goal_text.toLowerCase();
+        let score = 0;
+        
+        for (const word of words) {
+          if (word.length > 3 && goalText.includes(word)) { // Only consider words longer than 3 chars
+            score++;
+          }
+        }
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestGoal = goal;
+        }
+      }
+      
+      targetGoalId = bestGoal.id;
+      console.log(`Attaching action to goal "${bestGoal.goal_text}" (ID: ${targetGoalId})`);
+    }
+    
+    // Use the existing createAction function to create the action
+    return createAction(userId, targetGoalId, title, detectedFrequency, description);
+  } catch (error) {
+    console.error("Error creating simple action:", error);
+    toast.error(`Failed to create action: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
+/**
+ * Mark an action as completed
+ * @param actionId Action ID
+ * @returns Updated action data
+ */
+export async function completeAction(actionId: string): Promise<Action | null> {
+  try {
+    console.log("Attempting to complete action with ID:", actionId);
+    
+    // First verify the action exists
+    const { data: checkData, error: checkError } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', actionId)
+      .single();
+      
+    if (checkError) {
+      console.error("Action check error:", checkError);
+      throw new Error(`Action with ID ${actionId} not found`);
+    }
+    
+    console.log("Found action to complete:", checkData);
+    
+    // Now update the action
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({
+        completed: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', actionId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error("Action completion error:", error);
+      throw error;
+    }
+    
+    console.log("Action completed successfully:", data);
+    toast.success(`Action "${data.title}" marked as completed!`);
+    return data as Action;
+  } catch (error) {
+    console.error('Error completing action:', error);
+    toast.error(`Failed to complete action: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
+/**
+ * Delete a goal
+ * @param userId User ID
+ * @param goalId Goal ID or text
+ * @param exactMatch Whether to match text exactly or use LIKE
+ * @returns Success message
+ */
+export async function deleteGoal(
+  userId: string,
+  goalId?: string,
+  goalText?: string,
+  exactMatch: boolean = false
+): Promise<string> {
+  try {
+    // First find the goals to delete
+    let query = supabase
+      .from("goals")
+      .select("id, goal_text")
+      .eq("user_id", userId);
+
+    // Filter by ID if provided
+    if (goalId) {
+      query = query.eq("id", goalId);
+    } 
+    // Or filter by text if provided
+    else if (goalText) {
+      if (exactMatch) {
+        query = query.eq("goal_text", goalText);
+      } else {
+        query = query.ilike("goal_text", `%${goalText}%`);
+      }
+    } else {
+      throw new Error("Either goal ID or text must be provided");
+    }
+
+    const { data: goals, error: findError } = await query;
+    
+    if (findError) throw findError;
+
+    if (!goals || goals.length === 0) {
+      return "No goals found matching the criteria";
+    }
+
+    // Get IDs of the goals to delete
+    const goalIds = goals.map(goal => goal.id);
+    
+    // First delete related actions (due to foreign key constraint)
+    for (const id of goalIds) {
+      const { error: actionDeleteError } = await supabase
+        .from("tasks")
+        .delete()
+        .eq("goal_id", id);
+        
+      if (actionDeleteError) {
+        console.error(`Failed to delete actions for goal ${id}:`, actionDeleteError);
+      }
+    }
+    
+    // Then delete the goals
+    const { error: goalDeleteError } = await supabase
+      .from("goals")
+      .delete()
+      .in("id", goalIds);
+      
+    if (goalDeleteError) throw goalDeleteError;
+    
+    const message = `Successfully deleted ${goals.length} goal(s): ${goals.map(g => g.goal_text).join(', ')}`;
+    toast.success(message);
+    return message;
+  } catch (error) {
+    const errorMsg = `Failed to delete goal: ${error instanceof Error ? error.message : String(error)}`;
+    console.error("Error deleting goal(s):", error);
+    toast.error(errorMsg);
+    return errorMsg;
+  }
+}
+
+/**
+ * Delete an action
+ * @param userId User ID
+ * @param actionId Action ID or text
+ * @param exactMatch Whether to match text exactly or use LIKE
+ * @returns Success message
+ */
+export async function deleteAction(
+  userId: string,
+  actionId?: string,
+  actionText?: string,
+  exactMatch: boolean = false
+): Promise<string> {
+  try {
+    // Find the actions to delete
+    let query = supabase
+      .from("tasks")
+      .select("id, title")
+      .eq("user_id", userId);
+
+    // Filter by ID if provided
+    if (actionId) {
+      query = query.eq("id", actionId);
+    } 
+    // Or filter by text if provided
+    else if (actionText) {
+      if (exactMatch) {
+        query = query.eq("title", actionText);
+      } else {
+        query = query.ilike("title", `%${actionText}%`);
+      }
+    } else {
+      throw new Error("Either action ID or text must be provided");
+    }
+
+    const { data: actions, error: findError } = await query;
+    
+    if (findError) throw findError;
+
+    if (!actions || actions.length === 0) {
+      return "No actions found matching the criteria";
+    }
+
+    // Delete the actions
+    const actionIds = actions.map(action => action.id);
+    const { error: deleteError } = await supabase
+      .from("tasks")
+      .delete()
+      .in("id", actionIds);
+      
+    if (deleteError) throw deleteError;
+    
+    const message = `Successfully deleted ${actions.length} action(s): ${actions.map(a => a.title).join(', ')}`;
+    toast.success(message);
+    return message;
+  } catch (error) {
+    const errorMsg = `Failed to delete action: ${error instanceof Error ? error.message : String(error)}`;
+    console.error("Error deleting action(s):", error);
+    toast.error(errorMsg);
+    return errorMsg;
+  }
+}
+
+/**
  * LLM API request to process user messages
  * @param message User message
  * @param context Additional context like goals and actions
@@ -93,6 +475,7 @@ export async function processMessage(
     actions?: Action[];
     conversation?: Message[];
     userNickname?: string;
+    userId?: string;
   }
 ): Promise<{
   message: string;
@@ -116,12 +499,49 @@ export async function processMessage(
     // Add system message with context
     const systemMessage = {
       role: 'system',
-      content: `You are a helpful AI assistant. Here is some context about the user:
+      content: `You are a helpful AI assistant for a goal-tracking application called MyM8. Here is some context about the user:
 User's name: ${context.userNickname || 'Unknown'}
-Goals: ${context.goals?.map(g => g.goal_text).join(', ') || 'None'}
-Actions: ${context.actions?.map(a => a.title).join(', ') || 'None'}
 
-When the user mentions their name or refers to themselves, use their name "${context.userNickname}" in your responses if available.`
+Goals: ${context.goals?.map(g => `${g.goal_text} (ID: ${g.id})`).join(', ') || 'None'}
+
+Actions: ${context.actions?.map(a => `${a.title} (ID: ${a.id}, Status: ${a.completed ? 'Completed' : 'Pending'}, Frequency: ${a.frequency})`).join(', ') || 'None'}
+
+When the user mentions their name or refers to themselves, use their name "${context.userNickname}" in your responses if available.
+
+IMPORTANT: When a user asks you to create or manage goals or tasks, you CAN and SHOULD handle these by including special commands in your response. Use these formats:
+
+For creating a goal: [CREATE_GOAL: The goal text here]
+For creating an action: [CREATE_ACTION: Action title]
+For marking an action as complete: [COMPLETE_ACTION: action_id] or [COMPLETE_ACTION_TEXT: action text to search for]
+For deleting a goal: [DELETE_GOAL: goal_id] or [DELETE_GOAL_TEXT: goal text to search for]
+For deleting an action: [DELETE_ACTION: action_id] or [DELETE_ACTION_TEXT: action text to search for]
+
+FREQUENCIES: The app supports these action frequencies: morning, afternoon, evening, daily, weekly, monthly.
+
+VERY IMPORTANT FOR ACTIONS: When a user asks to create an action, FIRST analyze the request to determine:
+1. What frequency is appropriate (morning, afternoon, evening, daily, weekly, monthly)
+2. Which goal it should be attached to
+
+If this information is unclear, ASK the user before creating the action. For example:
+- "For your action 'Cut the grass', which goal should I attach this to? Also, how often would you like to do this (daily, weekly, monthly)?"
+- "I noticed you want to 'Get up early' - would you like this as a morning action? And which goal should I attach it to?"
+
+If the user clearly mentions the frequency in their request (like "every morning" or "once a week"), use that frequency.
+If the user clearly mentions which goal (like "for my fitness goal"), try to find the matching goal.
+
+Example: If a user says "create a goal to be happy", respond with something like:
+"I'll create that goal for you right away. [CREATE_GOAL: Be happy]"
+
+Example: If a user says "add an action to exercise", you should ask for clarification:
+"I'd be happy to add that action. Could you tell me which goal I should attach 'exercise' to, and how often you want to do this (daily, weekly, etc.)?"
+
+Example: If a user says "add an action to get up early every morning for my happiness goal", you can infer the frequency and goal:
+"I'll add that action to your happiness goal as a morning task. [CREATE_ACTION: Get up early every morning]"
+
+Example: If a user says "mark my reading action as complete", respond with:
+"I'll mark that action as completed. [COMPLETE_ACTION_TEXT: reading]"
+
+Always provide these commands in your response when the user asks to create, modify, or delete goals/actions, but ask for clarification when needed.`
     };
 
     // Make direct API call to OpenAI
@@ -153,34 +573,168 @@ When the user mentions their name or refers to themselves, use their name "${con
     const navigateMatch = aiResponse.match(/\[NAVIGATE:([^\]]+)\]/);
     const refreshMatch = aiResponse.match(/\[REFRESH\]/);
 
+    // Process goal/action creation commands
+    let refresh = !!refreshMatch;
+    let action: string | undefined = actionMatch ? actionMatch[1] : undefined;
+    
+    // Check for create goal command
+    const createGoalMatch = aiResponse.match(/\[CREATE_GOAL: (.*?)\]/);
+    if (createGoalMatch && context.userId) {
+      const goalText = createGoalMatch[1].trim();
+      const createdGoal = await createGoal(context.userId, goalText);
+      if (createdGoal) {
+        action = `Goal "${goalText}" created successfully`;
+        refresh = true;
+      }
+    }
+    
+    // Check for create action command
+    const createActionMatch = aiResponse.match(/\[CREATE_ACTION: (.*?)\]/);
+    if (createActionMatch && context.userId) {
+      console.log("CREATE_ACTION match found:", createActionMatch[1]);
+      const actionTitle = createActionMatch[1].trim();
+      
+      console.log("Attempting to create simple action:", actionTitle);
+      const createdAction = await createSimpleAction(context.userId, actionTitle);
+      
+      if (createdAction) {
+        action = `Action "${actionTitle}" created successfully with frequency: ${createdAction.frequency}`;
+        refresh = true;
+      } else {
+        console.error("Failed to create action");
+        action = `Failed to create action "${actionTitle}"`;
+      }
+    }
+    
+    // Check for complete action command
+    const completeActionMatch = aiResponse.match(/\[COMPLETE_ACTION: (.*?)\]/);
+    if (completeActionMatch) {
+      const actionId = completeActionMatch[1].trim();
+      console.log("COMPLETE_ACTION match found for ID:", actionId);
+      
+      try {
+        const updatedAction = await completeAction(actionId);
+        if (updatedAction) {
+          action = `Action "${updatedAction.title}" marked as completed`;
+          refresh = true;
+        } else {
+          console.error("Failed to complete action");
+          action = `Failed to complete action with ID ${actionId}`;
+        }
+      } catch (error) {
+        console.error("Error in completeAction:", error);
+        action = `Error completing action: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+    
+    // Also add a way for the AI to complete actions by text instead of just ID
+    const completeActionTextMatch = aiResponse.match(/\[COMPLETE_ACTION_TEXT: (.*?)\]/);
+    if (completeActionTextMatch && context.userId) {
+      const actionText = completeActionTextMatch[1].trim();
+      console.log("COMPLETE_ACTION_TEXT match found:", actionText);
+      
+      try {
+        // Find the action by text
+        const { data: actions, error: findError } = await supabase
+          .from("tasks")
+          .select("id, title")
+          .eq("user_id", context.userId)
+          .ilike("title", `%${actionText}%`);
+        
+        if (findError) throw findError;
+
+        if (!actions || actions.length === 0) {
+          action = `No actions found matching "${actionText}"`;
+        } else if (actions.length > 1) {
+          // If multiple matches, complete the first one but warn about it
+          const completedAction = await completeAction(actions[0].id);
+          if (completedAction) {
+            action = `Marked "${actions[0].title}" as completed. Note: ${actions.length} actions matched your query.`;
+            refresh = true;
+          }
+        } else {
+          // Single exact match
+          const completedAction = await completeAction(actions[0].id);
+          if (completedAction) {
+            action = `Action "${actions[0].title}" marked as completed`;
+            refresh = true;
+          }
+        }
+      } catch (error) {
+        console.error("Error completing action by text:", error);
+        action = `Error completing action: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+    
+    // Check for delete goal by ID command
+    const deleteGoalMatch = aiResponse.match(/\[DELETE_GOAL: (.*?)\]/);
+    if (deleteGoalMatch && context.userId) {
+      const goalId = deleteGoalMatch[1].trim();
+      console.log("DELETE_GOAL match found for ID:", goalId);
+      
+      const result = await deleteGoal(context.userId, goalId);
+      action = result;
+      refresh = true;
+    }
+
+    // Check for delete goal by text command
+    const deleteGoalTextMatch = aiResponse.match(/\[DELETE_GOAL_TEXT: (.*?)\]/);
+    if (deleteGoalTextMatch && context.userId) {
+      const goalText = deleteGoalTextMatch[1].trim();
+      console.log("DELETE_GOAL_TEXT match found:", goalText);
+      
+      const result = await deleteGoal(context.userId, undefined, goalText);
+      action = result;
+      refresh = true;
+    }
+
+    // Check for delete action by ID command
+    const deleteActionMatch = aiResponse.match(/\[DELETE_ACTION: (.*?)\]/);
+    if (deleteActionMatch && context.userId) {
+      const actionId = deleteActionMatch[1].trim();
+      console.log("DELETE_ACTION match found for ID:", actionId);
+      
+      const result = await deleteAction(context.userId, actionId);
+      action = result;
+      refresh = true;
+    }
+
+    // Check for delete action by text command
+    const deleteActionTextMatch = aiResponse.match(/\[DELETE_ACTION_TEXT: (.*?)\]/);
+    if (deleteActionTextMatch && context.userId) {
+      const actionText = deleteActionTextMatch[1].trim();
+      console.log("DELETE_ACTION_TEXT match found:", actionText);
+      
+      const result = await deleteAction(context.userId, undefined, actionText);
+      action = result;
+      refresh = true;
+    }
+
     return {
-      message: aiResponse.replace(/\[ACTION:[^\]]+\]|\[NAVIGATE:[^\]]+\]|\[REFRESH\]/g, '').trim(),
-      action: actionMatch ? actionMatch[1] : undefined,
+      message: aiResponse
+        .replace(/\[ACTION:[^\]]+\]/g, '')
+        .replace(/\[NAVIGATE:[^\]]+\]/g, '')
+        .replace(/\[REFRESH\]/g, '')
+        .replace(/\[CREATE_GOAL:[^\]]+\]/g, '')
+        .replace(/\[CREATE_ACTION:[^\]]+\]/g, '')
+        .replace(/\[COMPLETE_ACTION:[^\]]+\]/g, '')
+        .replace(/\[COMPLETE_ACTION_TEXT:[^\]]+\]/g, '')
+        .replace(/\[DELETE_GOAL:[^\]]+\]/g, '')
+        .replace(/\[DELETE_GOAL_TEXT:[^\]]+\]/g, '')
+        .replace(/\[DELETE_ACTION:[^\]]+\]/g, '')
+        .replace(/\[DELETE_ACTION_TEXT:[^\]]+\]/g, '')
+        .trim(),
+      action,
       navigate: navigateMatch ? navigateMatch[1] : undefined,
-      refresh: !!refreshMatch
+      refresh
     };
   } catch (error) {
-    console.error('Message processing error:', error);
-    toast.error(`Failed to process message: ${error instanceof Error ? error.message : String(error)}`);
-    throw error;
+    console.error('Error processing message:', error);
+    return {
+      message: 'An error occurred while processing your request. Please try again later.',
+      action: undefined,
+      navigate: undefined,
+      refresh: false
+    };
   }
-}
-
-/**
- * Get user subscription details
- * @returns Subscription information
- */
-export async function getSubscription(): Promise<{
-  level: string;
-  services: string[];
-  maxTokens: number;
-  models: string[];
-}> {
-  // For now, return a default subscription since we're using direct API calls
-  return {
-    level: 'free',
-    services: ['openai'],
-    maxTokens: 1000,
-    models: ['gpt-4']
-  };
 }
