@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getConfig } from '@/lib/configManager';
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 // Custom hooks
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
@@ -45,11 +46,17 @@ const AIAssistant = () => {
       if (!user) return [];
       
       try {
-        const response = await fetch('/api/goals');
-        if (!response.ok) {
-          throw new Error('Failed to fetch goals');
+        // Use direct Supabase query instead of API endpoint
+        const { data, error } = await supabase
+          .from('goals')
+          .select('*')
+          .eq('user_id', user.id);
+          
+        if (error) {
+          throw new Error(`Failed to fetch goals: ${error.message}`);
         }
-        return await response.json();
+        
+        return data || [];
       } catch (error) {
         console.error('Error fetching goals:', error);
         return [];
@@ -65,11 +72,17 @@ const AIAssistant = () => {
       if (!user) return [];
       
       try {
-        const response = await fetch('/api/tasks');
-        if (!response.ok) {
-          throw new Error('Failed to fetch actions');
+        // Use direct Supabase query instead of API endpoint
+        const { data, error } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('user_id', user.id);
+          
+        if (error) {
+          throw new Error(`Failed to fetch actions: ${error.message}`);
         }
-        return await response.json();
+        
+        return data || [];
       } catch (error) {
         console.error('Error fetching actions:', error);
         return [];
@@ -110,7 +123,8 @@ const AIAssistant = () => {
     goals, 
     actions, 
     onRefreshActions: refetchActions,
-    userNickname: profile?.nickname || ""
+    userNickname: profile?.nickname || "",
+    userId: user?.id
   });
 
   const {
