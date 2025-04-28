@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 
 // Define frequencies type
 type Frequency = "morning" | "afternoon" | "evening" | "daily" | "weekly" | "monthly";
@@ -219,17 +220,10 @@ const ActivityLog = () => {
   return (
     <Layout>
       <div className="w-full">
-        <div className="w-full flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Activity Log</h1>
-            <p className="text-muted-foreground">
-              Track your completed actions over time
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <MenuToggleButton />
-          </div>
-        </div>
+        <PageHeader 
+          title="Activity Log" 
+          description="Track your completed actions over time"
+        />
 
         <div className="w-full flex flex-col gap-3 mb-6">
           <div className="relative w-full">
