@@ -11,6 +11,7 @@ interface Goal {
   id: string;
   goal_text: string;
   description: string | null;
+  notes: string | null;
 }
 
 interface Action {
@@ -85,12 +86,14 @@ export async function textToSpeech(
  * @param userId User ID
  * @param goalText Goal text
  * @param description Optional goal description
+ * @param notes Optional additional notes for the goal
  * @returns Created goal data
  */
 export async function createGoal(
   userId: string,
   goalText: string,
-  description?: string
+  description?: string,
+  notes?: string
 ): Promise<Goal | null> {
   try {
     const { data, error } = await supabase
@@ -99,6 +102,7 @@ export async function createGoal(
         user_id: userId,
         goal_text: goalText,
         description: description || null,
+        notes: notes || null,
         created_at: new Date().toISOString()
       })
       .select()
@@ -486,6 +490,140 @@ export async function deleteAction(
 }
 
 /**
+ * Find a goal by text
+ * @param userId User ID
+ * @param goalText Text to search for in goal_text field
+ * @returns Goal ID if found, null if not found
+ */
+export async function findGoalByText(
+  userId: string,
+  goalText: string
+): Promise<string | null> {
+  try {
+    // Search for goals matching the text
+    const { data: goals, error } = await supabase
+      .from('goals')
+      .select('id, goal_text')
+      .eq('user_id', userId)
+      .ilike('goal_text', `%${goalText}%`);
+      
+    if (error) throw error;
+    
+    if (!goals || goals.length === 0) {
+      console.log(`No goals found matching text: "${goalText}"`);
+      return null;
+    }
+    
+    // Return the first match
+    console.log(`Found goal: "${goals[0].goal_text}" with ID: ${goals[0].id}`);
+    return goals[0].id;
+  } catch (error) {
+    console.error('Error finding goal by text:', error);
+    return null;
+  }
+}
+
+/**
+ * Update a goal's notes
+ * @param goalIdOrText Goal ID or text to search for
+ * @param notes New notes text
+ * @param userId User ID (required for security check)
+ * @returns Success message
+ */
+export async function updateGoalNotes(
+  goalIdOrText: string,
+  notes: string,
+  userId?: string
+): Promise<string> {
+  try {
+    let goalId = goalIdOrText;
+    
+    // If userId is provided and the goalIdOrText doesn't look like a UUID,
+    // try to find the goal by text
+    if (userId && !goalIdOrText.includes('-')) {
+      const foundGoalId = await findGoalByText(userId, goalIdOrText);
+      if (foundGoalId) {
+        goalId = foundGoalId;
+      } else {
+        return `Could not find a goal matching "${goalIdOrText}"`;
+      }
+    }
+    
+    // Add user ID check if provided
+    const query = supabase
+      .from('goals')
+      .update({ notes })
+      .eq('id', goalId);
+      
+    // Add user check if userId is provided (for security)
+    if (userId) {
+      query.eq('user_id', userId);
+    }
+    
+    const { error } = await query;
+
+    if (error) throw error;
+    
+    toast.success("Goal notes updated successfully!");
+    return "Goal notes updated successfully";
+  } catch (error) {
+    console.error('Error updating goal notes:', error);
+    toast.error(`Failed to update goal notes: ${error instanceof Error ? error.message : String(error)}`);
+    return `Error updating goal notes: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+/**
+ * Update a goal's description
+ * @param goalIdOrText Goal ID or text to search for
+ * @param description New description text
+ * @param userId User ID (required for security check)
+ * @returns Success message
+ */
+export async function updateGoalDescription(
+  goalIdOrText: string,
+  description: string,
+  userId?: string
+): Promise<string> {
+  try {
+    let goalId = goalIdOrText;
+    
+    // If userId is provided and the goalIdOrText doesn't look like a UUID,
+    // try to find the goal by text
+    if (userId && !goalIdOrText.includes('-')) {
+      const foundGoalId = await findGoalByText(userId, goalIdOrText);
+      if (foundGoalId) {
+        goalId = foundGoalId;
+      } else {
+        return `Could not find a goal matching "${goalIdOrText}"`;
+      }
+    }
+    
+    // Add user ID check if provided
+    const query = supabase
+      .from('goals')
+      .update({ description })
+      .eq('id', goalId);
+      
+    // Add user check if userId is provided (for security)
+    if (userId) {
+      query.eq('user_id', userId);
+    }
+    
+    const { error } = await query;
+
+    if (error) throw error;
+    
+    toast.success("Goal description updated successfully!");
+    return "Goal description updated successfully";
+  } catch (error) {
+    console.error('Error updating goal description:', error);
+    toast.error(`Failed to update goal description: ${error instanceof Error ? error.message : String(error)}`);
+    return `Error updating goal description: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+/**
  * LLM API request to process user messages
  * @param message User message
  * @param context Additional context like goals and actions
@@ -609,10 +747,14 @@ When the user mentions their name or refers to themselves, use their name "${con
 IMPORTANT: When a user asks you to create or manage goals or tasks, you CAN and SHOULD handle these by including special commands in your response. Use these formats:
 
 For creating a goal: [CREATE_GOAL: The goal text here]
+For creating a goal with description: [CREATE_GOAL_WITH_DESCRIPTION: Goal text|description text]
+For creating a goal with description and notes: [CREATE_GOAL_WITH_NOTES: Goal text|description text|notes text]
 For creating an action: [CREATE_ACTION: Action title]
 For marking an action as complete: [COMPLETE_ACTION: action_id] or [COMPLETE_ACTION_TEXT: action text to search for]
 For deleting a goal: [DELETE_GOAL: goal_id] or [DELETE_GOAL_TEXT: goal text to search for]
 For deleting an action: [DELETE_ACTION: action_id] or [DELETE_ACTION_TEXT: action text to search for]
+For updating a goal's description: [UPDATE_GOAL_DESCRIPTION: goal_text|new description]
+For updating a goal's notes: [UPDATE_GOAL_NOTES: goal_text|new notes]
 
 FREQUENCIES: The app supports these action frequencies: morning, afternoon, evening, daily, weekly, monthly.
 
@@ -635,8 +777,40 @@ If this information is unclear, ASK the user before creating the action. For exa
 If the user clearly mentions the frequency in their request (like "every morning" or "once a week"), use that frequency.
 If the user clearly mentions which goal (like "for my happiness goal"), try to find the matching goal.
 
+VERY IMPORTANT FOR GOAL CREATION: When a user asks to create a new goal, you should:
+1. Create the goal immediately using [CREATE_GOAL: goal text]
+2. ALWAYS ask about the importance/motivation behind the goal - why they want to achieve it
+3. Ask about any positive aspects or benefits they're hoping to gain
+4. Ask about challenges or obstacles they anticipate
+5. Use this information to craft a meaningful description and notes for the goal
+
+After getting these details, update the goal with:
+[UPDATE_GOAL_DESCRIPTION: goal_text|detailed purpose and motivation]
+[UPDATE_GOAL_NOTES: goal_text|benefits, obstacles, and other important notes]
+
+Example: If a user says "create a goal to quit smoking", respond with:
+"I've created that goal for you. [CREATE_GOAL: Quit smoking]
+Now, could you tell me why quitting smoking is important to you? What benefits are you hoping to see, and what challenges do you anticipate?"
+
+Then when they respond with more details, update the goal:
+"Thanks for sharing. I'll add those details to your goal. [UPDATE_GOAL_DESCRIPTION: quit smoking|To improve health and save money] [UPDATE_GOAL_NOTES: quit smoking|Benefits: better breathing, no more coughing, savings of $X per month. Challenges: cravings, social pressure.]"
+
+VERY IMPORTANT FOR GOAL DESCRIPTION/NOTES: When a user asks to update a goal's description or notes, you should:
+1. Determine which goal they want to update - you can use either the goal ID or the goal name/text
+2. Understand whether they're updating the description (main purpose/details) or notes (additional thoughts/information)
+3. For description updates, use: [UPDATE_GOAL_DESCRIPTION: goal_text|new description]
+4. For notes updates, use: [UPDATE_GOAL_NOTES: goal_text|new notes]
+
+You can use partial goal text - just enough to identify the goal. For example, use "happiness" for "Be Happy", or "work" for "Work More".
+
 Example: If a user says "create a goal to be happy", respond with something like:
 "I'll create that goal for you right away. [CREATE_GOAL: Be happy]"
+
+Example: If a user says "create a goal to exercise with a description to stay fit", respond with:
+"I'll create that goal with a description. [CREATE_GOAL_WITH_DESCRIPTION: Exercise|To stay fit and maintain a healthy lifestyle]"
+
+Example: If a user says "create a goal to read more books, add a description that it's for learning and notes that I should focus on non-fiction", respond with:
+"I'll create your reading goal with the description and notes. [CREATE_GOAL_WITH_NOTES: Read more books|For learning and personal growth|Focus on non-fiction books]"
 
 Example: If a user says "add an action to exercise", you should ask for clarification:
 "I'd be happy to add that action. Could you tell me which goal I should attach 'exercise' to, and how often you want to do this (daily, weekly, etc.)?"
@@ -647,7 +821,64 @@ Example: If a user says "add an action to get up early every morning for my happ
 Example: If a user says "mark my reading action as complete", respond with:
 "I'll mark that action as completed. [COMPLETE_ACTION_TEXT: reading]"
 
-Always provide these commands in your response when the user asks to create, modify, or delete goals/actions, but ask for clarification when needed.`
+Example: If a user says "update the description of my exercise goal to help me stay fit and healthy", respond with:
+"I'll update the description of your exercise goal. [UPDATE_GOAL_DESCRIPTION: exercise|help me stay fit and healthy]"
+
+Example: If a user says "add a note to my happiness goal that says I should meditate more", respond with:
+"I'll add that note to your happiness goal. [UPDATE_GOAL_NOTES: happiness|I should meditate more]"
+
+Example: If a user says "please add to my work more goal notes that working more will give me more money which will make me happy", respond with:
+"I'll add that note to your 'Work More' goal. [UPDATE_GOAL_NOTES: work more|Working more will give you more money which will make you happy]"
+
+Always provide these commands in your response when the user asks to create, modify, or delete goals/actions, but ask for clarification when needed.
+
+VERY IMPORTANT FOR PROVIDING SUGGESTIONS: For different types of common goals, you should offer specific, helpful suggestions:
+
+For "Quit Smoking" goals:
+- Suggest using nicotine replacement therapy (patches, gum, etc.)
+- Recommend tracking days without smoking
+- Suggest avoiding triggers (people, places, activities associated with smoking)
+- Advise calculating money saved and planning rewards
+- Recommend drinking water when cravings hit
+
+For "Exercise More" or fitness goals:
+- Suggest starting with small, achievable workout sessions (even 5-10 minutes)
+- Recommend finding an exercise buddy or group
+- Suggest tracking workouts and progress
+- Advise setting specific, measurable targets
+
+For "Weight Loss" goals:
+- Suggest food journaling
+- Recommend meal preparation
+- Advise combining with an exercise routine
+- Suggest tracking measurements beyond just weight
+
+For "Mental Health" related goals:
+- Suggest meditation or mindfulness practices
+- Recommend journaling
+- Advise establishing a sleep routine
+- Suggest scheduling regular breaks during the day
+
+For productivity or work-related goals:
+- Suggest time-blocking techniques
+- Recommend breaking tasks into smaller chunks
+- Advise using the Pomodoro technique
+- Suggest minimizing distractions
+
+Always offer these suggestions after creating the goal and gathering information about motivation, but present them as options the user might consider, not as requirements.
+
+After gathering motivation and details for a goal, ALWAYS suggest creating specific actions to help achieve the goal. For example:
+
+"Based on what you've shared about your goal to quit smoking, would you like me to create some actions to help you? Here are some suggestions:
+1. Track days without smoking (daily)
+2. Use nicotine replacement therapy when cravings hit (as needed)
+3. Drink water when cravings occur (as needed)
+4. Calculate money saved weekly (weekly)
+5. Avoid places where you usually smoke (daily)
+
+Which of these would you like me to set up, or do you have other actions in mind?"
+
+Wait for the user to select which actions they want before creating them. Then create each selected action with the appropriate frequency using [CREATE_ACTION: action title].`
     };
 
     // Make direct API call to OpenAI
@@ -690,6 +921,31 @@ Always provide these commands in your response when the user asks to create, mod
       const createdGoal = await createGoal(context.userId, goalText);
       if (createdGoal) {
         action = `Goal "${goalText}" created successfully`;
+        refresh = true;
+      }
+    }
+    
+    // Check for goal creation with description and/or notes
+    const createGoalWithDescriptionMatch = aiResponse.match(/\[CREATE_GOAL_WITH_DESCRIPTION: (.*?)\|(.*?)\]/);
+    if (createGoalWithDescriptionMatch && context.userId) {
+      const goalText = createGoalWithDescriptionMatch[1].trim();
+      const description = createGoalWithDescriptionMatch[2].trim();
+      const createdGoal = await createGoal(context.userId, goalText, description);
+      if (createdGoal) {
+        action = `Goal "${goalText}" created successfully with description`;
+        refresh = true;
+      }
+    }
+    
+    // Check for goal creation with description and notes
+    const createGoalWithNotesMatch = aiResponse.match(/\[CREATE_GOAL_WITH_NOTES: (.*?)\|(.*?)\|(.*?)\]/);
+    if (createGoalWithNotesMatch && context.userId) {
+      const goalText = createGoalWithNotesMatch[1].trim();
+      const description = createGoalWithNotesMatch[2].trim();
+      const notes = createGoalWithNotesMatch[3].trim();
+      const createdGoal = await createGoal(context.userId, goalText, description, notes);
+      if (createdGoal) {
+        action = `Goal "${goalText}" created successfully with description and notes`;
         refresh = true;
       }
     }
@@ -816,12 +1072,38 @@ Always provide these commands in your response when the user asks to create, mod
       refresh = true;
     }
 
+    // Check for update goal description command
+    const updateGoalDescriptionMatch = aiResponse.match(/\[UPDATE_GOAL_DESCRIPTION: ([^|]+)\|(.+?)\]/);
+    if (updateGoalDescriptionMatch) {
+      const goalIdOrText = updateGoalDescriptionMatch[1].trim();
+      const newDescription = updateGoalDescriptionMatch[2].trim();
+      console.log("UPDATE_GOAL_DESCRIPTION match found for:", goalIdOrText);
+      
+      const result = await updateGoalDescription(goalIdOrText, newDescription, context.userId);
+      action = result;
+      refresh = true;
+    }
+    
+    // Check for update goal notes command
+    const updateGoalNotesMatch = aiResponse.match(/\[UPDATE_GOAL_NOTES: ([^|]+)\|(.+?)\]/);
+    if (updateGoalNotesMatch) {
+      const goalIdOrText = updateGoalNotesMatch[1].trim();
+      const newNotes = updateGoalNotesMatch[2].trim();
+      console.log("UPDATE_GOAL_NOTES match found for:", goalIdOrText);
+      
+      const result = await updateGoalNotes(goalIdOrText, newNotes, context.userId);
+      action = result;
+      refresh = true;
+    }
+
     return {
       message: aiResponse
         .replace(/\[ACTION:[^\]]+\]/g, '')
         .replace(/\[NAVIGATE:[^\]]+\]/g, '')
         .replace(/\[REFRESH\]/g, '')
         .replace(/\[CREATE_GOAL:[^\]]+\]/g, '')
+        .replace(/\[CREATE_GOAL_WITH_DESCRIPTION:[^\]]*\|[^\]]*\]/g, '')
+        .replace(/\[CREATE_GOAL_WITH_NOTES:[^\]]*\|[^\]]*\|[^\]]*\]/g, '')
         .replace(/\[CREATE_ACTION:[^\]]+\]/g, '')
         .replace(/\[COMPLETE_ACTION:[^\]]+\]/g, '')
         .replace(/\[COMPLETE_ACTION_TEXT:[^\]]+\]/g, '')
@@ -829,6 +1111,8 @@ Always provide these commands in your response when the user asks to create, mod
         .replace(/\[DELETE_GOAL_TEXT:[^\]]+\]/g, '')
         .replace(/\[DELETE_ACTION:[^\]]+\]/g, '')
         .replace(/\[DELETE_ACTION_TEXT:[^\]]+\]/g, '')
+        .replace(/\[UPDATE_GOAL_DESCRIPTION:[^\]]*\|[^\]]*\]/g, '')
+        .replace(/\[UPDATE_GOAL_NOTES:[^\]]*\|[^\]]*\]/g, '')
         .trim(),
       action,
       navigate: navigateMatch ? navigateMatch[1] : undefined,
