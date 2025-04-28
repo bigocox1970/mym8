@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { v4 as uuidv4 } from 'uuid';
 import { getConfig } from '@/lib/configManager';
+import { Button } from "@/components/ui/button";
+import { Menu } from "lucide-react";
 
 // Custom hooks
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
@@ -229,7 +231,14 @@ const AIAssistant = () => {
                 Chat with {assistantName} your goal tracking AI assistant
               </p>
             </div>
-            <MenuToggleButton />
+            <Button
+              variant="outline"
+              size="icon"
+              className="md:hidden h-10 w-10 bg-white dark:bg-gray-800"
+              onClick={toggleSidebar}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
           </div>
         </div>
 
