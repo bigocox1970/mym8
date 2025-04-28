@@ -326,17 +326,20 @@ const ActionsList = () => {
                 <Button 
                   onClick={handleToggleEditMode}
                   variant="outline"
+                  size="sm"
                 >
-                  <Check className="mr-2 h-4 w-4" />
-                  Done
+                  <Check className="sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Done</span>
                 </Button>
                 {selectedActions.length > 0 && (
                   <Button 
                     variant="destructive"
+                    size="sm"
                     onClick={() => setShowDeleteDialog(true)}
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete ({selectedActions.length})
+                    <Trash2 className="sm:mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">Delete</span>
+                    {selectedActions.length > 0 && <span className="ml-1">({selectedActions.length})</span>}
                   </Button>
                 )}
               </>
@@ -347,6 +350,7 @@ const ActionsList = () => {
                   onValueChange={(value) => setFrequencyFilter(value as FrequencyFilter)}
                 >
                   <SelectTrigger className="w-[150px]">
+                    <Filter className="mr-2 h-4 w-4" />
                     <SelectValue placeholder="Filter by frequency" />
                   </SelectTrigger>
                   <SelectContent>
@@ -359,16 +363,20 @@ const ActionsList = () => {
                     <SelectItem value="monthly">Monthly</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button 
+                <Button
                   onClick={handleToggleEditMode}
                   variant="outline"
+                  size="sm"
                 >
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  <Edit className="sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Edit</span>
                 </Button>
-                <Button onClick={handleNewActionClick}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  New
+                <Button 
+                  onClick={handleNewActionClick}
+                  size="sm"
+                >
+                  <ListPlus className="sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">New Action</span>
                 </Button>
               </>
             )}
@@ -424,6 +432,7 @@ const ActionsList = () => {
               <Button 
                 onClick={handleAddActionToGoal} 
                 disabled={!selectedGoalId || goals?.length === 0}
+                variant="default"
               >
                 Continue
               </Button>
@@ -490,7 +499,7 @@ const ActionsList = () => {
               <Button variant="outline" onClick={() => setShowEditDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSaveEdit}>
+              <Button onClick={handleSaveEdit} variant="default">
                 <Save className="mr-2 h-4 w-4" />
                 Save Changes
               </Button>
@@ -812,7 +821,7 @@ const ActionsList = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="outline" onClick={handleNewActionClick}>
+              <Button variant="default" onClick={handleNewActionClick}>
                 <ListPlus className="mr-2 h-4 w-4" />
                 Add Your First Action
               </Button>
