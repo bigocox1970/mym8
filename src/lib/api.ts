@@ -13,6 +13,8 @@ import {
   PersonalInfoItem
 } from '@/lib/userProfileManager';
 import { analyzeConversation } from '@/lib/contextExtractor';
+import { getConfig } from '@/lib/configManager';
+import { PERSONALITY_PROMPTS, generateFullPrompt } from '@/config/prompts';
 
 // Define interfaces for the API data types
 interface Goal {
@@ -104,6 +106,22 @@ export async function createGoal(
   notes?: string
 ): Promise<Goal | null> {
   try {
+    // Check if a similar goal already exists
+    const { data: existingGoals, error: checkError } = await supabase
+      .from('goals')
+      .select('id, goal_text')
+      .eq('user_id', userId)
+      .ilike('goal_text', `%${goalText}%`);
+    
+    if (checkError) throw checkError;
+    
+    // If a similar goal exists, prevent duplicates
+    if (existingGoals && existingGoals.length > 0) {
+      console.log('Similar goal already exists:', existingGoals[0].goal_text);
+      toast.warning(`Similar goal "${existingGoals[0].goal_text}" already exists. No duplicate created.`);
+      return existingGoals[0] as Goal;
+    }
+    
     const { data, error } = await supabase
       .from('goals')
       .insert({
@@ -157,6 +175,23 @@ export async function createAction(
     if (goalCheckError) {
       console.error("Goal check error:", goalCheckError);
       throw new Error(`Goal not found with ID: ${goalId}`);
+    }
+    
+    // Check if a similar action already exists for this goal
+    const { data: existingActions, error: checkError } = await supabase
+      .from('tasks')
+      .select('id, title')
+      .eq('user_id', userId)
+      .eq('goal_id', goalId)
+      .ilike('title', `%${title}%`);
+    
+    if (checkError) throw checkError;
+    
+    // If a similar action exists, prevent duplicates
+    if (existingActions && existingActions.length > 0) {
+      console.log('Similar action already exists:', existingActions[0].title);
+      toast.warning(`Similar action "${existingActions[0].title}" already exists. No duplicate created.`);
+      return existingActions[0] as Action;
     }
     
     // Create the action
@@ -416,6 +451,8 @@ export async function deleteGoal(
   exactMatch: boolean = false
 ): Promise<string> {
   try {
+    console.log("Deleting goal:", { userId, goalId, goalText, exactMatch });
+    
     // First find the goals to delete
     let query = supabase
       .from("goals")
@@ -447,26 +484,53 @@ export async function deleteGoal(
 
     // Get IDs of the goals to delete
     const goalIds = goals.map(goal => goal.id);
+    console.log("Found goals to delete:", goalIds);
     
     // First delete related actions (due to foreign key constraint)
     for (const id of goalIds) {
-      const { error: actionDeleteError } = await supabase
-        .from("tasks")
-        .delete()
-        .eq("goal_id", id);
-        
-      if (actionDeleteError) {
-        console.error(`Failed to delete actions for goal ${id}:`, actionDeleteError);
+      try {
+        const { error: actionDeleteError } = await supabase
+          .from("tasks")
+          .delete()
+          .eq("goal_id", id);
+          
+        if (actionDeleteError) {
+          console.error(`Failed to delete actions for goal ${id}:`, actionDeleteError);
+        }
+      } catch (actionError) {
+        console.error(`Exception deleting actions for goal ${id}:`, actionError);
+        // Continue with other deletions even if this one failed
       }
     }
     
-    // Then delete the goals
-    const { error: goalDeleteError } = await supabase
-      .from("goals")
-      .delete()
-      .in("id", goalIds);
-      
-    if (goalDeleteError) throw goalDeleteError;
+    // Then delete the goals - try one by one if bulk delete fails
+    try {
+      // First try bulk delete
+      const { error: goalDeleteError } = await supabase
+        .from("goals")
+        .delete()
+        .in("id", goalIds);
+        
+      if (goalDeleteError) {
+        console.error("Bulk delete failed, trying individual deletes:", goalDeleteError);
+        // If bulk delete fails, try deleting one by one
+        for (const id of goalIds) {
+          const { error: singleDeleteError } = await supabase
+            .from("goals")
+            .delete()
+            .eq("id", id);
+            
+          if (singleDeleteError) {
+            console.error(`Failed to delete goal ${id}:`, singleDeleteError);
+          } else {
+            console.log(`Successfully deleted goal ${id}`);
+          }
+        }
+      }
+    } catch (deleteError) {
+      console.error("Exception during goal deletion:", deleteError);
+      throw deleteError;
+    }
     
     const message = `Successfully deleted ${goals.length} goal(s): ${goals.map(g => g.goal_text).join(', ')}`;
     toast.success(message);
@@ -493,6 +557,8 @@ export async function deleteAction(
   exactMatch: boolean = false
 ): Promise<string> {
   try {
+    console.log("Deleting action:", { userId, actionId, actionText, exactMatch });
+    
     // Find the actions to delete
     let query = supabase
       .from("tasks")
@@ -522,14 +588,37 @@ export async function deleteAction(
       return "No actions found matching the criteria";
     }
 
-    // Delete the actions
-    const actionIds = actions.map(action => action.id);
-    const { error: deleteError } = await supabase
-      .from("tasks")
-      .delete()
-      .in("id", actionIds);
-      
-    if (deleteError) throw deleteError;
+    console.log("Found actions to delete:", actions.map(a => a.id));
+    
+    // Delete the actions - try one by one if bulk delete fails
+    try {
+      // First try bulk delete
+      const actionIds = actions.map(action => action.id);
+      const { error: deleteError } = await supabase
+        .from("tasks")
+        .delete()
+        .in("id", actionIds);
+        
+      if (deleteError) {
+        console.error("Bulk delete failed, trying individual deletes:", deleteError);
+        // If bulk delete fails, try deleting one by one
+        for (const id of actionIds) {
+          const { error: singleDeleteError } = await supabase
+            .from("tasks")
+            .delete()
+            .eq("id", id);
+            
+          if (singleDeleteError) {
+            console.error(`Failed to delete action ${id}:`, singleDeleteError);
+          } else {
+            console.log(`Successfully deleted action ${id}`);
+          }
+        }
+      }
+    } catch (deleteError) {
+      console.error("Exception during action deletion:", deleteError);
+      throw deleteError;
+    }
     
     const message = `Successfully deleted ${actions.length} action(s): ${actions.map(a => a.title).join(', ')}`;
     toast.success(message);
@@ -796,10 +885,22 @@ export async function processMessage(
       userAIContext = await getUserAIContext(context.userId);
     }
 
-    // Add system message with context
+    // Get the user's selected personality from config
+    const config = getConfig();
+    const assistantName = config.assistant_name || "M8";
+    const personalityType = config.personality_type || "gentle";
+    console.log(`Using assistant name: ${assistantName}, personality type: ${personalityType}`);
+    
+    // Get the personality prompt
+    const personalityPrompt = PERSONALITY_PROMPTS[personalityType as keyof typeof PERSONALITY_PROMPTS] || 
+                              PERSONALITY_PROMPTS.gentle;
+
+    // Add system message with context and personality
     const systemMessage = {
       role: 'system',
-      content: `You are a helpful AI assistant for a goal-tracking application called MyM8. Here is some context about the user:
+      content: `You are a helpful AI assistant for a goal-tracking application called MyM8. Your name is ${assistantName}. ${personalityPrompt}
+
+Here is some context about the user:
 User's name: ${context.userNickname || 'Unknown'}
 
 Goals: ${context.goals?.map(g => `${g.goal_text} (ID: ${g.id})`).join(', ') || 'None'}
