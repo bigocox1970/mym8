@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { Filter, ListPlus, Plus, X, Edit, Save } from "lucide-react";
+import { Filter, ListPlus, Plus, X, Edit, Save, Trash2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,6 +27,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 
 type FrequencyFilter = "all" | "morning" | "afternoon" | "evening" | "daily" | "weekly" | "monthly";
 
@@ -67,6 +77,11 @@ const ActionsList = () => {
   const [selectedGoalId, setSelectedGoalId] = useState<string>("");
   const [editingAction, setEditingAction] = useState<EditingAction | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  
+  // Add these new state variables for multi-select functionality
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedActions, setSelectedActions] = useState<string[]>([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data: actions, isLoading, isError, refetch } = useQuery({
     queryKey: ['actions'],
@@ -256,6 +271,44 @@ const ActionsList = () => {
     }
   };
 
+  const handleToggleEditMode = () => {
+    setIsEditMode(!isEditMode);
+    if (isEditMode) {
+      setSelectedActions([]);
+    }
+  };
+
+  const handleToggleSelection = (actionId: string) => {
+    if (selectedActions.includes(actionId)) {
+      setSelectedActions(selectedActions.filter(id => id !== actionId));
+    } else {
+      setSelectedActions([...selectedActions, actionId]);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!user || selectedActions.length === 0) return;
+
+    try {
+      // Delete the selected actions
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .in('id', selectedActions);
+
+      if (error) throw error;
+
+      toast.success(`Successfully deleted ${selectedActions.length} action(s)`);
+      setIsEditMode(false);
+      setSelectedActions([]);
+      setShowDeleteDialog(false);
+      refetch();
+    } catch (error) {
+      console.error('Error deleting actions:', error);
+      toast.error("Failed to delete actions");
+    }
+  };
+
   const filteredActions = frequencyFilter === "all" 
     ? actionsWithGoals 
     : actionsWithGoals.filter(action => action.frequency === frequencyFilter);
@@ -268,27 +321,57 @@ const ActionsList = () => {
             <h1 className="text-3xl font-bold tracking-tight">Actions</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Select
-              value={frequencyFilter}
-              onValueChange={(value) => setFrequencyFilter(value as FrequencyFilter)}
-            >
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Filter by frequency" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="morning">Morning</SelectItem>
-                <SelectItem value="afternoon">Afternoon</SelectItem>
-                <SelectItem value="evening">Evening</SelectItem>
-                <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="weekly">Weekly</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={handleNewActionClick}>
-              <Plus className="mr-2 h-4 w-4" />
-              New
-            </Button>
+            {isEditMode ? (
+              <>
+                <Button 
+                  onClick={handleToggleEditMode}
+                  variant="outline"
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  Done
+                </Button>
+                {selectedActions.length > 0 && (
+                  <Button 
+                    variant="destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete ({selectedActions.length})
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <Select
+                  value={frequencyFilter}
+                  onValueChange={(value) => setFrequencyFilter(value as FrequencyFilter)}
+                >
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Filter by frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="morning">Morning</SelectItem>
+                    <SelectItem value="afternoon">Afternoon</SelectItem>
+                    <SelectItem value="evening">Evening</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  onClick={handleToggleEditMode}
+                  variant="outline"
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button onClick={handleNewActionClick}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New
+                </Button>
+              </>
+            )}
             <MenuToggleButton />
           </div>
         </div>
@@ -415,6 +498,24 @@ const ActionsList = () => {
           </DialogContent>
         </Dialog>
 
+        {/* Add new Delete confirmation dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Actions</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {selectedActions.length} action{selectedActions.length > 1 ? 's' : ''}? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive text-destructive-foreground">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {isLoading ? (
           <div className="text-center py-8">Loading your actions...</div>
         ) : isError ? (
@@ -450,12 +551,19 @@ const ActionsList = () => {
                       >
                         <CardContent className="pt-6 pb-4">
                           <div className="flex items-start space-x-4">
-                            <Checkbox
-                              id={`action-${action.id}`}
-                              checked={action.completed}
-                              onCheckedChange={(checked) => handleActionComplete(action.id, !!checked)}
-                              className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
-                            />
+                            {isEditMode ? (
+                              <Checkbox 
+                                className="mt-1"
+                                checked={selectedActions.includes(action.id)}
+                                onCheckedChange={() => handleToggleSelection(action.id)}
+                              />
+                            ) : (
+                              <Checkbox
+                                checked={action.completed}
+                                onCheckedChange={(checked) => handleActionComplete(action.id, checked === true)}
+                                className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
+                              />
+                            )}
                             <div className="flex-1">
                               <div className="flex justify-between items-start">
                                 <div>
@@ -486,14 +594,16 @@ const ActionsList = () => {
                                   <Link to={`/goals/${action.goal_id}`} className="text-sm text-primary hover:underline">
                                     {action.goal_text}
                                   </Link>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    onClick={() => handleEditAction(action)}
-                                    className="h-8 w-8"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
+                                  {!isEditMode && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon"
+                                      onClick={() => handleEditAction(action)}
+                                      className="h-8 w-8"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                               <div className="mt-2 text-sm text-muted-foreground">
@@ -530,12 +640,19 @@ const ActionsList = () => {
                       >
                         <CardContent className="pt-6 pb-4">
                           <div className="flex items-start space-x-4">
-                            <Checkbox
-                              id={`action-${action.id}`}
-                              checked={action.completed}
-                              onCheckedChange={(checked) => handleActionComplete(action.id, !!checked)}
-                              className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
-                            />
+                            {isEditMode ? (
+                              <Checkbox 
+                                className="mt-1"
+                                checked={selectedActions.includes(action.id)}
+                                onCheckedChange={() => handleToggleSelection(action.id)}
+                              />
+                            ) : (
+                              <Checkbox
+                                checked={action.completed}
+                                onCheckedChange={(checked) => handleActionComplete(action.id, checked === true)}
+                                className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
+                              />
+                            )}
                             <div className="flex-1">
                               <div className="flex justify-between items-start">
                                 <div>
@@ -566,14 +683,16 @@ const ActionsList = () => {
                                   <Link to={`/goals/${action.goal_id}`} className="text-sm text-primary hover:underline">
                                     {action.goal_text}
                                   </Link>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    onClick={() => handleEditAction(action)}
-                                    className="h-8 w-8"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
+                                  {!isEditMode && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon"
+                                      onClick={() => handleEditAction(action)}
+                                      className="h-8 w-8"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                               <div className="mt-2 text-sm text-muted-foreground">
@@ -608,12 +727,19 @@ const ActionsList = () => {
                       >
                         <CardContent className="pt-6 pb-4">
                           <div className="flex items-start space-x-4">
-                            <Checkbox
-                              id={`action-${action.id}`}
-                              checked={action.completed}
-                              onCheckedChange={(checked) => handleActionComplete(action.id, !!checked)}
-                              className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
-                            />
+                            {isEditMode ? (
+                              <Checkbox 
+                                className="mt-1"
+                                checked={selectedActions.includes(action.id)}
+                                onCheckedChange={() => handleToggleSelection(action.id)}
+                              />
+                            ) : (
+                              <Checkbox
+                                checked={action.completed}
+                                onCheckedChange={(checked) => handleActionComplete(action.id, checked === true)}
+                                className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
+                              />
+                            )}
                             <div className="flex-1">
                               <div className="flex justify-between items-start">
                                 <div>
@@ -644,14 +770,16 @@ const ActionsList = () => {
                                   <Link to={`/goals/${action.goal_id}`} className="text-sm text-primary hover:underline">
                                     {action.goal_text}
                                   </Link>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    onClick={() => handleEditAction(action)}
-                                    className="h-8 w-8"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
+                                  {!isEditMode && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon"
+                                      onClick={() => handleEditAction(action)}
+                                      className="h-8 w-8"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                               <div className="mt-2 text-sm text-muted-foreground">
