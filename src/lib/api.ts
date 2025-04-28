@@ -206,8 +206,9 @@ export async function createSimpleAction(
         titleLower.includes("evening") || titleLower.includes("night") || titleLower.includes("dinner") || 
         titleLower.includes("pm ")) {
       detectedFrequency = "evening";
-    } else if (titleLower.includes("morning") || titleLower.includes("wake up") || titleLower.includes("breakfast") || 
-        titleLower.includes("early") || titleLower.includes("am ")) {
+    } else if (titleLower.includes("every morning") || titleLower.includes("morning") || titleLower.includes("wake up") || 
+        titleLower.includes("wake up early") || titleLower.includes("get up early") || titleLower.includes("get up earlier") ||
+        titleLower.includes("breakfast") || titleLower.includes("early") || titleLower.includes("am ")) {
       detectedFrequency = "morning";
     } else if (titleLower.includes("afternoon") || titleLower.includes("lunch")) {
       detectedFrequency = "afternoon";
@@ -518,6 +519,14 @@ For deleting an action: [DELETE_ACTION: action_id] or [DELETE_ACTION_TEXT: actio
 
 FREQUENCIES: The app supports these action frequencies: morning, afternoon, evening, daily, weekly, monthly.
 
+VERY IMPORTANT FOR ACTION FREQUENCY DETECTION: Pay very close attention to frequency indicators in the user's request.
+- If they mention "every morning," "wake up early," "get up earlier," etc., this clearly indicates a MORNING frequency
+- If they mention "afternoon," "lunch time," etc., this indicates an AFTERNOON frequency
+- If they mention "evening," "night," "before bed," etc., this indicates an EVENING frequency
+- If they mention "weekly," "once a week," etc., this indicates a WEEKLY frequency
+- If they mention "monthly," "once a month," etc., this indicates a MONTHLY frequency
+- If no frequency is specified, default to DAILY
+
 VERY IMPORTANT FOR ACTIONS: When a user asks to create an action, FIRST analyze the request to determine:
 1. What frequency is appropriate (morning, afternoon, evening, daily, weekly, monthly)
 2. Which goal it should be attached to
@@ -527,7 +536,7 @@ If this information is unclear, ASK the user before creating the action. For exa
 - "I noticed you want to 'Get up early' - would you like this as a morning action? And which goal should I attach it to?"
 
 If the user clearly mentions the frequency in their request (like "every morning" or "once a week"), use that frequency.
-If the user clearly mentions which goal (like "for my fitness goal"), try to find the matching goal.
+If the user clearly mentions which goal (like "for my happiness goal"), try to find the matching goal.
 
 Example: If a user says "create a goal to be happy", respond with something like:
 "I'll create that goal for you right away. [CREATE_GOAL: Be happy]"
