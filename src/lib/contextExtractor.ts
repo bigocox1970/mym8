@@ -71,18 +71,18 @@ export async function analyzeConversation(userId: string, messages: Message[]): 
       const message = messages[i];
       
       if (message.role === 'user' && isSignificantMessage(message.content)) {
-        // Save the user message
-        const truncatedUserMessage = message.content.substring(0, 100) + (message.content.length > 100 ? '...' : '');
-        await addUserConversationHighlight(userId, truncatedUserMessage);
+        // Save the user message with much higher character limit
+        const userMessage = message.content.length > 500 ? message.content.substring(0, 500) + "..." : message.content;
+        await addUserConversationHighlight(userId, userMessage);
         
         // If there's an assistant response following this message, save that too
         if (i + 1 < messages.length && messages[i + 1].role === 'assistant') {
           const assistantResponse = messages[i + 1].content;
           
-          // Extract a meaningful summary from the assistant response
-          const assistantSummary = extractAssistantSummary(assistantResponse);
-          if (assistantSummary) {
-            await addUserConversationHighlight(userId, `Assistant: ${assistantSummary}`);
+          // Store a more complete assistant response
+          const assistantHighlight = extractAssistantHighlight(assistantResponse);
+          if (assistantHighlight) {
+            await addUserConversationHighlight(userId, `Assistant: ${assistantHighlight}`);
           }
         }
       }
@@ -292,22 +292,32 @@ async function extractPreferences(userId: string, content: string): Promise<void
 }
 
 /**
- * Extract a meaningful summary from assistant responses
+ * Extract a meaningful highlight from assistant responses
  * @param content Assistant message content
- * @returns A summarized version of the response or null
+ * @returns A more complete version of the response
  */
-function extractAssistantSummary(content: string): string | null {
+function extractAssistantHighlight(content: string): string | null {
   if (!content || content.length < 10) return null;
   
-  // Try to get the first meaningful sentence
-  const sentences = content.split(/[.!?]+/);
-  const firstSentence = sentences[0]?.trim();
-  
-  if (firstSentence && firstSentence.length > 10) {
-    // Truncate if too long
-    return firstSentence.substring(0, 100) + (firstSentence.length > 100 ? '...' : '');
+  // For longer responses, keep more of the content
+  if (content.length > 500) {
+    // Try to extract the most meaningful part by looking for complete sentences
+    const sentences = content.split(/[.!?]+/);
+    let highlight = "";
+    
+    // Take first 3-4 sentences if available (or fewer if the message is shorter)
+    const sentenceCount = Math.min(sentences.length, 4);
+    for (let i = 0; i < sentenceCount; i++) {
+      if (sentences[i].trim()) {
+        highlight += sentences[i].trim() + ". ";
+        // Break if we've already got a substantial amount of text
+        if (highlight.length > 350) break;
+      }
+    }
+    
+    return highlight.trim() || content.substring(0, 500) + "...";
   }
   
-  // If we can't get a good first sentence, just truncate the content
-  return content.substring(0, 100) + (content.length > 100 ? '...' : '');
+  // For shorter responses, just return the full content
+  return content;
 }

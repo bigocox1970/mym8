@@ -1455,14 +1455,6 @@ export async function saveMessage(
 }
 
 /**
- * Generate a response to the user when they ask about chat history
- * @returns String explaining what happened
- */
-function generateHistoryAnalysisResponse(): string {
-  return "I've analyzed your past conversations and updated my understanding of your preferences, interests, and personal information. This will help me provide more personalized responses in the future. If you notice I'm missing anything important about you, feel free to let me know directly.";
-}
-
-/**
  * Analyze all user conversations to extract context
  * @param userId User ID
  * @returns Promise resolving to boolean indicating success
@@ -1477,12 +1469,40 @@ export async function analyzeAllUserConversations(userId: string): Promise<boole
     if (pastMessages && pastMessages.length > 0) {
       console.log(`Analyzing ${pastMessages.length} past conversations for user ${userId}`);
       
-      // Analyze in batches of 10 messages for more context
-      for (let i = 0; i < pastMessages.length; i += 10) {
-        const batch = pastMessages.slice(i, i + 10);
-        await analyzeConversation(userId, batch);
+      // Sort messages by timestamp to maintain conversation flow
+      const sortedMessages = [...pastMessages].sort((a, b) => 
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+      
+      // Group messages into conversation chunks to maintain context
+      // Each conversation chunk consists of up to 15 messages
+      const conversationChunks = [];
+      for (let i = 0; i < sortedMessages.length; i += 10) {
+        // Get a chunk with overlap to maintain context between chunks
+        const startIndex = Math.max(0, i - 5); // Add 5 messages of overlap for context
+        const endIndex = Math.min(sortedMessages.length, i + 15);
+        const chunk = sortedMessages.slice(startIndex, endIndex);
+        
+        // Only add chunk if it contains at least one new message
+        if (i === 0 || endIndex > i) {
+          conversationChunks.push(chunk);
+        }
       }
       
+      console.log(`Grouped messages into ${conversationChunks.length} conversation chunks for analysis`);
+      
+      // Analyze each conversation chunk
+      for (const chunk of conversationChunks) {
+        // Format messages for analysis
+        const messagesToAnalyze = chunk.map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content
+        }));
+        
+        await analyzeConversation(userId, messagesToAnalyze);
+      }
+      
+      console.log(`Completed analysis of all conversation chunks`);
       return true;
     } else {
       console.log("No past messages found to analyze");
@@ -1492,4 +1512,12 @@ export async function analyzeAllUserConversations(userId: string): Promise<boole
     console.error("Error analyzing all user conversations:", error);
     return false;
   }
+}
+
+/**
+ * Generate a response to the user when they ask about chat history
+ * @returns String explaining what happened
+ */
+function generateHistoryAnalysisResponse(): string {
+  return "I've analyzed our past conversations and updated my understanding of your preferences, interests, and personal information. This gives me better context about our interactions and helps me provide more personalized responses in future conversations. I've saved important highlights from our chats so I can remember key details about you. If you'd like to see what I've learned, you can check the 'Conversation Highlights' section in your profile settings.";
 }

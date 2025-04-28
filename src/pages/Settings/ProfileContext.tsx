@@ -42,6 +42,7 @@ const ProfileContext = () => {
     key: "",
     value: ""
   });
+  const [expandedHighlights, setExpandedHighlights] = useState<Set<number>>(new Set());
 
   // Load user context on component mount
   useEffect(() => {
@@ -175,6 +176,18 @@ const ProfileContext = () => {
       console.error("Error adding preference:", error);
       toast.error("Failed to add preference");
     }
+  };
+
+  const toggleHighlight = (index: number) => {
+    setExpandedHighlights(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
   };
 
   if (loading) {
@@ -458,23 +471,41 @@ const ProfileContext = () => {
                       Clear All
                     </Button>
                   </div>
-                  {userContext.conversation_highlights.map((highlight, index) => (
-                    <div key={index} className={`p-3 rounded-md ${highlight.startsWith('Assistant:') ? 'bg-muted border-l-4 border-primary ml-4' : 'border'}`}>
-                      <div className="flex items-start gap-2">
-                        {highlight.startsWith('Assistant:') ? (
-                          <BotIcon className="h-4 w-4 mt-1 text-primary" />
-                        ) : (
-                          <UserIcon className="h-4 w-4 mt-1" />
-                        )}
-                        <div>
-                          <p className="text-sm">{highlight}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {new Date(Date.now() - (index * 86400000)).toLocaleDateString()}
-                          </p>
+                  {userContext.conversation_highlights.map((highlight, index) => {
+                    const isExpanded = expandedHighlights.has(index);
+                    const isLong = highlight.length > 150;
+                    const displayText = isLong && !isExpanded 
+                      ? highlight.substring(0, 150) + "..." 
+                      : highlight;
+                    
+                    return (
+                      <div key={index} className={`p-3 rounded-md ${highlight.startsWith('Assistant:') ? 'bg-muted border-l-4 border-primary ml-4' : 'border'}`}>
+                        <div className="flex items-start gap-2">
+                          {highlight.startsWith('Assistant:') ? (
+                            <BotIcon className="h-4 w-4 mt-1 text-primary" />
+                          ) : (
+                            <UserIcon className="h-4 w-4 mt-1" />
+                          )}
+                          <div className="w-full">
+                            <p className="text-sm whitespace-pre-wrap">{displayText}</p>
+                            {isLong && (
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="px-0 h-5 text-xs"
+                                onClick={() => toggleHighlight(index)}
+                              >
+                                {isExpanded ? "Show less" : "Show more"}
+                              </Button>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {new Date(Date.now() - (index * 86400000)).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-muted-foreground">No conversation highlights recorded yet.</p>
