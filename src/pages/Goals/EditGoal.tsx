@@ -14,6 +14,7 @@ interface Goal {
   id: string;
   goal_text: string;
   description: string | null;
+  notes: string | null;
   created_at: string;
   user_id: string;
 }
@@ -25,6 +26,7 @@ const EditGoal = () => {
   
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [notes, setNotes] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -44,6 +46,7 @@ const EditGoal = () => {
         const goal = data as Goal;
         setTitle(goal.goal_text || "");
         setDescription(goal.description || "");
+        setNotes(goal.notes || "");
         
       } catch (error) {
         console.error("Error fetching goal:", error);
@@ -73,33 +76,35 @@ const EditGoal = () => {
     setIsSaving(true);
     
     try {
-      // First check if the description column exists in the database
       try {
-        // Update both title and description
+        // Try to update all fields
         const { error } = await supabase
           .from("goals")
           .update({
             goal_text: title.trim(),
-            description: description.trim() || null
+            description: description.trim() || null,
+            notes: notes.trim() || null
           })
           .eq("id", id);
         
         if (error) throw error;
         
       } catch (error: unknown) {
-        // If the error is about the description column not existing
+        // If the error is about the notes column not existing
         const err = error as { message?: string };
-        if (err.message && err.message.includes("description")) {
-          console.log("Description column not found, updating only title");
-          // Fall back to updating only the title
-          const { error: titleOnlyError } = await supabase
+        if (err.message && err.message.includes("notes")) {
+          console.log("Notes column might be missing, trying fallback");
+          
+          // Try updating just title and description
+          const { error: descError } = await supabase
             .from("goals")
             .update({
-              goal_text: title.trim()
+              goal_text: title.trim(),
+              description: description.trim() || null
             })
             .eq("id", id);
-          
-          if (titleOnlyError) throw titleOnlyError;
+            
+          if (descError) throw descError;
         } else {
           // Rethrow if it's a different error
           throw error;
@@ -117,7 +122,13 @@ const EditGoal = () => {
   };
 
   if (isLoading) {
-    return <Layout>Loading goal...</Layout>;
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-[calc(100vh-64px)]">
+          <p>Loading goal...</p>
+        </div>
+      </Layout>
+    );
   }
 
   return (
@@ -155,9 +166,24 @@ const EditGoal = () => {
                 <Label htmlFor="description">Description (optional)</Label>
                 <Textarea
                   id="description"
-                  placeholder="Add details about your goal"
+                  placeholder="Brief overview of your goal"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  className="resize-none dark:text-white"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="notes">
+                  <span className="font-medium">Notes (optional)</span>
+                  <p className="text-xs text-muted-foreground mt-1">Add detailed notes, motivation, or any other information about your goal</p>
+                </Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Examples: Why is this goal important? What steps will you take? Resources you'll need..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
                   rows={5}
                   className="resize-none dark:text-white"
                 />

@@ -5,6 +5,14 @@
 
 import { toast } from '@/components/ui/sonner';
 import { supabase } from '@/lib/supabase';
+import { 
+  getUserAIContext, 
+  addUserConversationHighlight, 
+  UserAIContext,
+  UserPreference,
+  PersonalInfoItem
+} from '@/lib/userProfileManager';
+import { analyzeConversation } from '@/lib/contextExtractor';
 
 // Define interfaces for the API data types
 interface Goal {
@@ -777,6 +785,17 @@ export async function processMessage(
       content: message
     });
 
+    // Save the user message to the database for history
+    if (context.userId) {
+      await saveMessage(context.userId, 'user', message);
+    }
+
+    // Fetch user AI context if available
+    let userAIContext = null;
+    if (context.userId) {
+      userAIContext = await getUserAIContext(context.userId);
+    }
+
     // Add system message with context
     const systemMessage = {
       role: 'system',
@@ -787,7 +806,33 @@ Goals: ${context.goals?.map(g => `${g.goal_text} (ID: ${g.id})`).join(', ') || '
 
 Actions: ${context.actions?.map(a => `${a.title} (ID: ${a.id}, Status: ${a.completed ? 'Completed' : 'Pending'}, Frequency: ${a.frequency})`).join(', ') || 'None'}
 
+${userAIContext ? `
+User Interests: ${userAIContext.interests.length > 0 ? userAIContext.interests.join(', ') : 'None specified yet'}
+
+User Dislikes: ${userAIContext.dislikes.length > 0 ? userAIContext.dislikes.join(', ') : 'None specified yet'}
+
+User Preferences: ${Object.entries(userAIContext.preferences).length > 0 ? 
+  Object.entries(userAIContext.preferences)
+    .map(([key, pref]) => `${key}: ${(pref as UserPreference).value}`)
+    .join(', ') : 
+  'None specified yet'}
+
+Personal Information: ${Object.entries(userAIContext.personal_info).length > 0 ? 
+  Object.entries(userAIContext.personal_info)
+    .map(([key, info]) => `${key}: ${(info as PersonalInfoItem).value}`)
+    .join(', ') : 
+  'None specified yet'}
+
+Recent Highlights: ${userAIContext.conversation_highlights.length > 0 ? 
+  userAIContext.conversation_highlights.slice(-5).join(' | ') : 
+  'None recorded yet'}
+` : ''}
+
 When the user mentions their name or refers to themselves, use their name "${context.userNickname}" in your responses if available.
+
+IMPORTANT: LEARN ABOUT THE USER - As you chat with the user, try to learn more about them. When the user shares important information about themselves (like preferences, interests, family details, work information, health concerns, etc.), remember this information and use it to personalize future responses.
+
+IMPORTANT CONVERSATION HISTORY: If a user asks you to read through past conversations or remember something from before, you can use the command [ANALYZE_CONVERSATION_HISTORY] which will scan through past messages and extract important information to improve your context about the user. Use this command when users ask you to read or remember past conversations.
 
 IMPORTANT: When a user asks you to create or manage goals or tasks, you CAN and SHOULD handle these by including special commands in your response. Use these formats:
 
@@ -801,6 +846,7 @@ For deleting a goal: [DELETE_GOAL: goal_id] or [DELETE_GOAL_TEXT: goal text to s
 For deleting an action: [DELETE_ACTION: action_id] or [DELETE_ACTION_TEXT: action text to search for]
 For updating a goal's description: [UPDATE_GOAL_DESCRIPTION: goal_text|new description]
 For updating a goal's notes: [UPDATE_GOAL_NOTES: goal_text|new notes]
+For analyzing past conversations: [ANALYZE_CONVERSATION_HISTORY]
 
 FREQUENCIES: The app supports these action frequencies: morning, afternoon, evening, daily, weekly, monthly.
 
@@ -927,7 +973,31 @@ Which of these would you like me to set up, or do you have other actions in mind
 Wait for the user to select which actions they want before creating them. Then create each selected action with the appropriate frequency using [CREATE_ACTION: action title].
 
 Example: If a user wants to add several actions to a newly created goal, use the specific goal command:
-"I'll add those workout actions to your gym goal. [CREATE_ACTION_FOR_GOAL: Schedule gym sessions in your calendar|gym]`
+"I'll add those workout actions to your gym goal. [CREATE_ACTION_FOR_GOAL: Schedule gym sessions in your calendar|gym]
+
+VERY IMPORTANT FOR GOAL PROGRESS INQUIRIES: When a user asks about their goals or progress:
+
+1. ALWAYS reference the specific goals and actions information provided in the system context
+2. Remember that you have full access to their goals through the context at the top of this prompt
+3. You can see all their goals and actions in the "Goals:" and "Actions:" sections above
+4. Calculate completion rates for each goal by counting related actions and checking completion status
+
+When a user asks "how am I doing with my goals" or similar:
+1. Provide a summary of each goal they have
+2. For each goal, mention the related actions and their completion status 
+3. Offer encouragement based on their actual progress
+4. If they ask about a specific goal, focus your response on that goal and its actions
+
+Example response:
+"You currently have 3 goals:
+1. Improve fitness: You've completed 2 out of 4 actions (50% completion rate)
+2. Learn Spanish: You've completed 1 out of 3 actions (33% completion rate)
+3. Read more books: You've completed 0 out of 2 actions (0% completion rate)
+
+Would you like more details about any specific goal?"
+
+DO NOT respond with "As an AI, I don't have the ability to directly access your goal progress" - you DO have this information in the context.
+`
     };
 
     // Make direct API call to OpenAI
@@ -953,6 +1023,40 @@ Example: If a user wants to add several actions to a newly created goal, use the
 
     const data = await response.json();
     const aiResponse = data.choices[0].message.content;
+
+    // Save the assistant response to the database for history
+    if (context.userId) {
+      await saveMessage(context.userId, 'assistant', aiResponse);
+    }
+
+    // Extract and save important information from the conversation for later context
+    if (context.userId && userAIContext) {
+      // Run automated extraction on the conversation messages
+      if (context.conversation && context.conversation.length > 0) {
+        // Add latest user message to analysis
+        const conversationToAnalyze = [
+          ...context.conversation,
+          { id: 'current', role: 'user', content: message, timestamp: new Date().toISOString() }
+        ];
+        
+        // Analyze only the last 10 messages to avoid too much processing
+        const recentMessages = conversationToAnalyze.slice(-10).map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content
+        }));
+        
+        // Run the analysis asynchronously
+        analyzeConversation(context.userId, recentMessages).catch(error => {
+          console.error('Error analyzing conversation:', error);
+        });
+      }
+      
+      // Add the current message to highlights if it's substantive
+      if (message.length > 30) {
+        const truncatedMessage = message.substring(0, 100) + (message.length > 100 ? '...' : '');
+        await addUserConversationHighlight(context.userId, truncatedMessage);
+      }
+    }
 
     // Parse the response for any special actions
     const actionMatch = aiResponse.match(/\[ACTION:([^\]]+)\]/);
@@ -1179,8 +1283,68 @@ Example: If a user wants to add several actions to a newly created goal, use the
       }
     }
 
+    // Check for analyze conversation history command
+    const analyzeHistoryMatch = aiResponse.match(/\[ANALYZE_CONVERSATION_HISTORY\]/);
+    let analysisResult: 'success' | 'no_data' | 'error' = 'error'; // Default to error state
+    
+    if (analyzeHistoryMatch && context.userId) {
+      console.log("ANALYZE_CONVERSATION_HISTORY match found, analyzing past conversations");
+      
+      try {
+        // Fetch past conversations
+        const pastMessages = await getConversationHistory(context.userId, 200);
+        
+        if (pastMessages.length > 0) {
+          // Convert to format expected by analyzeConversation
+          const messagesToAnalyze = pastMessages.map(msg => ({
+            role: msg.role as 'user' | 'assistant',
+            content: msg.content
+          }));
+          
+          // Run analysis on past conversations
+          await analyzeConversation(context.userId, messagesToAnalyze);
+          
+          // Track that analysis was successful
+          analysisResult = 'success';
+          action = "Past conversations analyzed successfully.";
+          refresh = true;
+        } else {
+          // Track that there was no data
+          analysisResult = 'no_data';
+          action = "No past conversations found to analyze.";
+        }
+      } catch (error) {
+        console.error("Error analyzing conversation history:", error);
+        analysisResult = 'error';
+        action = `Error analyzing conversation history: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+
+    // Process the final message to return
+    let finalMessage = aiResponse;
+    
+    // Replace the analysis command with appropriate text
+    if (analyzeHistoryMatch) {
+      if (analysisResult === 'success') {
+        finalMessage = finalMessage.replace(
+          /\[ANALYZE_CONVERSATION_HISTORY\]/g, 
+          generateHistoryAnalysisResponse()
+        );
+      } else if (analysisResult === 'no_data') {
+        finalMessage = finalMessage.replace(
+          /\[ANALYZE_CONVERSATION_HISTORY\]/g, 
+          "I don't have any past conversations to analyze yet. Let's keep chatting so I can learn more about you!"
+        );
+      } else {
+        finalMessage = finalMessage.replace(
+          /\[ANALYZE_CONVERSATION_HISTORY\]/g, 
+          "I encountered an error trying to analyze our past conversations. Let's continue from here!"
+        );
+      }
+    }
+
     return {
-      message: aiResponse
+      message: finalMessage
         .replace(/\[ACTION:[^\]]+\]/g, '')
         .replace(/\[NAVIGATE:[^\]]+\]/g, '')
         .replace(/\[REFRESH\]/g, '')
@@ -1197,6 +1361,7 @@ Example: If a user wants to add several actions to a newly created goal, use the
         .replace(/\[DELETE_ACTION_TEXT:[^\]]+\]/g, '')
         .replace(/\[UPDATE_GOAL_DESCRIPTION:[^\]]*\|[^\]]*\]/g, '')
         .replace(/\[UPDATE_GOAL_NOTES:[^\]]*\|[^\]]*\]/g, '')
+        .replace(/\[ANALYZE_CONVERSATION_HISTORY\]/g, '')
         .trim(),
       action,
       navigate: navigateMatch ? navigateMatch[1] : undefined,
@@ -1211,4 +1376,88 @@ Example: If a user wants to add several actions to a newly created goal, use the
       refresh: false
     };
   }
+}
+
+/**
+ * Get recent conversation history
+ * @param userId User ID
+ * @param limit Number of messages to retrieve (default: 50)
+ * @returns Conversation messages
+ */
+export async function getConversationHistory(
+  userId: string, 
+  limit: number = 50
+): Promise<Message[]> {
+  try {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('user_id', userId)
+      .order('timestamp', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching conversation history:', error);
+      return [];
+    }
+
+    return (data || []) as Message[];
+  } catch (error) {
+    console.error('Error in getConversationHistory:', error);
+    return [];
+  }
+}
+
+/**
+ * Save a message to the database
+ * @param userId User ID
+ * @param role Message role (user or assistant)
+ * @param content Message content
+ * @returns Saved message or null if failed
+ */
+export async function saveMessage(
+  userId: string,
+  role: 'user' | 'assistant',
+  content: string
+): Promise<Message | null> {
+  try {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    const message = {
+      user_id: userId,
+      role,
+      content,
+      timestamp: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from('messages')
+      .insert(message)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error saving message:', error);
+      return null;
+    }
+
+    return data as Message;
+  } catch (error) {
+    console.error('Error in saveMessage:', error);
+    return null;
+  }
+}
+
+/**
+ * Generate a response to the user when they ask about chat history
+ * @returns String explaining what happened
+ */
+function generateHistoryAnalysisResponse(): string {
+  return "I've analyzed your past conversations and updated my understanding of your preferences, interests, and personal information. This will help me provide more personalized responses in the future. If you notice I'm missing anything important about you, feel free to let me know directly.";
 }

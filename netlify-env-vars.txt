@@ -7,6 +7,9 @@ OPENAI_API_KEY=sk-proj-BycOI0KZHyg6T2_pF-eQpHJ9fZy6tGUCRF4T_97k6-fT5EGgwglWrVTMf
 # OpenRouter API Key (IMPORTANT: This must be without the VITE_ prefix for functions)
 OPENROUTER_API_KEY=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
 
+# API URL for frontend
+VITE_API_BASE_URL=/.netlify/functions/api
+
 # OPTIONAL: Frontend variables (if you want to access these in the React frontend)
 VITE_OPENAI_API_KEY=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
 VITE_OPENROUTER_API_KEY=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

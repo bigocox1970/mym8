@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/sonner";
-import { Plus, Edit, Save } from "lucide-react";
+import { Plus, Edit, Save, ChevronDown, ChevronUp } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Select,
@@ -31,6 +31,7 @@ interface Goal {
   id: string;
   goal_text: string;
   description: string | null;
+  notes: string | null;
   created_at: string;
   user_id: string;
 }
@@ -69,6 +70,9 @@ const GoalDetail = () => {
   const [editingAction, setEditingAction] = useState<EditingAction | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [showDailyActions, setShowDailyActions] = useState(true);
+  const [showWeeklyActions, setShowWeeklyActions] = useState(false);
+  const [showMonthlyActions, setShowMonthlyActions] = useState(false);
 
   useEffect(() => {
     const fetchGoalAndActions = async () => {
@@ -83,6 +87,7 @@ const GoalDetail = () => {
           .single();
 
         if (goalError) throw goalError;
+        console.log("Goal data fetched:", goalData);
         setGoal(goalData as Goal);
 
         // Fetch actions related to the goal
@@ -273,7 +278,13 @@ const GoalDetail = () => {
     : actions.filter(action => action.frequency === frequencyFilter);
 
   if (loading) {
-    return <Layout>Loading goal details...</Layout>;
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-[calc(100vh-64px)]">
+          <p>Loading goal details...</p>
+        </div>
+      </Layout>
+    );
   }
 
   if (!goal) {
@@ -291,24 +302,49 @@ const GoalDetail = () => {
   return (
     <Layout>
       <div className="w-full">
-        {/* Title in its own row */}
-        <div className="mb-4">
-          <h1 className="text-3xl font-bold">{goal.goal_text}</h1>
-          {goal.description && (
-            <p className={`text-muted-foreground mt-2 ${!showFullDescription && goal.description.length > 100 ? 'line-clamp-2' : ''}`}>
-              {goal.description}
-            </p>
-          )}
-          {goal.description && goal.description.length > 100 && (
-            <Button 
-              variant="link" 
-              onClick={() => setShowFullDescription(!showFullDescription)}
-              className="p-0 h-auto mt-1"
-            >
-              {showFullDescription ? 'Show Less' : 'Show More'}
-            </Button>
-          )}
-        </div>
+        {/* Title and Details in a card */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>
+              <h1 className="text-3xl font-bold">{goal.goal_text}</h1>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Description section - ALWAYS show if exists */}
+            {goal.description && (
+              <div className="mt-2">
+                <h3 className="text-md font-semibold mb-2">Description</h3>
+                <p>{goal.description}</p>
+              </div>
+            )}
+            
+            {/* Notes section - ALWAYS show if exists */}
+            {'notes' in goal && goal.notes && (
+              <div className="mt-4 pt-4 border-t">
+                <h3 className="text-md font-semibold mb-2">Notes</h3>
+                <p className={`${!showFullDescription && goal.notes.length > 100 ? 'line-clamp-2' : ''}`}>
+                  {goal.notes}
+                </p>
+                {goal.notes.length > 100 && (
+                  <Button 
+                    variant="link" 
+                    onClick={() => setShowFullDescription(!showFullDescription)}
+                    className="p-0 h-auto mt-1"
+                  >
+                    {showFullDescription ? 'Show Less' : 'Show More'}
+                  </Button>
+                )}
+              </div>
+            )}
+            
+            {/* Show message if neither exists */}
+            {!goal.description && !('notes' in goal && goal.notes) && (
+              <div className="text-center py-4 text-muted-foreground mt-4">
+                No additional details for this goal. <Link to={`/goals/${id}/edit`} className="underline hover:text-foreground">Edit goal</Link> to add description or notes.
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Navigation row */}
         <div className="flex justify-between items-center mb-6">
@@ -352,264 +388,303 @@ const GoalDetail = () => {
             <CardTitle>Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Daily Actions */}
-            <div className="space-y-2">
-              <h3 className="text-md font-semibold mb-2">Daily Actions</h3>
-              {filteredActions.filter(action => 
-                action.frequency === "morning" || 
-                action.frequency === "afternoon" || 
-                action.frequency === "evening" || 
-                action.frequency === "daily"
-              ).length > 0 ? (
-                filteredActions.filter(action => 
+            {/* Daily Actions Section */}
+            <div className="border-b pb-2">
+              <div 
+                className="flex justify-between items-center cursor-pointer py-2" 
+                onClick={() => setShowDailyActions(!showDailyActions)}
+              >
+                <h3 className="text-md font-semibold">Daily Actions</h3>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  {showDailyActions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            
+            {showDailyActions && (
+              <div className="py-2">
+                {filteredActions.filter(action => 
                   action.frequency === "morning" || 
                   action.frequency === "afternoon" || 
                   action.frequency === "evening" || 
                   action.frequency === "daily"
-                ).map((action) => (
-                  <div 
-                    key={action.id} 
-                    className={`flex items-start space-x-2 p-3 border rounded-md transition-colors ${action.completed ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : ''}`}
-                  >
-                    <Checkbox
-                      id={`action-${action.id}`}
-                      checked={action.completed}
-                      onCheckedChange={(checked) => handleActionComplete(action.id, !!checked)}
-                      className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
-                    />
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <label
-                            htmlFor={`action-${action.id}`}
-                            className={`text-sm font-medium leading-none ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
-                          >
-                            {action.title}
-                            {action.completed && (
-                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 font-medium">
-                                Completed
-                              </span>
-                            )}
-                            {action.skipped && (
-                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100 font-medium">
-                                Skipped
-                              </span>
-                            )}
-                          </label>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {action.frequency.charAt(0).toUpperCase() + action.frequency.slice(1)} action
-                          </p>
-                          {action.description && (
-                            <p className="mt-2 text-sm text-slate-700 dark:text-white">{action.description}</p>
-                          )}
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleEditAction(action)}
-                          className="h-8 w-8"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  {frequencyFilter === "all" 
-                    ? "No daily actions created yet" 
-                    : `No ${frequencyFilter} actions found`}
-                </div>
-              )}
-            </div>
-            
-            {/* Weekly Actions */}
-            <div className="space-y-2 mt-6 pt-6 border-t">
-              <h3 className="text-md font-semibold mb-2">Weekly Actions</h3>
-              {filteredActions.filter(action => action.frequency === "weekly").length > 0 ? (
-                filteredActions.filter(action => action.frequency === "weekly").map((action) => (
-                  <div 
-                    key={action.id} 
-                    className={`flex items-start space-x-2 p-3 border rounded-md transition-colors ${action.completed ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : ''}`}
-                  >
-                    <Checkbox
-                      id={`action-${action.id}`}
-                      checked={action.completed}
-                      onCheckedChange={(checked) => handleActionComplete(action.id, !!checked)}
-                      className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
-                    />
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <label
-                            htmlFor={`action-${action.id}`}
-                            className={`text-sm font-medium leading-none ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
-                          >
-                            {action.title}
-                            {action.completed && (
-                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 font-medium">
-                                Completed
-                              </span>
-                            )}
-                            {action.skipped && (
-                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100 font-medium">
-                                Skipped
-                              </span>
-                            )}
-                          </label>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Weekly action
-                          </p>
-                          {action.description && (
-                            <p className="mt-2 text-sm text-slate-700 dark:text-white">{action.description}</p>
-                          )}
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleEditAction(action)}
-                          className="h-8 w-8"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  No weekly actions created yet
-                </div>
-              )}
-            </div>
-            
-            {/* Monthly Actions */}
-            <div className="space-y-2 mt-6 pt-6 border-t">
-              <h3 className="text-md font-semibold mb-2">Monthly Actions</h3>
-              {filteredActions.filter(action => action.frequency === "monthly").length > 0 ? (
-                filteredActions.filter(action => action.frequency === "monthly").map((action) => (
-                  <div 
-                    key={action.id} 
-                    className={`flex items-start space-x-2 p-3 border rounded-md transition-colors ${action.completed ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : ''}`}
-                  >
-                    <Checkbox
-                      id={`action-${action.id}`}
-                      checked={action.completed}
-                      onCheckedChange={(checked) => handleActionComplete(action.id, !!checked)}
-                      className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
-                    />
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <label
-                            htmlFor={`action-${action.id}`}
-                            className={`text-sm font-medium leading-none ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
-                          >
-                            {action.title}
-                            {action.completed && (
-                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 font-medium">
-                                Completed
-                              </span>
-                            )}
-                            {action.skipped && (
-                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100 font-medium">
-                                Skipped
-                              </span>
-                            )}
-                          </label>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Monthly action
-                          </p>
-                          {action.description && (
-                            <p className="mt-2 text-sm text-slate-700 dark:text-white">{action.description}</p>
-                          )}
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleEditAction(action)}
-                          className="h-8 w-8"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  No monthly actions created yet
-                </div>
-              )}
-            </div>
-
-            <div className="pt-4 border-t">
-              <div className="flex flex-col space-y-2">
-                <h3 className="text-sm font-medium">Add New Action</h3>
-                <div className="flex flex-col gap-2">
-                  <div className="flex gap-2">
-                    <Select
-                      value={selectedFrequency}
-                      onValueChange={(value) => setSelectedFrequency(value as Action["frequency"])}
-                    >
-                      <SelectTrigger className="w-[120px]">
-                        <SelectValue placeholder="Frequency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="morning">Morning</SelectItem>
-                        <SelectItem value="afternoon">Afternoon</SelectItem>
-                        <SelectItem value="evening">Evening</SelectItem>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <div className="flex flex-col gap-2 flex-1">
-                      <Input
-                        type="text"
-                        placeholder="Enter a new action"
-                        value={newActionText}
-                        onChange={(e) => setNewActionText(e.target.value)}
-                        className="flex-1"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            if (!showDescriptionInput) {
-                              setShowDescriptionInput(true);
-                            } else {
-                              handleAddAction();
-                            }
-                          }
-                        }}
-                      />
-                      {showDescriptionInput && (
-                        <Textarea
-                          placeholder="Add a description (optional)"
-                          value={newActionDescription}
-                          onChange={(e) => setNewActionDescription(e.target.value)}
-                          rows={2}
-                          className="resize-none"
-                        />
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex justify-between">
-                    {!showDescriptionInput && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setShowDescriptionInput(true)}
+                ).length > 0 ? (
+                  <div className="space-y-2">
+                    {filteredActions.filter(action => 
+                      action.frequency === "morning" || 
+                      action.frequency === "afternoon" || 
+                      action.frequency === "evening" || 
+                      action.frequency === "daily"
+                    ).map((action) => (
+                      <div 
+                        key={action.id} 
+                        className={`flex items-start space-x-2 p-3 border rounded-md transition-colors ${action.completed ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : ''}`}
                       >
-                        Add Description
-                      </Button>
-                    )}
-                    <div className="flex-1"></div>
-                    <Button onClick={handleAddAction} disabled={!newActionText.trim()}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Action
-                    </Button>
+                        <Checkbox
+                          id={`action-${action.id}`}
+                          checked={action.completed}
+                          onCheckedChange={(checked) => handleActionComplete(action.id, !!checked)}
+                          className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
+                        />
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <label
+                                htmlFor={`action-${action.id}`}
+                                className={`text-sm font-medium leading-none ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
+                              >
+                                {action.title}
+                                {action.completed && (
+                                  <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 font-medium">
+                                    Completed
+                                  </span>
+                                )}
+                                {action.skipped && (
+                                  <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100 font-medium">
+                                    Skipped
+                                  </span>
+                                )}
+                              </label>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {action.frequency.charAt(0).toUpperCase() + action.frequency.slice(1)} action
+                              </p>
+                              {action.description && (
+                                <p className="mt-2 text-sm text-slate-700 dark:text-white">{action.description}</p>
+                              )}
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => handleEditAction(action)}
+                              className="h-8 w-8"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    {frequencyFilter === "all" 
+                      ? "No daily actions created yet" 
+                      : `No ${frequencyFilter} actions found`}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Weekly Actions Section */}
+            <div className="border-b pb-2">
+              <div 
+                className="flex justify-between items-center cursor-pointer py-2" 
+                onClick={() => setShowWeeklyActions(!showWeeklyActions)}
+              >
+                <h3 className="text-md font-semibold">Weekly Actions</h3>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  {showWeeklyActions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            
+            {showWeeklyActions && (
+              <div className="py-2">
+                {filteredActions.filter(action => action.frequency === "weekly").length > 0 ? (
+                  <div className="space-y-2">
+                    {filteredActions.filter(action => action.frequency === "weekly").map((action) => (
+                      <div 
+                        key={action.id} 
+                        className={`flex items-start space-x-2 p-3 border rounded-md transition-colors ${action.completed ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : ''}`}
+                      >
+                        <Checkbox
+                          id={`action-${action.id}`}
+                          checked={action.completed}
+                          onCheckedChange={(checked) => handleActionComplete(action.id, !!checked)}
+                          className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
+                        />
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <label
+                                htmlFor={`action-${action.id}`}
+                                className={`text-sm font-medium leading-none ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
+                              >
+                                {action.title}
+                                {action.completed && (
+                                  <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 font-medium">
+                                    Completed
+                                  </span>
+                                )}
+                                {action.skipped && (
+                                  <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100 font-medium">
+                                    Skipped
+                                  </span>
+                                )}
+                              </label>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Weekly action
+                              </p>
+                              {action.description && (
+                                <p className="mt-2 text-sm text-slate-700 dark:text-white">{action.description}</p>
+                              )}
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => handleEditAction(action)}
+                              className="h-8 w-8"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No weekly actions created yet
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Monthly Actions Section */}
+            <div className="border-b pb-2">
+              <div 
+                className="flex justify-between items-center cursor-pointer py-2" 
+                onClick={() => setShowMonthlyActions(!showMonthlyActions)}
+              >
+                <h3 className="text-md font-semibold">Monthly Actions</h3>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  {showMonthlyActions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            
+            {showMonthlyActions && (
+              <div className="py-2">
+                {filteredActions.filter(action => action.frequency === "monthly").length > 0 ? (
+                  <div className="space-y-2">
+                    {filteredActions.filter(action => action.frequency === "monthly").map((action) => (
+                      <div 
+                        key={action.id} 
+                        className={`flex items-start space-x-2 p-3 border rounded-md transition-colors ${action.completed ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : ''}`}
+                      >
+                        <Checkbox
+                          id={`action-${action.id}`}
+                          checked={action.completed}
+                          onCheckedChange={(checked) => handleActionComplete(action.id, !!checked)}
+                          className={`mt-0.5 ${action.completed ? 'text-green-600 dark:text-green-400' : ''}`}
+                        />
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <label
+                                htmlFor={`action-${action.id}`}
+                                className={`text-sm font-medium leading-none ${action.completed ? 'text-green-600 dark:text-green-400' : ''}${action.skipped ? 'text-amber-600 dark:text-amber-400' : ''}`}
+                              >
+                                {action.title}
+                                {action.completed && (
+                                  <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 font-medium">
+                                    Completed
+                                  </span>
+                                )}
+                                {action.skipped && (
+                                  <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100 font-medium">
+                                    Skipped
+                                  </span>
+                                )}
+                              </label>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Monthly action
+                              </p>
+                              {action.description && (
+                                <p className="mt-2 text-sm text-slate-700 dark:text-white">{action.description}</p>
+                              )}
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => handleEditAction(action)}
+                              className="h-8 w-8"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No monthly actions created yet
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Add New Action Section */}
+            <div className="pt-4">
+              <h3 className="text-md font-semibold mb-4">Add New Action</h3>
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <Select
+                    value={selectedFrequency}
+                    onValueChange={(value) => setSelectedFrequency(value as Action["frequency"])}
+                  >
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="morning">Morning</SelectItem>
+                      <SelectItem value="afternoon">Afternoon</SelectItem>
+                      <SelectItem value="evening">Evening</SelectItem>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="text"
+                    placeholder="Enter a new action"
+                    value={newActionText}
+                    onChange={(e) => setNewActionText(e.target.value)}
+                    className="flex-1"
+                  />
+                </div>
+                
+                {showDescriptionInput && (
+                  <Textarea
+                    placeholder="Add details about this action"
+                    value={newActionDescription}
+                    onChange={(e) => setNewActionDescription(e.target.value)}
+                    rows={2}
+                    className="resize-none"
+                  />
+                )}
+                
+                <div className="flex justify-between mt-2">
+                  {!showDescriptionInput ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setShowDescriptionInput(true)}
+                    >
+                      Add Description
+                    </Button>
+                  ) : (
+                    <div></div>
+                  )}
+                  
+                  <Button 
+                    onClick={handleAddAction} 
+                    disabled={!newActionText.trim()}
+                    className="ml-auto"
+                  >
+                    Add Action
+                  </Button>
                 </div>
               </div>
             </div>
@@ -640,13 +715,16 @@ const GoalDetail = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="action-description" className="text-foreground">Description</Label>
+                  <Label htmlFor="action-description" className="text-foreground">
+                    <span className="font-medium">Action Notes</span>
+                    <p className="text-xs text-muted-foreground mt-1">Add details, steps, or any other notes about this action</p>
+                  </Label>
                   <Textarea 
                     id="action-description"
                     value={editingAction.description} 
                     onChange={(e) => setEditingAction({...editingAction, description: e.target.value})}
-                    placeholder="Add details about this action"
-                    rows={3}
+                    placeholder="Examples: Required materials, specific instructions, motivation, etc."
+                    rows={4}
                     className="text-foreground dark:text-white bg-background dark:bg-slate-900 border-input"
                   />
                 </div>

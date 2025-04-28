@@ -73,6 +73,72 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
     if (voiceService === 'amazon') voice = config.amazon_voice || 'Joanna';
     console.log("voiceService:", voiceService, "voice:", voice);
 
+    // Split text into sentences for more reliable processing
+    const splitTextIntoChunks = (fullText: string): string[] => {
+      // Split on sentence boundaries (periods, question marks, exclamation points followed by space or end)
+      const sentenceRegex = /[.!?]+(?:\s|$)/g;
+      const sentences: string[] = [];
+      let lastIndex = 0;
+      let match;
+      
+      // Find all sentence boundaries
+      while ((match = sentenceRegex.exec(fullText)) !== null) {
+        sentences.push(fullText.substring(lastIndex, match.index + match[0].length));
+        lastIndex = match.index + match[0].length;
+      }
+      
+      // Add any remaining text
+      if (lastIndex < fullText.length) {
+        sentences.push(fullText.substring(lastIndex));
+      }
+      
+      // Group sentences into chunks of reasonable size (max ~500 chars)
+      const chunks: string[] = [];
+      let currentChunk = "";
+      
+      for (const sentence of sentences) {
+        // If this single sentence is too long, split it further
+        if (sentence.length > 500) {
+          if (currentChunk) {
+            chunks.push(currentChunk);
+            currentChunk = "";
+          }
+          
+          // Split long sentence by commas or just by character count
+          const commaSegments = sentence.split(/,\s*/);
+          let segment = "";
+          
+          for (const commaSegment of commaSegments) {
+            if (segment.length + commaSegment.length > 400) {
+              chunks.push(segment);
+              segment = commaSegment;
+            } else {
+              segment += (segment ? ", " : "") + commaSegment;
+            }
+          }
+          
+          if (segment) {
+            chunks.push(segment);
+          }
+        } 
+        // Otherwise group sentences into reasonable chunks
+        else if (currentChunk.length + sentence.length > 500) {
+          chunks.push(currentChunk);
+          currentChunk = sentence;
+        } else {
+          currentChunk += sentence;
+        }
+      }
+      
+      // Add the last chunk if it exists
+      if (currentChunk) {
+        chunks.push(currentChunk);
+      }
+      
+      console.log(`Split text into ${chunks.length} chunks for TTS`);
+      return chunks;
+    };
+
     if (voiceService === 'browser') {
       console.log("Using browser TTS");
       // Browser TTS logic
@@ -89,38 +155,90 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
       }
       setIsSpeaking(true);
       const selectedVoiceName = config.voice_gender === 'male' ? 'Alex' : 'Samantha';
-      const utterance = new SpeechSynthesisUtterance(text);
       const voices = window.speechSynthesis.getVoices();
       const selectedVoice = voices.find(v => v.name === selectedVoiceName);
-      if (selectedVoice) utterance.voice = selectedVoice;
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = (error) => {
-        setIsSpeaking(false);
-        if (error.error !== 'interrupted' && error.error !== 'canceled') {
-          toast.error("Speech synthesis failed.");
+      
+      // Split text into chunks and queue them for speaking
+      const textChunks = splitTextIntoChunks(text);
+      let chunkIndex = 0;
+      
+      const speakNextChunk = () => {
+        if (chunkIndex >= textChunks.length) {
+          setIsSpeaking(false);
+          return;
         }
+        
+        const utterance = new SpeechSynthesisUtterance(textChunks[chunkIndex]);
+        if (selectedVoice) utterance.voice = selectedVoice;
+        
+        utterance.onend = () => {
+          chunkIndex++;
+          speakNextChunk();
+        };
+        
+        utterance.onerror = (error) => {
+          console.error("Speech synthesis error:", error);
+          if (error.error !== 'interrupted' && error.error !== 'canceled') {
+            toast.error(`Speech synthesis failed for chunk ${chunkIndex + 1}`);
+          }
+          chunkIndex++;
+          speakNextChunk();
+        };
+        
+        window.speechSynthesis.speak(utterance);
       };
-      window.speechSynthesis.speak(utterance);
+      
+      speakNextChunk();
       return;
     }
 
-      // API-based TTS
-      try {
-        console.log("Using API TTS");
-        setIsSpeaking(true);
-        // No toast notification here, we'll handle this in the UI
-        const audioBlob = await textToSpeech(text, voiceService, { voice });
-      const audioUrl = URL.createObjectURL(audioBlob as Blob);
-      const audio = new Audio(audioUrl);
-      audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-        setIsSpeaking(false);
+    // API-based TTS
+    try {
+      console.log("Using API TTS");
+      setIsSpeaking(true);
+      
+      // Split text into chunks for more reliable processing
+      const textChunks = splitTextIntoChunks(text);
+      let chunkIndex = 0;
+      
+      const playNextChunk = async () => {
+        if (chunkIndex >= textChunks.length) {
+          setIsSpeaking(false);
+          return;
+        }
+        
+        try {
+          const chunk = textChunks[chunkIndex];
+          console.log(`Playing TTS chunk ${chunkIndex + 1}/${textChunks.length} (${chunk.length} chars)`);
+          
+          const audioBlob = await textToSpeech(chunk, voiceService, { voice });
+          const audioUrl = URL.createObjectURL(audioBlob as Blob);
+          const audio = new Audio(audioUrl);
+          
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            chunkIndex++;
+            playNextChunk();
+          };
+          
+          audio.onerror = (e) => {
+            console.error("Audio playback error:", e);
+            URL.revokeObjectURL(audioUrl);
+            toast.error(`Failed to play audio chunk ${chunkIndex + 1}`);
+            chunkIndex++;
+            playNextChunk();
+          };
+          
+          await audio.play();
+        } catch (error) {
+          console.error(`Error processing TTS chunk ${chunkIndex + 1}:`, error);
+          toast.error(`Failed to generate speech for chunk ${chunkIndex + 1}`);
+          chunkIndex++;
+          playNextChunk();
+        }
       };
-      audio.onerror = () => {
-        URL.revokeObjectURL(audioUrl);
-        setIsSpeaking(false);
-      };
-      await audio.play();
+      
+      playNextChunk();
     } catch (error) {
       setIsSpeaking(false);
       toast.error("Failed to generate speech.");

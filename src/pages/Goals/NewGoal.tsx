@@ -15,6 +15,7 @@ const NewGoal = () => {
   const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [notes, setNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,20 +34,48 @@ const NewGoal = () => {
     setIsLoading(true);
     
     try {
-      // Only insert goal_text for now, as description might not be available in the database
-      const { data, error } = await supabase
-        .from("goals")
-        .insert({
-          user_id: user.id,
-          goal_text: title.trim()
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      toast.success("Goal created successfully!");
-      navigate("/goals");
+      // Try to insert with all fields
+      try {
+        const { data, error } = await supabase
+          .from("goals")
+          .insert({
+            user_id: user.id,
+            goal_text: title.trim(),
+            description: description.trim() || null,
+            notes: notes.trim() || null
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        
+        toast.success("Goal created successfully!");
+        navigate(`/goals/${data.id}`);
+      } catch (error: unknown) {
+        // If the error is about the notes column not existing
+        const err = error as { message?: string };
+        if (err.message && err.message.includes("notes")) {
+          console.log("Notes column might be missing, falling back to description only");
+          // Try without notes field
+          const { data, error: descError } = await supabase
+            .from("goals")
+            .insert({
+              user_id: user.id,
+              goal_text: title.trim(),
+              description: description.trim() || null
+            })
+            .select()
+            .single();
+          
+          if (descError) throw descError;
+          
+          toast.success("Goal created successfully!");
+          navigate(`/goals/${data.id}`);
+        } else {
+          // Rethrow if it's a different error
+          throw error;
+        }
+      }
     } catch (error) {
       console.error("Error creating goal:", error);
       toast.error("Failed to create goal");
@@ -89,9 +118,24 @@ const NewGoal = () => {
                 <Label htmlFor="description">Description (optional)</Label>
                 <Textarea
                   id="description"
-                  placeholder="Add details about your goal"
+                  placeholder="Brief overview of your goal"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  className="resize-none"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="notes">
+                  <span className="font-medium">Notes (optional)</span>
+                  <p className="text-xs text-muted-foreground mt-1">Add detailed notes, motivation, or any other information about your goal</p>
+                </Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Examples: Why is this goal important? What steps will you take? Resources you'll need..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
                   rows={5}
                   className="resize-none"
                 />
