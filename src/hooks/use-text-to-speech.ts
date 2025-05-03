@@ -3,6 +3,20 @@ import { toast } from '@/components/ui/sonner';
 import { getConfig, initConfig } from '@/lib/configManager';
 import { textToSpeech } from '@/lib/api';
 
+// Cache interface
+interface AudioCacheItem {
+  messageId: string;
+  content: string;
+  audioBlob: Blob;
+  timestamp: number;
+}
+
+// Maximum number of items to keep in cache
+const MAX_CACHE_SIZE = 10;
+
+// Create a singleton audio cache that persists between hook instances
+const audioCache: AudioCacheItem[] = [];
+
 interface UseTextToSpeechProps {
   initialEnabled?: boolean;
 }
@@ -50,9 +64,56 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
     };
   }, []);
 
+  // Cache management functions
+  const addToCache = (messageId: string, content: string, audioBlob: Blob) => {
+    // Check if we already have this item in cache
+    const existingIndex = audioCache.findIndex(item => item.messageId === messageId);
+    
+    if (existingIndex !== -1) {
+      // Update existing item and move it to the front
+      const existingItem = audioCache.splice(existingIndex, 1)[0];
+      existingItem.timestamp = Date.now();
+      audioCache.unshift(existingItem);
+      return;
+    }
+    
+    // Add new item to the front of the cache
+    audioCache.unshift({
+      messageId,
+      content,
+      audioBlob,
+      timestamp: Date.now(),
+    });
+    
+    // If we exceed max size, remove oldest item
+    if (audioCache.length > MAX_CACHE_SIZE) {
+      audioCache.pop();
+    }
+    
+    console.log(`Added audio to cache, current cache size: ${audioCache.length}`);
+  };
+
+  const getFromCache = (messageId: string, content: string): Blob | null => {
+    const cacheItem = audioCache.find(item => 
+      item.messageId === messageId && item.content === content
+    );
+    
+    if (cacheItem) {
+      console.log('Found audio in cache:', messageId);
+      // Update timestamp to keep this item fresh
+      cacheItem.timestamp = Date.now();
+      return cacheItem.audioBlob;
+    }
+    
+    console.log('Audio not in cache:', messageId);
+    return null;
+  };
+
   // Text-to-speech functionality
-  const speakText = async (text: string) => {
+  const speakText = async (text: string, messageId?: string) => {
     if (!text || !isVoiceEnabled) return;
+    
+    const actualMessageId = messageId || Date.now().toString();
 
     let config;
     try {
@@ -76,7 +137,7 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
           onClick: () => {
             window.localStorage.setItem('voice_user_interacted', 'true');
             // Try again after user interaction
-            setTimeout(() => speakText(text), 100);
+            setTimeout(() => speakText(text, actualMessageId), 100);
           }
         }
       });
@@ -258,6 +319,45 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
       console.log("Using API TTS");
       setIsSpeaking(true);
       
+      // Check cache first if we have a messageId
+      if (actualMessageId) {
+        const cachedAudio = getFromCache(actualMessageId, text);
+        if (cachedAudio) {
+          // Play from cache
+          const audioUrl = URL.createObjectURL(cachedAudio);
+          const audio = new Audio(audioUrl);
+          
+          // For iOS Safari
+          audio.crossOrigin = 'anonymous';
+          
+          // Set audio events
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            setIsSpeaking(false);
+          };
+          
+          audio.onerror = (e) => {
+            console.error("Audio playback error from cache:", e);
+            URL.revokeObjectURL(audioUrl);
+            setIsSpeaking(false);
+            
+            // Fallback to API if cache playback fails
+            setTimeout(() => {
+              speakText(text, actualMessageId);
+            }, 100);
+          };
+          
+          // Play from cache
+          try {
+            await audio.play();
+            return;
+          } catch (playError) {
+            console.error("Failed to play from cache:", playError);
+            // Continue to API-based playback
+          }
+        }
+      }
+      
       // Split text into chunks for more reliable processing
       const textChunks = splitTextIntoChunks(text);
       let chunkIndex = 0;
@@ -303,6 +403,11 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
             delete preloadedBlobs[chunkIndex]; // Free memory
           } else {
             audioBlob = await textToSpeech(chunk, voiceService, { voice }) as Blob;
+          }
+          
+          // If this is the first chunk, store in cache
+          if (chunkIndex === 0 && actualMessageId) {
+            addToCache(actualMessageId, text, audioBlob);
           }
           
           const audioUrl = URL.createObjectURL(audioBlob);

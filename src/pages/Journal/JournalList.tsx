@@ -4,7 +4,7 @@ import { Layout, MenuToggleButton } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
-import { FileText, Plus, Search, Mic, Edit, Trash2, Check } from "lucide-react";
+import { FileText, Plus, Search, Mic, Edit, Trash2, Check, Volume2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/PageHeader";
+import { useTextToSpeech } from "@/hooks/use-text-to-speech";
 
 interface JournalEntry {
   id: string;
@@ -36,11 +37,31 @@ const JournalList = () => {
   const [selectedEntries, setSelectedEntries] = useState<string[]>([]);
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [playingEntryId, setPlayingEntryId] = useState<string | null>(null);
+  const [lastPlayedEntryId, setLastPlayedEntryId] = useState<string | null>(null);
   const navigate = useNavigate();
+  
+  // Initialize text-to-speech hook
+  const { speakText, isSpeaking, stopSpeaking } = useTextToSpeech({ initialEnabled: true });
 
   useEffect(() => {
     fetchEntries();
   }, [user]);
+
+  // Add useEffect to handle cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Stop any playing audio when component unmounts
+      stopSpeaking();
+    };
+  }, [stopSpeaking]);
+
+  useEffect(() => {
+    // Reset playingEntryId when speech stops
+    if (!isSpeaking && playingEntryId) {
+      setPlayingEntryId(null);
+    }
+  }, [isSpeaking]);
 
   const fetchEntries = async () => {
     if (!user) return;
@@ -61,6 +82,33 @@ const JournalList = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePlayEntry = (entry: JournalEntry) => {
+    // Skip if no content
+    if (!entry.content?.trim()) {
+      toast.error("No content to read");
+      return;
+    }
+    
+    // If currently playing the same entry, stop it
+    if (playingEntryId === entry.id && isSpeaking) {
+      stopSpeaking();
+      setPlayingEntryId(null);
+      // Keep the lastPlayedEntryId set to this entry
+      return;
+    }
+    
+    // If playing a different entry, stop the current one
+    if (isSpeaking) {
+      stopSpeaking();
+    }
+    
+    // Play the selected entry
+    setPlayingEntryId(entry.id);
+    // Set this as the last played entry
+    setLastPlayedEntryId(entry.id);
+    speakText(entry.content, `journal-${entry.id}`);
   };
 
   const formatDate = (dateString: string) => {
@@ -153,8 +201,11 @@ const JournalList = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <PageHeader title="Journal">
+      <div className="container mx-auto py-6 space-y-6">
+        <PageHeader
+          title="Journal"
+          description="Record your thoughts and reflect on your journey"
+        >
           {isEditMode ? (
             <>
               <Button 
@@ -214,7 +265,33 @@ const JournalList = () => {
             </Card>
           ) : filteredEntries.length > 0 ? (
             filteredEntries.map((entry) => (
-              <Card key={entry.id} className={`hover:shadow-md transition-shadow ${isEditMode && selectedEntries.includes(entry.id) ? 'ring-2 ring-primary' : ''}`}>
+              <Card 
+                key={entry.id} 
+                className={`hover:shadow-md transition-all ${
+                  isEditMode && selectedEntries.includes(entry.id) 
+                    ? 'ring-2 ring-primary' 
+                    : playingEntryId === entry.id
+                      ? 'ring-2 ring-green-500 animate-pulse' 
+                      : lastPlayedEntryId === entry.id
+                        ? 'ring-2 ring-green-500' 
+                        : ''
+                } ${
+                  lastPlayedEntryId === entry.id
+                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+                    : ''
+                } ${!isEditMode ? 'cursor-pointer' : ''}`}
+                onClick={(e) => {
+                  if (!isEditMode) {
+                    // Only if we're not in edit mode
+                    // Don't play if the click was on a link or button (for View button)
+                    const target = e.target as HTMLElement;
+                    const isLink = target.closest('a') || target.closest('button');
+                    if (!isLink) {
+                      handlePlayEntry(entry);
+                    }
+                  }
+                }}
+              >
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start gap-4">
                     {isEditMode && (
@@ -241,7 +318,7 @@ const JournalList = () => {
                           </h3>
                         </Link>
                       )}
-                      <p className="text-gray-600 text-sm line-clamp-2">
+                      <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2">
                         {entry.content?.substring(0, 200)}
                         {entry.content && entry.content.length > 200 ? "..." : ""}
                       </p>
@@ -260,19 +337,36 @@ const JournalList = () => {
                           <Button 
                             variant="destructive" 
                             size="sm"
-                            onClick={() => handleDeleteSingle(entry.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSingle(entry.id);
+                            }}
                           >
                             <Trash2 className="h-4 w-4 mr-1" />
                             Delete
                           </Button>
                         </div>
                       ) : (
-                        <Link to={`/journal/${entry.id}`}>
-                          <Button variant="ghost" size="sm" className="mt-2">
-                            <FileText className="h-4 w-4 mr-1" />
-                            View
+                        <div className="flex gap-2 mt-2 justify-end">
+                          <Button
+                            variant={playingEntryId === entry.id ? "default" : "outline"}
+                            size="sm"
+                            className={playingEntryId === entry.id ? "bg-green-500 hover:bg-green-600" : ""}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePlayEntry(entry);
+                            }}
+                          >
+                            <Volume2 className="h-4 w-4 mr-1" />
+                            {playingEntryId === entry.id ? "Stop" : "Play"}
                           </Button>
-                        </Link>
+                          <Link to={`/journal/${entry.id}`}>
+                            <Button variant="ghost" size="sm">
+                              <FileText className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          </Link>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -281,42 +375,43 @@ const JournalList = () => {
             ))
           ) : (
             <Card>
-              <CardHeader>
-                <CardTitle>No journal entries yet</CardTitle>
-                <CardDescription>
-                  Start recording your thoughts and reflections
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link to="/journal/new">
-                  <Button>
-                    <Mic className="mr-2 h-4 w-4" />
-                    Create Your First Entry
-                  </Button>
-                </Link>
+              <CardContent className="py-12 text-center">
+                <h3 className="text-lg font-medium mb-2">No journal entries found</h3>
+                <p className="text-muted-foreground mb-6">
+                  {searchTerm ? "Try a different search term" : "Start writing to record your journey"}
+                </p>
+                {!searchTerm && (
+                  <Link to="/journal/new">
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create your first entry
+                    </Button>
+                  </Link>
+                )}
               </CardContent>
             </Card>
           )}
         </div>
-      </div>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete {entryToDelete ? 'this entry' : `${selectedEntries.length} selected ${selectedEntries.length === 1 ? 'entry' : 'entries'}`}. 
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {entryToDelete
+                  ? "This will permanently delete this journal entry. This action cannot be undone."
+                  : `This will permanently delete ${selectedEntries.length} journal ${selectedEntries.length === 1 ? 'entry' : 'entries'}. This action cannot be undone.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} className="bg-red-500 hover:bg-red-600">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </Layout>
   );
 };

@@ -22,7 +22,6 @@ import { ChatHistory } from "./components/ChatHistory";
 import { ChatHeader } from "./components/ChatHeader";
 import { ChatMessages } from "./components/ChatMessages";
 import { ChatInput } from "./components/ChatInput";
-import { SpeakingIndicator } from "./components/SpeakingIndicator";
 import { NewConversationDialog } from "./components/NewConversationDialog";
 import { DeleteConversationDialog } from "./components/DeleteConversationDialog";
 
@@ -38,6 +37,11 @@ const AIAssistant = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const initialLoadRef = useRef(true);
   const [assistantName, setAssistantName] = useState("");
+  const initialQuestionSubmittedRef = useRef(false);
+  
+  // Add new state variables for the visual feedback
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Get user goals and actions using React Query
   const { data: goals = [] } = useQuery({
@@ -157,6 +161,58 @@ const AIAssistant = () => {
     onTranscript: (transcript) => setInput(transcript)
   });
 
+  // Handle initial creation of conversation if needed (runs once on mount)
+  useEffect(() => {
+    const handleInitialConversation = async () => {
+      // Skip if user isn't loaded
+      if (!user) return;
+      
+      const shouldCreateNew = localStorage.getItem('createNewConversation') === 'true';
+      const newTitle = localStorage.getItem('newConversationTitle') || '';
+      
+      if (shouldCreateNew && newTitle) {
+        // Clear the flags but keep the question for the next effect
+        localStorage.removeItem('createNewConversation');
+        localStorage.removeItem('newConversationTitle');
+        
+        // Create new conversation with the question as title
+        console.log('Creating new conversation with title:', newTitle);
+        await createNewConversation(newTitle);
+      }
+    };
+    
+    handleInitialConversation();
+    // Only run this once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+  
+  // Check for a predefined question in localStorage and process it
+  useEffect(() => {
+    const checkPredefinedQuestion = async () => {
+      // Skip if we don't have a conversation or user yet
+      if (!currentConversationId || !user) return;
+      
+      // Check if there's a question in localStorage and we haven't already submitted it
+      const question = localStorage.getItem('assistantQuestion');
+      if (question && !initialQuestionSubmittedRef.current) {
+        // Set the input to the question
+        setInput(question);
+        
+        // Clear the question from localStorage
+        localStorage.removeItem('assistantQuestion');
+        
+        // Small delay to ensure the conversation is ready
+        setTimeout(() => {
+          // Trigger the form submission programmatically
+          handleSubmit(new Event('submit') as unknown as React.FormEvent);
+          initialQuestionSubmittedRef.current = true;
+        }, 500);
+      }
+    };
+    
+    checkPredefinedQuestion();
+  }, [currentConversationId, user]);
+
   // Handle changing conversations
   const handleConversationChange = (conversationId: string) => {
     // Reset initialLoadRef to prevent TTS from speaking when loading an existing conversation
@@ -167,7 +223,47 @@ const AIAssistant = () => {
     setCurrentConversationId(conversationId);
   };
 
-  // Handle form submission
+  // Play a message when clicked
+  const handlePlayMessage = (messageContent: string, messageId: string) => {
+    if (!isVoiceEnabled) {
+      // If voice is not enabled, prompt the user to enable it
+      toast.message("Voice playback disabled", {
+        description: "Enable voice responses to play messages",
+        action: {
+          label: "Enable",
+          onClick: () => {
+            toggleVoiceMode();
+            // Wait a bit to ensure voice is enabled, then try again
+            setTimeout(() => {
+              setIsLoadingAudio(true);
+              updateLastSpokenRefs(messageId, messageContent);
+              speakText(messageContent, messageId);
+              setIsLoadingAudio(false);
+            }, 300);
+          }
+        }
+      });
+      return;
+    }
+    
+    // If already speaking, stop it first - the hook will track the messageId internally
+    if (isSpeaking) {
+      stopSpeaking();
+      // If we were already speaking this message, we're done after stopping
+      return;
+    }
+    
+    setIsLoadingAudio(true);
+    
+    // Small delay to show loading animation
+    setTimeout(() => {
+      updateLastSpokenRefs(messageId, messageContent);
+      speakText(messageContent, messageId);
+      setIsLoadingAudio(false);
+    }, 300);
+  };
+
+  // Handle form submission with visual feedback
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isProcessing || !currentConversationId) return;
@@ -182,6 +278,7 @@ const AIAssistant = () => {
     
     // Clear input and add user message to UI
     setInput("");
+    setIsSubmitting(true);
     await addMessage(userMessage);
     
     try {
@@ -193,11 +290,15 @@ const AIAssistant = () => {
       
       // Speak the response if voice is enabled
       if (shouldSpeakMessage(aiMessage.id, aiMessage.content)) {
+        setIsLoadingAudio(true);
         updateLastSpokenRefs(aiMessage.id, aiMessage.content);
-        speakText(aiMessage.content);
+        speakText(aiMessage.content, aiMessage.id);
+        setIsLoadingAudio(false);
       }
     } catch (error) {
       console.error("Error in handleSubmit:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -240,8 +341,10 @@ const AIAssistant = () => {
       
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.role === 'assistant' && shouldSpeakMessage(lastMessage.id, lastMessage.content)) {
+        setIsLoadingAudio(true);
         updateLastSpokenRefs(lastMessage.id, lastMessage.content);
-        speakText(lastMessage.content);
+        speakText(lastMessage.content, lastMessage.id);
+        setIsLoadingAudio(false);
       }
     }
   }, [messages]);
@@ -293,7 +396,10 @@ const AIAssistant = () => {
               
               {/* Scrollable message area - using flex instead of fixed height */}
               <div className="flex-1 overflow-y-auto mb-[105px] sm:mb-[120px]">
-                <ChatMessages messages={messages} />
+                <ChatMessages 
+                  messages={messages} 
+                  onPlayMessage={handlePlayMessage}
+                />
               </div>
               
               {/* Fixed footer at bottom */}
@@ -307,6 +413,9 @@ const AIAssistant = () => {
                   toggleVoiceMode={toggleVoiceMode}
                   isListening={isListening}
                   toggleListening={toggleListening}
+                  isLoadingAudio={isLoadingAudio}
+                  isSpeaking={isSpeaking}
+                  isSubmitting={isSubmitting}
                 />
               </div>
             </Card>
@@ -327,12 +436,6 @@ const AIAssistant = () => {
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
         onDeleteConversation={deleteCurrentConversation}
-      />
-      
-      {/* Speaking indicator */}
-      <SpeakingIndicator
-        isSpeaking={isSpeaking}
-        onStop={stopSpeaking}
       />
     </Layout>
   );

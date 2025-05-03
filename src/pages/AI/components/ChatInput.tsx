@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Mic, MicOff, Send, Volume2, VolumeX } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ChatInputProps {
   input: string;
@@ -12,6 +13,9 @@ interface ChatInputProps {
   toggleVoiceMode: () => void;
   isListening: boolean;
   toggleListening: () => void;
+  isLoadingAudio?: boolean;
+  isSpeaking?: boolean;
+  isSubmitting?: boolean;
 }
 
 export function ChatInput({
@@ -22,7 +26,10 @@ export function ChatInput({
   isVoiceEnabled,
   toggleVoiceMode,
   isListening,
-  toggleListening
+  toggleListening,
+  isLoadingAudio = false,
+  isSpeaking = false,
+  isSubmitting = false
 }: ChatInputProps) {
   return (
     <div className="p-2 sm:p-3">
@@ -49,11 +56,15 @@ export function ChatInput({
             size="icon"
             onClick={toggleVoiceMode}
             title={isVoiceEnabled ? "Disable voice responses" : "Enable voice responses"}
-            className={`${isVoiceEnabled ? 'bg-primary/10' : ''}`}
+            className={cn(
+              isLoadingAudio && "animate-pulse",
+              isSpeaking && "bg-green-100 text-green-600 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
+              isVoiceEnabled && !isSpeaking && "bg-primary/10"
+            )}
             type="button"
           >
             {isVoiceEnabled ? (
-              <Volume2 className="h-4 w-4" />
+              <Volume2 className={cn("h-4 w-4", isSpeaking && "animate-pulse text-green-600 dark:text-green-400")} />
             ) : (
               <VolumeX className="h-4 w-4" />
             )}
@@ -65,17 +76,27 @@ export function ChatInput({
             onClick={toggleListening}
             disabled={isProcessing}
             title={isListening ? "Stop listening" : "Start listening"}
-            className={`${isListening ? 'bg-red-100 dark:bg-red-900/20' : ''}`}
+            className={cn(
+              isListening && "bg-green-100 text-green-600 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
+              isListening && "animate-pulse"
+            )}
             type="button"
           >
             {isListening ? (
-              <MicOff className="h-4 w-4" />
+              <MicOff className="h-4 w-4 text-green-600 dark:text-green-400" />
             ) : (
               <Mic className="h-4 w-4" />
             )}
           </Button>
           
-          <Button type="submit" disabled={isProcessing || !input.trim()} className="px-3 sm:px-4">
+          <Button 
+            type="submit" 
+            disabled={isProcessing || !input.trim()} 
+            className={cn(
+              "px-3 sm:px-4",
+              isSubmitting && "bg-green-600 hover:bg-green-700 animate-pulse"
+            )}
+          >
             {isProcessing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (

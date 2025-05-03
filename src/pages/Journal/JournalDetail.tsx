@@ -5,10 +5,10 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Calendar, Clock, Edit, Trash, Volume2 } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Edit, Trash } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { getConfig } from "@/lib/configManager";
-import { textToSpeech } from "@/lib/api";
+import { useTextToSpeech } from "@/hooks/use-text-to-speech";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +33,10 @@ const JournalDetail = () => {
   const [entry, setEntry] = useState<JournalEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [hasBeenPlayed, setHasBeenPlayed] = useState(false);
+  
+  // Use the text-to-speech hook for better audio caching
+  const { speakText, isSpeaking, stopSpeaking } = useTextToSpeech({ initialEnabled: true });
 
   useEffect(() => {
     const fetchEntry = async () => {
@@ -59,7 +62,12 @@ const JournalDetail = () => {
     };
 
     fetchEntry();
-  }, [id, user, navigate]);
+    
+    // Clean up any speech when component unmounts
+    return () => {
+      stopSpeaking();
+    };
+  }, [id, user, navigate, stopSpeaking]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -96,88 +104,23 @@ const JournalDetail = () => {
     }
   };
 
-  const readAloud = async () => {
+  const readAloud = () => {
     if (!entry?.content?.trim()) {
       toast.error("No content to read");
       return;
     }
-    try {
-      // Stop and clean up any previous audio
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = "";
-        audioRef.current = null;
-      }
-      let config;
-      try {
-        config = getConfig();
-      } catch (e) {
-        toast.error("TTS config not loaded. Please refresh the page.");
-        console.error("Config error:", e);
-        return;
-      }
-      const service = config.voice_service || 'browser';
-      let voice = 'alloy';
-      if (service === 'openai') voice = config.openai_voice || 'alloy';
-      if (service === 'elevenlabs') voice = config.elevenlabs_voice || 'rachel';
-      if (service === 'google') voice = config.google_voice || 'en-US-Neural2-F';
-      if (service === 'azure') voice = config.azure_voice || 'en-US-JennyNeural';
-      if (service === 'amazon') voice = config.amazon_voice || 'Joanna';
-
-      if (service === 'browser') {
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel(); // Stop any previous speech
-          const utterance = new window.SpeechSynthesisUtterance(entry.content);
-          const voices = window.speechSynthesis.getVoices();
-          const selectedVoiceName = config.voice_gender === 'male' ? 'Alex' : 'Samantha';
-          const selectedVoice = voices.find(voice =>
-            voice.name.includes(selectedVoiceName) ||
-            (config.voice_gender === 'male' ? voice.name.includes('Male') : voice.name.includes('Female'))
-          );
-          if (selectedVoice) {
-            utterance.voice = selectedVoice;
-          }
-          utterance.rate = 1.0;
-          window.speechSynthesis.speak(utterance);
-        } else {
-          toast.error("Text-to-speech is not supported in your browser");
-        }
-        return;
-      }
-      // Use API-based TTS
-      let audioBlob;
-      try {
-        audioBlob = await textToSpeech(entry.content, service, { voice });
-      } catch (apiError) {
-        toast.error("TTS API error: " + (apiError instanceof Error ? apiError.message : String(apiError)));
-        console.error("TTS API error:", apiError);
-        return;
-      }
-      if (!audioBlob) {
-        toast.error("No audio returned from TTS API");
-        return;
-      }
-      try {
-        const audioUrl = URL.createObjectURL(audioBlob as Blob);
-        const audio = new Audio(audioUrl);
-        audioRef.current = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          audioRef.current = null;
-        };
-        audio.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
-          audioRef.current = null;
-        };
-        await audio.play();
-      } catch (audioError) {
-        toast.error("Failed to play audio: " + (audioError instanceof Error ? audioError.message : String(audioError)));
-        console.error("Audio playback error:", audioError);
-      }
-    } catch (error) {
-      toast.error("Unexpected error: " + (error instanceof Error ? error.message : String(error)));
-      console.error("Unexpected error in readAloud:", error);
+    
+    // If already speaking, stop it
+    if (isSpeaking) {
+      stopSpeaking();
+      return;
     }
+    
+    // Mark as played
+    setHasBeenPlayed(true);
+    
+    // Play the journal entry using the hook (with caching)
+    speakText(entry.content, `journal-${entry.id}`);
   };
 
   if (loading) {
@@ -209,7 +152,7 @@ const JournalDetail = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="container mx-auto space-y-6 py-6">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <Link to="/journal">
@@ -221,11 +164,10 @@ const JournalDetail = () => {
             <h1 className="text-3xl font-bold">Journal Entry</h1>
           </div>
           <div className="space-x-2 flex items-center">
-            <Button variant="outline" onClick={readAloud}>
-              <Volume2 className="mr-2 h-4 w-4" />
-              Read Aloud
-            </Button>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(true)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setDeleteDialogOpen(true)}
+            >
               <Trash className="mr-2 h-4 w-4" />
               Delete
             </Button>
@@ -249,9 +191,20 @@ const JournalDetail = () => {
           </div>
         </div>
 
-        <Card>
+        <Card className={`transition-all ${
+          isSpeaking 
+            ? 'ring-2 ring-green-500 animate-pulse' 
+            : hasBeenPlayed 
+              ? 'ring-2 ring-green-500' 
+              : ''
+        } ${
+          hasBeenPlayed || isSpeaking
+            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+            : ''
+        } cursor-pointer`}
+        onClick={readAloud}>
           <CardContent className="p-6">
-            <div className="prose max-w-none">
+            <div className="prose dark:prose-invert max-w-none">
               {entry.content.split("\n").map((paragraph, index) => (
                 <p key={index}>{paragraph}</p>
               ))}
