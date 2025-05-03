@@ -32,6 +32,7 @@ const JournalList = () => {
       if (!user) return;
 
       try {
+        setLoading(true);
         const { data, error } = await supabase
           .from("journal_entries")
           .select("*")
@@ -52,16 +53,49 @@ const JournalList = () => {
     
     // Clean up on unmount
     return () => {
+      console.log("JournalList component unmounting, cleaning up audio");
       stopAudio();
+      
+      // Extra safeguard for speech synthesis
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, [user]);
 
+  useEffect(() => {
+    console.log("playingEntryId changed:", playingEntryId);
+  }, [playingEntryId]);
+
+  useEffect(() => {
+    // Pre-load voices for browser speech synthesis
+    if (window.speechSynthesis) {
+      const loadVoices = () => {
+        window.speechSynthesis.getVoices();
+        console.log("Browser speech synthesis voices loaded");
+      };
+      
+      loadVoices();
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
+    }
+  }, []);
+
   const stopAudio = () => {
     if (audioRef.current) {
+      console.log("Stopping audio playback");
       audioRef.current.pause();
       audioRef.current.src = "";
       audioRef.current = null;
-      setPlayingEntryId(null);
+    }
+    
+    // Always reset the playing state
+    setPlayingEntryId(null);
+    
+    // Cancel any browser speech synthesis if active
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
     }
   };
 
@@ -71,13 +105,13 @@ const JournalList = () => {
       return;
     }
     
-    // If already playing this entry, stop it
+    // If already playing this entry, stop it and return early
     if (playingEntryId === entry.id) {
       stopAudio();
       return;
     }
     
-    // Stop any previously playing audio
+    // Stop any previously playing audio first
     stopAudio();
     
     try {
@@ -119,9 +153,18 @@ const JournalList = () => {
             utterance.voice = selectedVoice;
           }
           utterance.rate = 1.0;
+          
+          // Make sure these callbacks are properly handling state
           utterance.onend = () => {
+            console.log("Browser speech synthesis ended");
             setPlayingEntryId(null);
           };
+          
+          utterance.onerror = (error) => {
+            console.error("Browser speech synthesis error:", error);
+            setPlayingEntryId(null);
+          };
+          
           window.speechSynthesis.speak(utterance);
         } else {
           toast.error("Text-to-speech is not supported in your browser");
@@ -269,6 +312,7 @@ const JournalList = () => {
                           )}
                           onClick={(e) => {
                             e.stopPropagation(); // Prevent triggering card click
+                            console.log("Play/stop button clicked for entry:", entry.id);
                             playAudio(entry);
                           }}
                         >
