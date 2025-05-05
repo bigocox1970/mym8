@@ -12,7 +12,7 @@ interface AIAssistantButtonProps {
  * A button component that navigates to the AI Assistant page
  * Optionally can pre-populate a question for the assistant
  */
-export const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({ 
+const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({ 
   question,
   title = "Ask AI assistant for help"
 }) => {
