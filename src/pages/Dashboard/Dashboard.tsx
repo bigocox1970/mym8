@@ -12,7 +12,7 @@ import { toast } from "@/components/ui/sonner";
 import { getConfig } from "@/lib/configManager";
 import { cn } from "@/lib/utils";
 import { PERSONALITIES, PersonalityType } from "@/personalities";
-import { AIAssistantButton } from "@/components/AIAssistantButton";
+import AIAssistantButton from "@/components/AIAssistantButton";
 
 interface Goal {
   id: string;

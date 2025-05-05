@@ -53,7 +53,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
-import { AIAssistantButton } from "@/components/AIAssistantButton";
+import AIAssistantButton from "@/components/AIAssistantButton";
 
 interface TodoItem {
   id: string;

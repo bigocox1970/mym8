@@ -12,7 +12,8 @@ import { getConfig } from "@/lib/configManager";
 import { textToSpeech } from "@/lib/api";
 import { getCachedAudio, cacheAudio } from "@/lib/audioCache";
 import { processAndPlayChunks, stopAllAudio, isEntryPlaying } from "@/lib/audioChunkProcessor";
-import { AIAssistantButton } from "@/components/AIAssistantButton";
+import { PageHeader } from "@/components/PageHeader";
+import AIAssistantButton from "@/components/AIAssistantButton";
 
 interface JournalEntry {
   id: string;

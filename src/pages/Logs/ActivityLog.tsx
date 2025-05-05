@@ -17,7 +17,7 @@ import {
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import { AIAssistantButton } from "@/components/AIAssistantButton";
+import AIAssistantButton from "@/components/AIAssistantButton";
 
 // Define frequencies type
 type Frequency = "morning" | "afternoon" | "evening" | "daily" | "weekly" | "monthly";

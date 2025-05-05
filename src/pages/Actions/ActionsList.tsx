@@ -38,7 +38,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/PageHeader";
-import { AIAssistantButton } from "@/components/AIAssistantButton";
+import AIAssistantButton from "@/components/AIAssistantButton";
 
 type FrequencyFilter = "all" | "morning" | "afternoon" | "evening" | "daily" | "weekly" | "monthly";
 

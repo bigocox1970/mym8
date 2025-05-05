@@ -21,7 +21,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/PageHeader";
-import { AIAssistantButton } from "@/components/AIAssistantButton";
+import AIAssistantButton from "@/components/AIAssistantButton";
 
 type Goal = {
   id: string;
