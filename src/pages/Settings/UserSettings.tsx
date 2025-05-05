@@ -7,6 +7,7 @@ import { ProfileSettings } from "./components/ProfileSettings";
 import { PasswordSettings } from "./components/PasswordSettings";
 import { AppearanceSettings } from "./components/AppearanceSettings";
 import AISettings from "./components/AISettings";
+import SubscriptionSettings from "./components/SubscriptionSettings";
 import ProfileContext from "./ProfileContext";
 import { toast } from "@/components/ui/sonner";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -172,6 +173,8 @@ const UserSettings = () => {
           profile={profile} 
           onProfileUpdate={handleProfileUpdate}
         />
+        
+        <SubscriptionSettings user={user} />
         
         <PasswordSettings />
         

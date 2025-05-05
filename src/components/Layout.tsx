@@ -267,6 +267,16 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                     <span>Actions</span>
                   </Button>
                 </Link>
+                <Link to="/todo">
+                  <Button 
+                    variant={isActive("/todo") ? "default" : "ghost"} 
+                    className="w-full justify-start"
+                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
+                  >
+                    <ListTodo className="mr-2 h-4 w-4" />
+                    <span>To Do List</span>
+                  </Button>
+                </Link>
                 <Link to="/logs">
                   <Button 
                     variant={isActive("/logs") ? "default" : "ghost"} 
@@ -285,6 +295,16 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                   >
                     <MessageSquare className="mr-2 h-4 w-4" />
                     <span>Journal</span>
+                  </Button>
+                </Link>
+                <Link to="/pricing">
+                  <Button 
+                    variant={isActive("/pricing") ? "default" : "ghost"} 
+                    className="w-full justify-start"
+                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    <span>Subscription Plans</span>
                   </Button>
                 </Link>
                 <Link to="/assistant">

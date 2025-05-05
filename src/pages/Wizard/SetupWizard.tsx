@@ -112,6 +112,8 @@ const SetupWizard = () => {
   const [keepExistingData, setKeepExistingData] = useState(false);
   const [loadingExistingData, setLoadingExistingData] = useState(false);
   const [existingGoals, setExistingGoals] = useState<Goal[]>([]);
+  const [startFresh, setStartFresh] = useState(true);
+  const [deletingData, setDeletingData] = useState(false);
 
   useEffect(() => {
     // Check if user has already completed the wizard
@@ -411,11 +413,60 @@ const SetupWizard = () => {
     setIsSubmitting(true);
     
     try {
+      // If startFresh is selected, delete existing goals and actions first
+      if (startFresh) {
+        setDeletingData(true);
+        
+        // Delete existing actions
+        try {
+          console.log("Deleting existing actions...");
+          const { error: deleteActionsError } = await supabase
+            .from("tasks")
+            .delete()
+            .eq("user_id", user.id);
+            
+          if (deleteActionsError) {
+            console.error("Error deleting actions:", deleteActionsError);
+            // Continue with the setup even if deletion fails
+          } else {
+            console.log("Actions deleted successfully");
+          }
+        } catch (error) {
+          console.error("Error attempting to delete actions:", error);
+          // Continue with the setup even if deletion fails
+        }
+        
+        // Delete existing goals
+        try {
+          console.log("Deleting existing goals...");
+          const { error: deleteGoalsError } = await supabase
+            .from("goals")
+            .delete()
+            .eq("user_id", user.id);
+            
+          if (deleteGoalsError) {
+            console.error("Error deleting goals:", deleteGoalsError);
+            // Continue with the setup even if deletion fails
+          } else {
+            console.log("Goals deleted successfully");
+          }
+        } catch (error) {
+          console.error("Error attempting to delete goals:", error);
+          // Continue with the setup even if deletion fails
+        }
+        
+        setDeletingData(false);
+      }
+      
       // Create goals based on selected issues
       const createdGoals = await createGoalsFromIssues();
       
       // Convert selected issues to array for database storage
       const issuesArray = selectedIssues.map(id => id);
+      
+      // Get current timestamp and store in localStorage instead of database column
+      const currentTimestamp = Date.now();
+      localStorage.setItem('wizard_completed_timestamp', currentTimestamp.toString());
       
       // Save wizard data to profile
       const { error } = await supabase
@@ -437,6 +488,9 @@ const SetupWizard = () => {
         personality_type: personality,
         voice_gender: voiceGender
       });
+      
+      // Set flag in localStorage to indicate the user just completed onboarding
+      localStorage.setItem('just_completed_onboarding', 'true');
       
       // Show success message with goals created
       if (createdGoals.length > 0) {
@@ -513,6 +567,22 @@ const SetupWizard = () => {
                   />
                 </div>
               )}
+              
+              <div className="border-t pt-4 mt-6">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="start-fresh" 
+                    checked={startFresh}
+                    onCheckedChange={(checked) => setStartFresh(checked as boolean)}
+                  />
+                  <Label htmlFor="start-fresh" className="cursor-pointer">
+                    Start fresh (delete any existing goals and tasks)
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 ml-6">
+                  Recommended for new setups or when you want to completely reset your goals.
+                </p>
+              </div>
             </CardContent>
           </>
         );

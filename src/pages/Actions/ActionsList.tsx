@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { Filter, ListPlus, Plus, X, Edit, Save, Trash2, Check } from "lucide-react";
+import { Filter, Plus, X, Edit, Save, Trash2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,6 +38,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/PageHeader";
+import { AIAssistantButton } from "@/components/AIAssistantButton";
 
 type FrequencyFilter = "all" | "morning" | "afternoon" | "evening" | "daily" | "weekly" | "monthly";
 
@@ -342,39 +343,40 @@ const ActionsList = () => {
             </>
           ) : (
             <>
-              <Select
-                value={frequencyFilter}
-                onValueChange={(value) => setFrequencyFilter(value as FrequencyFilter)}
-              >
-                <SelectTrigger className="w-[150px]">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="Filter by frequency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="morning">Morning</SelectItem>
-                  <SelectItem value="afternoon">Afternoon</SelectItem>
-                  <SelectItem value="evening">Evening</SelectItem>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
+              <div className="p-2 cursor-pointer hover:bg-primary/10 rounded-md" onClick={() => {
+                // Create a custom dropdown on click
+                const dropdown = document.getElementById('frequency-dropdown');
+                if (dropdown) {
+                  dropdown.classList.toggle('hidden');
+                }
+              }}>
+                <Filter className="h-5 w-5" />
+              </div>
+              <div id="frequency-dropdown" className="hidden absolute top-12 right-24 z-10 mt-2 w-48 rounded-md bg-popover shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                <div className="py-1">
+                  <button onClick={() => setFrequencyFilter('all')} className="block px-4 py-2 w-full text-left hover:bg-accent">All</button>
+                  <button onClick={() => setFrequencyFilter('morning')} className="block px-4 py-2 w-full text-left hover:bg-accent">Morning</button>
+                  <button onClick={() => setFrequencyFilter('afternoon')} className="block px-4 py-2 w-full text-left hover:bg-accent">Afternoon</button>
+                  <button onClick={() => setFrequencyFilter('evening')} className="block px-4 py-2 w-full text-left hover:bg-accent">Evening</button>
+                  <button onClick={() => setFrequencyFilter('daily')} className="block px-4 py-2 w-full text-left hover:bg-accent">Daily</button>
+                  <button onClick={() => setFrequencyFilter('weekly')} className="block px-4 py-2 w-full text-left hover:bg-accent">Weekly</button>
+                  <button onClick={() => setFrequencyFilter('monthly')} className="block px-4 py-2 w-full text-left hover:bg-accent">Monthly</button>
+                </div>
+              </div>
+              <div 
+                className="p-2 cursor-pointer hover:bg-primary/10 rounded-md"
                 onClick={handleToggleEditMode}
-                variant="outline"
-                size="sm"
               >
-                <Edit className="sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Edit</span>
-              </Button>
-              <Button 
+                <Edit className="h-5 w-5" />
+              </div>
+              <div 
+                className="p-2 cursor-pointer hover:bg-primary/10 rounded-md"
                 onClick={handleNewActionClick}
-                size="sm"
               >
-                <ListPlus className="sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">New Action</span>
-              </Button>
+                <Plus className="h-5 w-5" />
+              </div>
+              <AIAssistantButton question="I need help managing my actions and daily tasks. Can you provide assistance?" />
+              <MenuToggleButton />
             </>
           )}
         </PageHeader>
@@ -836,18 +838,11 @@ const ActionsList = () => {
             )}
           </div>
         ) : (
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>No actions found</CardTitle>
-              <CardDescription>
-                {frequencyFilter === "all" 
-                  ? "You haven't created any actions yet" 
-                  : `You don't have any ${frequencyFilter} actions`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Card>
+            <CardContent className="py-8 text-center">
+              <p className="text-muted-foreground mb-4">You don't have any actions yet</p>
               <Button variant="default" onClick={handleNewActionClick}>
-                <ListPlus className="mr-2 h-4 w-4" />
+                <Plus className="mr-2 h-4 w-4" />
                 Add Your First Action
               </Button>
             </CardContent>

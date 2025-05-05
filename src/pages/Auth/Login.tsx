@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/lib/supabase";
+import { ChevronLeft } from "lucide-react";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email" }),
@@ -100,6 +101,12 @@ const Login = () => {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 dark:bg-gray-900">
+      <div className="absolute top-4 left-4">
+        <Link to="/" className="flex items-center text-sm text-muted-foreground hover:text-primary transition-colors">
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          Back to Home
+        </Link>
+      </div>
       <div className="w-full max-w-md space-y-6 bg-white p-8 rounded-lg shadow-md dark:bg-gray-800 dark:text-white">
         <div className="text-center">
           <img 

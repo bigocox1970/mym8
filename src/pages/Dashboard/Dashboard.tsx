@@ -1,17 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout, MenuToggleButton } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/lib/supabase";
-import { BarChart, ListTodo, Plus, CheckCircle2, Bot, ChevronDown, Send, User } from "lucide-react";
+import { BarChart, ListTodo, Plus, CheckCircle2, Bot, ChevronDown, Settings, BookOpen } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import { getConfig } from "@/lib/configManager";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
+import { PERSONALITIES, PersonalityType } from "@/personalities";
+import { AIAssistantButton } from "@/components/AIAssistantButton";
 
 interface Goal {
   id: string;
@@ -32,6 +33,20 @@ interface ActionSummary {
   percentage: number;
 }
 
+interface QuoteData {
+  text: string;
+  author: string;
+  book?: string;
+}
+
+// Function to create an Amazon affiliate link for a book
+const createAmazonAffiliateLink = (bookTitle: string, author: string): string => {
+  // Encode the book title and author for a URL
+  const encodedSearch = encodeURIComponent(`${bookTitle} ${author}`);
+  // Create the Amazon search URL with affiliate ID
+  return `https://www.amazon.com/s?k=${encodedSearch}&tag=b000izj08k-20`;
+};
+
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -47,9 +62,108 @@ const Dashboard = () => {
     monthly: { total: 0, completed: 0, percentage: 0 }
   });
   const [assistantName, setAssistantName] = useState<string | null>(null);
+  const [personalityType, setPersonalityType] = useState<string>("gentle");
+  const [currentQuote, setCurrentQuote] = useState<QuoteData>({ 
+    text: "", 
+    author: "" 
+  });
   const [isGoalsOpen, setIsGoalsOpen] = useState(false);
   const [isProgressOpen, setIsProgressOpen] = useState(false);
-  const [inputText, setInputText] = useState("");
+
+  // Function to get a random quote, preferring the user's personality type
+  const getRandomQuote = useCallback((): QuoteData => {
+    // 70% chance to use the user's personality quotes, 30% chance to use any personality
+    const useUserPersonality = Math.random() < 0.7;
+    let personality;
+    let randomQuoteText = "";
+    let authorName = "";
+    let bookTitle = "";
+    
+    if (useUserPersonality && PERSONALITIES[personalityType as PersonalityType]) {
+      // Use quotes from the user's personality type
+      personality = PERSONALITIES[personalityType as PersonalityType];
+      const personalityQuotes = personality.quotes;
+      const randomIndex = Math.floor(Math.random() * personalityQuotes.length);
+      randomQuoteText = personalityQuotes[randomIndex];
+      authorName = personality.name;
+      
+      // Try to find a matching book if possible
+      if (personality.books && personality.books.length > 0) {
+        // Just choose a random book for now - in a more advanced version we could match quotes to books
+        const randomBookIndex = Math.floor(Math.random() * personality.books.length);
+        bookTitle = personality.books[randomBookIndex].title;
+      }
+    } else {
+      // Use quotes from any personality type
+      // Get all personality types
+      const personalityTypes = Object.keys(PERSONALITIES) as PersonalityType[];
+      // Select a random personality type
+      const randomPersonalityType = personalityTypes[Math.floor(Math.random() * personalityTypes.length)];
+      personality = PERSONALITIES[randomPersonalityType];
+      // Get quotes from that personality
+      const quotes = personality.quotes;
+      // Select a random quote from that personality
+      const randomIndex = Math.floor(Math.random() * quotes.length);
+      randomQuoteText = quotes[randomIndex];
+      authorName = personality.name;
+      
+      // Try to find a matching book if possible
+      if (personality.books && personality.books.length > 0) {
+        // Just choose a random book for now
+        const randomBookIndex = Math.floor(Math.random() * personality.books.length);
+        bookTitle = personality.books[randomBookIndex].title;
+      }
+    }
+    
+    return {
+      text: randomQuoteText,
+      author: authorName,
+      book: bookTitle || undefined
+    };
+  }, [personalityType]);
+
+  // Set up the quote rotation
+  useEffect(() => {
+    // Set initial quote
+    setCurrentQuote(getRandomQuote());
+    
+    // Set up interval to change quotes
+    const interval = setInterval(() => {
+      // Get the quote container and text element
+      const quoteContainer = document.getElementById('quote-container');
+      const quoteElement = document.getElementById('quote-text');
+      
+      if (quoteContainer && quoteElement) {
+        // First, slide the current quote out to the left
+        quoteElement.classList.add('translate-x-[-100%]');
+        quoteElement.classList.add('opacity-0');
+        
+        // Wait for exit animation to complete
+        setTimeout(() => {
+          // Change the quote
+          setCurrentQuote(getRandomQuote());
+          
+          // Position the new quote off-screen to the right
+          quoteElement.classList.remove('translate-x-[-100%]');
+          quoteElement.classList.add('translate-x-[100%]');
+          
+          // Force a reflow to ensure the positioning takes effect
+          void quoteElement.offsetWidth;
+          
+          // Slide the new quote in from the right
+          setTimeout(() => {
+            quoteElement.classList.remove('translate-x-[100%]');
+            quoteElement.classList.remove('opacity-0');
+          }, 50);
+        }, 500); // Match this to the transition duration in the JSX
+      } else {
+        // No animation if elements not found
+        setCurrentQuote(getRandomQuote());
+      }
+    }, 10000); // Change quote every 10 seconds (increased from 8 to give more reading time)
+    
+    return () => clearInterval(interval);
+  }, [getRandomQuote]);
 
   useEffect(() => {
     const fetchGoals = async () => {
@@ -141,9 +255,9 @@ const Dashboard = () => {
       }
     };
 
-    const fetchAssistantName = async () => {
+    const fetchAssistantConfig = async () => {
       try {
-        // Use the config manager to get the assistant name
+        // Use the config manager to get the assistant config
         const config = getConfig();
         
         if (config && config.assistant_name) {
@@ -151,42 +265,106 @@ const Dashboard = () => {
         } else {
           setAssistantName("M8"); // Default name
         }
+
+        if (config && config.personality_type) {
+          setPersonalityType(config.personality_type);
+        }
       } catch (error) {
-        console.error("Error fetching assistant name:", error);
+        console.error("Error fetching assistant config:", error);
         setAssistantName("M8"); // Default name on error
+      }
+    };
+    
+    // Check if user just completed onboarding, and redirect to Assistant if they did
+    const checkOnboardingStatus = async () => {
+      if (!user) return;
+      
+      try {
+        // Check if there's a flag in localStorage indicating the user just completed onboarding
+        const justCompletedFlag = localStorage.getItem('just_completed_onboarding');
+        
+        if (justCompletedFlag === 'true') {
+          console.log('User just completed onboarding - redirecting to Assistant');
+          
+          // Clear the flag so it only shows once
+          localStorage.removeItem('just_completed_onboarding');
+          
+          // Get the user's goals to pass along to Assistant
+          const { data: userGoals } = await supabase
+            .from("goals")
+            .select("goal_text")
+            .eq("user_id", user.id);
+            
+          const goalsList = userGoals?.map(g => g.goal_text) || [];
+          
+          // Set welcome conversation flag for the Assistant page
+          localStorage.setItem('show_welcome_conversation', 'true');
+          
+          // Pass along goals information
+          if (goalsList.length > 0) {
+            localStorage.setItem('user_goals', JSON.stringify(goalsList));
+          }
+          
+          // Clear any existing conversation data from localStorage 
+          localStorage.removeItem('currentConversationId');
+          
+          // Force the system to delete any previous Set Up conversations
+          try {
+            const { data: existingSetups } = await supabase
+              .from('conversations')
+              .select('id, title')
+              .eq('user_id', user.id)
+              .eq('title', 'Set Up');
+              
+            if (existingSetups && existingSetups.length > 0) {
+              console.log('Removing existing Set Up conversations:', existingSetups.length);
+              
+              // Delete previous Set Up conversations to avoid confusion
+              for (const conv of existingSetups) {
+                await supabase
+                  .from('chat_messages')
+                  .delete()
+                  .eq('conversation_id', conv.id);
+                  
+                await supabase
+                  .from('conversations')
+                  .delete()
+                  .eq('id', conv.id);
+              }
+            }
+          } catch (error) {
+            console.error('Error cleaning up old Set Up conversations:', error);
+          }
+          
+          // Create a unique timestamp to ensure we get a fresh conversation
+          const timestamp = new Date().getTime();
+          
+          // Force creation of a new conversation with the title "Set Up"
+          localStorage.setItem('createNewConversation', 'true');
+          localStorage.setItem('newConversationTitle', `Set Up ${timestamp}`);
+          localStorage.setItem('forceNewChat', 'true');
+          
+          // Redirect to Assistant page
+          navigate('/assistant');
+          return;
+        }
+      } catch (error) {
+        console.error("Error checking onboarding status:", error);
       }
     };
 
     fetchGoals();
     calculateProgress();
-    fetchAssistantName();
-  }, [user]);
+    fetchAssistantConfig();
+    checkOnboardingStatus();
+  }, [user, navigate]);
 
-  // Predefined questions
-  const quickQuestions = [
-    { id: 1, text: "What have I got on today?" },
-    { id: 2, text: "How am I doing with my goals?" },
-    { id: 3, text: "Let's make some changes to my plan" },
-    { id: 4, text: "I need some motivation" }
-  ];
-
-  // Function to navigate to assistant with a predefined question
-  const navigateToAssistantWithQuestion = (question: string) => {
-    // Store both the question and a flag to create a new conversation
-    localStorage.setItem('assistantQuestion', question);
-    localStorage.setItem('createNewConversation', 'true');
-    localStorage.setItem('newConversationTitle', question);
-    
-    // Navigate to the assistant page
-    navigate('/assistant');
-  };
-
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (inputText.trim()) {
-      navigateToAssistantWithQuestion(inputText);
-    }
+  // Function to handle Amazon link click
+  const handleAmazonClick = (event: React.MouseEvent, book: string, author: string) => {
+    // Prevent the click from triggering other parent element clicks
+    event.stopPropagation();
+    // Open the Amazon link in a new tab
+    window.open(createAmazonAffiliateLink(book, author), '_blank');
   };
 
   return (
@@ -195,79 +373,85 @@ const Dashboard = () => {
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <div className="flex items-center gap-2">
+            <AIAssistantButton question="Can you help me understand my dashboard data and provide tips for improving my goal progress?" />
             <MenuToggleButton />
           </div>
         </div>
 
         <div className="space-y-6">
-          {/* AI Assistant Section - Chat-like UI with input field */}
-          <Card className="overflow-hidden border shadow-md">
+          {/* Quick Links Card */}
+          <Card className="shadow-md">
             <CardHeader className="bg-primary/5 border-b pb-3">
               <CardTitle className="flex items-center gap-2">
                 <Bot className="h-5 w-5 text-primary" />
-                Chat with {assistantName || "M8"}
+                <div id="quote-container" className="overflow-hidden w-full">
+                  <div 
+                    id="quote-text" 
+                    className="transition-all duration-500 ease-in-out text-sm md:text-base font-medium italic text-primary/80"
+                  >
+                    <span className="block">{currentQuote.text}</span>
+                    {(currentQuote.author || currentQuote.book) && (
+                      <span className="text-xs text-muted-foreground block mt-1">
+                        — {currentQuote.author}
+                        {currentQuote.book && (
+                          <>
+                            , "
+                            <span 
+                              className="text-primary/70 hover:text-primary hover:underline cursor-pointer" 
+                              onClick={(e) => handleAmazonClick(e, currentQuote.book || '', currentQuote.author)}
+                              title={`Buy "${currentQuote.book}" on Amazon`}
+                            >
+                              {currentQuote.book}
+                            </span>
+                            "
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </CardTitle>
-              <CardDescription>Your personal AI goal coach</CardDescription>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
-              {/* Quick Questions Bubbles */}
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium text-muted-foreground">Quick questions:</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {quickQuestions.map((question) => (
-                    <button
-                      key={question.id}
-                      className="text-left px-3 py-2 text-sm rounded-lg border bg-card hover:bg-muted/50 transition-colors"
-                      onClick={() => navigateToAssistantWithQuestion(question.text)}
-                    >
-                      {question.text}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Chat Messages */}
-              <div className="max-h-[150px] overflow-y-auto p-3 space-y-3 bg-muted/20 rounded-md">
-                {/* Bot message */}
-                <div className="flex w-max max-w-[80%] rounded-lg px-3 py-2 bg-muted text-foreground">
-                  <div className="flex items-start gap-2">
-                    <div className="mt-0.5">
-                      <Bot className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm">Hello! I'm {assistantName || "your AI assistant"}. How can I help you with your goals today?</p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Bot summary of tasks */}
-                <div className="flex w-max max-w-[80%] rounded-lg px-3 py-2 bg-muted text-foreground">
-                  <div className="flex items-start gap-2">
-                    <div className="mt-0.5">
-                      <Bot className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm">You have {actionSummary.daily.total} daily actions. {actionSummary.daily.completed} completed and {actionSummary.daily.total - actionSummary.daily.completed} remaining.</p>
-                    </div>
-                  </div>
-                </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Link to="/assistant">
+                  <Button variant="outline" className="w-full h-24 flex flex-col items-center justify-center gap-2 p-4 hover:bg-muted/50">
+                    <Bot className="h-6 w-6" />
+                    <span>MyM8</span>
+                  </Button>
+                </Link>
+                <Link to="/goals">
+                  <Button variant="outline" className="w-full h-24 flex flex-col items-center justify-center gap-2 p-4 hover:bg-muted/50">
+                    <ListTodo className="h-6 w-6" />
+                    <span>Goals</span>
+                  </Button>
+                </Link>
+                <Link to="/actions">
+                  <Button variant="outline" className="w-full h-24 flex flex-col items-center justify-center gap-2 p-4 hover:bg-muted/50">
+                    <CheckCircle2 className="h-6 w-6" />
+                    <span>Actions</span>
+                  </Button>
+                </Link>
+                <Link to="/todo">
+                  <Button variant="outline" className="w-full h-24 flex flex-col items-center justify-center gap-2 p-4 hover:bg-muted/50">
+                    <ListTodo className="h-6 w-6" />
+                    <span>To Do List</span>
+                  </Button>
+                </Link>
+                <Link to="/journal">
+                  <Button variant="outline" className="w-full h-24 flex flex-col items-center justify-center gap-2 p-4 hover:bg-muted/50">
+                    <BookOpen className="h-6 w-6" />
+                    <span>Journal</span>
+                  </Button>
+                </Link>
+                <Link to="/settings">
+                  <Button variant="outline" className="w-full h-24 flex flex-col items-center justify-center gap-2 p-4 hover:bg-muted/50">
+                    <Settings className="h-6 w-6" />
+                    <span>Settings</span>
+                  </Button>
+                </Link>
               </div>
             </CardContent>
-            <CardFooter className="flex items-center p-3 border-t bg-card">
-              <form onSubmit={handleSubmit} className="w-full flex items-center gap-2">
-                <Input
-                  type="text"
-                  placeholder="Type your question..."
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  className="flex-1"
-                />
-                <Button type="submit" size="sm" className="flex items-center gap-2">
-                  <Send className="h-4 w-4" />
-                  Ask
-                </Button>
-              </form>
-            </CardFooter>
           </Card>
 
           {/* Progress Section - Now collapsible */}
@@ -347,58 +531,67 @@ const Dashboard = () => {
                   <CollapsibleTrigger className="flex items-center gap-2 hover:opacity-80">
                     <CardTitle className="flex items-center gap-2">
                       <ListTodo className="h-5 w-5" />
-                      Your Goals
+                      Help and AI Guide
                       <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isGoalsOpen ? 'rotate-180' : ''}`} />
                     </CardTitle>
                   </CollapsibleTrigger>
-                  <CardDescription>Recent goals you've set</CardDescription>
+                  <CardDescription>Get help and learn about MyM8</CardDescription>
                 </div>
-                <Link to="/goals/new">
+                <Link to="/help">
                   <Button size="sm">
                     <Plus className="mr-2 h-4 w-4" />
-                    New Goal
+                    Get Help
                   </Button>
                 </Link>
               </CardHeader>
               <CollapsibleContent>
                 <CardContent>
-                  {loading ? (
-                    <p>Loading your goals...</p>
-                  ) : goals.length > 0 ? (
-                    <ul className="space-y-2">
-                      {goals.map((goal) => (
-                        <li key={goal.id} className="p-3 border rounded-md hover:bg-muted/50 transition-colors">
-                          <Link to={`/goals/${goal.id}`} className="block">
-                            <p className="font-medium">{goal.goal_text}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Created: {new Date(goal.created_at).toLocaleDateString()}
-                            </p>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="text-center py-6">
-                      <p className="text-muted-foreground mb-4">You haven't set any goals yet</p>
-                      <Link to="/goals/new">
-                        <Button size="sm" variant="outline">
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add Your First Goal
-                        </Button>
+                  <div className="space-y-4">
+                    <div className="p-3 border rounded-md hover:bg-muted/50 transition-colors">
+                      <Link to="/help/getting-started" className="block">
+                        <p className="font-medium">Getting Started</p>
+                        <p className="text-xs text-muted-foreground">
+                          Learn the basics of using MyM8
+                        </p>
                       </Link>
                     </div>
-                  )}
-                  
-                  {goals.length > 0 && (
+                    
+                    <div className="p-3 border rounded-md hover:bg-muted/50 transition-colors">
+                      <Link to="/assistant" className="block">
+                        <p className="font-medium">Talk to MyM8</p>
+                        <p className="text-xs text-muted-foreground">
+                          Get personalized help from your AI assistant
+                        </p>
+                      </Link>
+                    </div>
+                    
+                    <div className="p-3 border rounded-md hover:bg-muted/50 transition-colors">
+                      <Link to="/help/features" className="block">
+                        <p className="font-medium">Features & Capabilities</p>
+                        <p className="text-xs text-muted-foreground">
+                          Discover what MyM8 can do for you
+                        </p>
+                      </Link>
+                    </div>
+                    
+                    <div className="p-3 border rounded-md hover:bg-muted/50 transition-colors">
+                      <Link to="/settings" className="block">
+                        <p className="font-medium">Customize MyM8</p>
+                        <p className="text-xs text-muted-foreground">
+                          Adjust settings to fit your preferences
+                        </p>
+                      </Link>
+                    </div>
+                    
                     <div className="flex justify-end mt-4">
-                      <Link to="/goals">
+                      <Link to="/help">
                         <Button variant="outline" size="sm" className="text-xs">
                           <ListTodo className="mr-1 h-3 w-3" />
-                          View All Goals
+                          View All Help Topics
                         </Button>
                       </Link>
                     </div>
-                  )}
+                  </div>
                 </CardContent>
               </CollapsibleContent>
             </Collapsible>

@@ -108,6 +108,25 @@ const Onboarding = () => {
         throw new Error("Failed to save some goals");
       }
       
+      // Get current timestamp and store in localStorage instead of database column
+      const currentTimestamp = Date.now();
+      localStorage.setItem('wizard_completed_timestamp', currentTimestamp.toString());
+      
+      // Mark onboarding as completed in profiles table
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          wizard_completed: true,
+        })
+        .eq("id", user.id);
+        
+      if (profileError) {
+        console.error("Error updating profile:", profileError);
+      }
+      
+      // Set flag in localStorage to indicate the user just completed onboarding
+      localStorage.setItem('just_completed_onboarding', 'true');
+      
       toast.success("Onboarding completed successfully");
       console.log("Navigation to dashboard");
       navigate("/dashboard");

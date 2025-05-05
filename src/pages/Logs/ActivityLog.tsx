@@ -17,6 +17,7 @@ import {
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
+import { AIAssistantButton } from "@/components/AIAssistantButton";
 
 // Define frequencies type
 type Frequency = "morning" | "afternoon" | "evening" | "daily" | "weekly" | "monthly";
@@ -223,7 +224,10 @@ const ActivityLog = () => {
         <PageHeader 
           title="Activity Log" 
           description="Track your completed actions over time"
-        />
+        >
+          <AIAssistantButton question="Can you help me understand my activity log and analyze my patterns of task completion?" />
+          <MenuToggleButton />
+        </PageHeader>
 
         <div className="w-full flex flex-col gap-3 mb-6">
           <div className="relative w-full">

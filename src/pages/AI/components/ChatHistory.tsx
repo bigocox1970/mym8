@@ -63,15 +63,15 @@ export function ChatHistory({
   const renderGroup = (title: string, convos: Conversation[]) => {
     if (convos.length === 0) return null;
     return (
-      <div key={title}>
-        <div className="px-3 py-1 text-xs text-muted-foreground font-medium bg-muted/50">
+      <div key={title} className="mb-2">
+        <div className="px-4 py-2 text-xs text-muted-foreground font-medium bg-muted/50">
           {title}
         </div>
         {convos.map((conversation) => (
           <div 
             key={conversation.id}
             className={cn(
-              "flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors",
+              "flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors",
               currentConversationId === conversation.id ? "bg-muted/70 dark:bg-muted/50" : ""
             )}
             onClick={() => {
@@ -89,7 +89,7 @@ export function ChatHistory({
               }
             }}
           >
-            <div className="flex items-center space-x-2 truncate w-full">
+            <div className="flex items-center space-x-3 truncate w-full">
               {isEditMode ? (
                 <Checkbox 
                   checked={selectedConversations.includes(conversation.id)}
@@ -107,6 +107,22 @@ export function ChatHistory({
               )}
               <span className="truncate">{conversation.title || "Untitled Conversation"}</span>
             </div>
+            
+            {/* Add timestamp display */}
+            {!isEditMode && (
+              <div className="text-xs text-muted-foreground font-medium ml-2 shrink-0">
+                {title === "Today" ? (
+                  // For today, show time only (HH:MM format)
+                  new Date(conversation.last_message_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                ) : title === "Yesterday" ? (
+                  // For yesterday, show "Yesterday"
+                  "Yesterday"
+                ) : (
+                  // For older, show short date (MM/DD or DD/MM based on locale)
+                  new Date(conversation.last_message_at).toLocaleDateString([], {month: 'numeric', day: 'numeric'})
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -117,15 +133,15 @@ export function ChatHistory({
     <Card className={cn(
       "border-none shadow-md overflow-hidden transition-all duration-200 h-full bg-background/95 dark:bg-background/90",
       showChatHistory 
-        ? "block fixed inset-0 z-50 md:relative md:z-auto md:col-span-1" 
-        : "hidden md:block md:col-span-1"
+        ? "block fixed inset-0 z-50 lg:relative lg:z-auto lg:col-span-1" 
+        : "hidden lg:block lg:col-span-1"
     )}>
       <CardHeader className="px-3 py-2 sm:py-4 flex flex-row items-center justify-between sticky top-0 bg-card z-10 border-b">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="sm"
-            className="md:hidden"
+            className="lg:hidden"
             onClick={() => setShowChatHistory(false)}
           >
             <ArrowLeft className="h-4 w-4" />

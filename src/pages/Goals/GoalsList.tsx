@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ListPlus, Edit, Trash2, Check } from "lucide-react";
+import { Plus, Edit, Trash2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,6 +21,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/PageHeader";
+import { AIAssistantButton } from "@/components/AIAssistantButton";
 
 type Goal = {
   id: string;
@@ -128,20 +129,17 @@ const GoalsList = () => {
             </>
           ) : (
             <>
-              <Button
+              <div 
+                className="p-2 cursor-pointer hover:bg-primary/10 rounded-md"
                 onClick={handleToggleEditMode}
-                variant="outline"
-                size="sm"
               >
-                <Edit className="sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Edit</span>
-              </Button>
-              <Link to="/goals/new">
-                <Button size="sm">
-                  <ListPlus className="sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">New Goal</span>
-                </Button>
+                <Edit className="h-5 w-5" />
+              </div>
+              <Link to="/goals/new" className="p-2 cursor-pointer hover:bg-primary/10 rounded-md">
+                <Plus className="h-5 w-5" />
               </Link>
+              <AIAssistantButton question="I'd like help creating or managing my goals. Can you assist me?" />
+              <MenuToggleButton />
             </>
           )}
         </PageHeader>
@@ -213,7 +211,7 @@ const GoalsList = () => {
             <CardContent>
               <Link to="/goals/new">
                 <Button>
-                  <ListPlus className="mr-2 h-4 w-4" />
+                  <Plus className="mr-2 h-4 w-4" />
                   Create Your First Goal
                 </Button>
               </Link>

@@ -119,39 +119,50 @@ export function useConversations({ userId }: UseConversationsProps) {
       // Update local state
       setCurrentConversationId(data.id);
       
-      // Get assistant name from config
-      const config = getConfig();
-      const assistantName = config.assistant_name || "AI assistant";
-      
-      // Add welcome message with the assistant's name
-      const welcomeMessage = `Hi there! I'm ${assistantName}. How can I help you today?`;
-      
-      const { error: messageError } = await supabase
-        .from('chat_messages')
-        .insert({
-          conversation_id: data.id,
-          user_id: userId,
+      // For Set Up conversations, don't add a welcome message
+      // since we'll use the handleWelcomeConversation function
+      if (title.startsWith('Set Up')) {
+        // For Set Up, initialize with empty messages array
+        setMessages([]);
+        console.log('Set Up conversation created without default welcome message');
+      } else {
+        // Get assistant name from config
+        const config = getConfig();
+        const assistantName = config.assistant_name || "AI assistant";
+        
+        // Add welcome message with the assistant's name
+        const welcomeMessage = `Hi there! I'm ${assistantName}. How can I help you today?`;
+        
+        const { error: messageError } = await supabase
+          .from('chat_messages')
+          .insert({
+            conversation_id: data.id,
+            user_id: userId,
+            role: 'assistant',
+            content: welcomeMessage,
+            created_at: new Date().toISOString(),
+            timestamp: new Date().toISOString()
+          });
+
+        if (messageError) {
+          console.error('Error adding welcome message:', messageError);
+        }
+        
+        // Set welcome message in UI
+        setMessages([{
+          id: uuidv4(),
           role: 'assistant',
           content: welcomeMessage,
-          created_at: new Date().toISOString(),
-          timestamp: new Date().toISOString()
-        });
-
-      if (messageError) {
-        console.error('Error adding welcome message:', messageError);
+          timestamp: new Date().toISOString(),
+          conversation_id: data.id
+        }]);
       }
-      
-      // Set welcome message in UI
-      setMessages([{
-        id: uuidv4(),
-        role: 'assistant',
-        content: welcomeMessage,
-        timestamp: new Date().toISOString(),
-        conversation_id: data.id
-      }]);
       
       // Refresh conversations list
       fetchConversations();
+      
+      // Return the conversation ID so it can be used by the caller
+      return data.id;
       
     } catch (err) {
       console.error('Error in createNewConversation:', err);
@@ -374,6 +385,7 @@ export function useConversations({ userId }: UseConversationsProps) {
     updateConversationTitle,
     saveMessage,
     addMessage,
-    getCurrentConversationTitle
+    getCurrentConversationTitle,
+    setConversations
   };
 }

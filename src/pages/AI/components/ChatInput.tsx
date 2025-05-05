@@ -16,6 +16,7 @@ interface ChatInputProps {
   isLoadingAudio?: boolean;
   isSpeaking?: boolean;
   isSubmitting?: boolean;
+  stopSpeaking?: () => void;
 }
 
 export function ChatInput({
@@ -29,8 +30,18 @@ export function ChatInput({
   toggleListening,
   isLoadingAudio = false,
   isSpeaking = false,
-  isSubmitting = false
+  isSubmitting = false,
+  stopSpeaking
 }: ChatInputProps) {
+  
+  const handleVolumeButtonClick = () => {
+    if (isSpeaking && stopSpeaking) {
+      stopSpeaking();
+    } else {
+      toggleVoiceMode();
+    }
+  };
+
   return (
     <div className="p-2 sm:p-3">
       <form onSubmit={onSubmit} className="w-full flex flex-col space-y-2">
@@ -54,8 +65,8 @@ export function ChatInput({
           <Button
             variant="outline"
             size="icon"
-            onClick={toggleVoiceMode}
-            title={isVoiceEnabled ? "Disable voice responses" : "Enable voice responses"}
+            onClick={handleVolumeButtonClick}
+            title={isSpeaking ? "Stop playback" : isVoiceEnabled ? "Disable voice responses" : "Enable voice responses"}
             className={cn(
               isLoadingAudio && "animate-pulse",
               isSpeaking && "bg-green-100 text-green-600 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",

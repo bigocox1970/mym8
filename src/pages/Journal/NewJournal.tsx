@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { Mic, Square, Play, Save } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
-const NewJournal = () => {
+export const NewJournal = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [content, setContent] = useState("");

@@ -57,36 +57,60 @@ export async function textToSpeech(
   }
 ): Promise<Blob | string> {
   try {
+    console.log(`[API-DEBUG] TTS request - Service: ${service}, Voice: ${options.voice}, Text length: ${text.length} chars`);
+    
     // Only handle non-browser TTS services here
     if (service === 'browser') {
+      console.log('[API-DEBUG] Browser TTS requested, should be handled in client');
       throw new Error('Browser TTS should be handled in the client component');
     }
 
+    // Check if we have the required API key
+    const openaiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    if (!openaiKey) {
+      console.error('[API-DEBUG] Missing OpenAI API key');
+      throw new Error('Missing OpenAI API key. Please add it to your environment variables.');
+    }
+    
     // Handle OpenAI TTS
     if (service === 'openai') {
-      const response = await fetch('https://api.openai.com/v1/audio/speech', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'tts-1',
-          voice: options.voice || 'alloy',
-          input: text
-        })
-      });
+      console.log('[API-DEBUG] Using OpenAI TTS service');
+      console.log(`[API-DEBUG] API Key exists: ${openaiKey ? 'Yes (redacted)' : 'No'}`);
+      console.log(`[API-DEBUG] Voice selected: ${options.voice}`);
+      
+      try {
+        const response = await fetch('https://api.openai.com/v1/audio/speech', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiKey}`
+          },
+          body: JSON.stringify({
+            model: 'tts-1',
+            voice: options.voice || 'alloy',
+            input: text
+          })
+        });
 
-      if (!response.ok) {
-        throw new Error('Failed to generate speech');
+        if (!response.ok) {
+          const errorResponse = await response.text();
+          console.error(`[API-DEBUG] OpenAI TTS error: Status ${response.status}, Response:`, errorResponse);
+          throw new Error(`Failed to generate speech: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        console.log(`[API-DEBUG] Successfully retrieved audio from OpenAI. Size: ${blob.size} bytes`);
+        return blob;
+      } catch (fetchError) {
+        console.error('[API-DEBUG] Fetch error in OpenAI TTS:', fetchError);
+        throw fetchError;
       }
-
-      return await response.blob();
     }
 
+    console.error(`[API-DEBUG] Unsupported TTS service: ${service}`);
     throw new Error(`Unsupported TTS service: ${service}`);
   } catch (error) {
-    console.error('TTS API error:', error);
+    console.error('[API-DEBUG] TTS API error:', error);
     throw error;
   }
 }
@@ -766,6 +790,117 @@ export async function updateGoalDescription(
 }
 
 /**
+ * Analyze user's communication style based on message history
+ * This helps the adaptive personality mode match the user's communication patterns
+ * @param messages Array of conversation messages
+ * @returns An analysis of the user's communication style
+ */
+function analyzeUserCommunicationStyle(messages: Array<{role: string, content: string}>) {
+  // Only look at user messages
+  const userMessages = messages.filter(m => m.role === 'user').map(m => m.content);
+  
+  if (userMessages.length < 2) {
+    return {
+      style: 'neutral',
+      formality: 'neutral',
+      detectedPatterns: []
+    };
+  }
+  
+  // Count patterns
+  let slangCount = 0;
+  let emojiCount = 0;
+  let shortSentenceCount = 0;
+  let longSentenceCount = 0;
+  let formalPhraseCount = 0;
+  let casualPhraseCount = 0;
+  
+  // Common slang terms to detect
+  const slangTerms = ['bruh', 'lol', 'idk', 'tbh', 'lmao', 'bro', 'dude', 'yeet', 'lit', 'fire', 'fam', 'sus'];
+  const formalPhrases = ['please', 'thank you', 'I would like to', 'I would appreciate', 'would you kindly'];
+  const casualPhrases = ['hey', 'yo', 'sup', 'thanks', 'cool', 'awesome', 'wanna', 'gonna'];
+  
+  // Detect patterns in each message
+  const detectedPatterns = [];
+  
+  userMessages.forEach(message => {
+    // Check for slang
+    slangTerms.forEach(term => {
+      if (message.toLowerCase().includes(term)) {
+        slangCount++;
+        if (!detectedPatterns.includes(term)) {
+          detectedPatterns.push(term);
+        }
+      }
+    });
+    
+    // Check for emojis (simple regex for common emoji patterns)
+    const emojiRegex = /[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu;
+    const emojisInMessage = (message.match(emojiRegex) || []).length;
+    emojiCount += emojisInMessage;
+    
+    // Check sentence length
+    const sentences = message.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    sentences.forEach(sentence => {
+      const words = sentence.trim().split(/\s+/).length;
+      if (words < 5) shortSentenceCount++;
+      if (words > 15) longSentenceCount++;
+    });
+    
+    // Check for formal/casual phrasing
+    formalPhrases.forEach(phrase => {
+      if (message.toLowerCase().includes(phrase)) {
+        formalPhraseCount++;
+      }
+    });
+    
+    casualPhrases.forEach(phrase => {
+      if (message.toLowerCase().includes(phrase)) {
+        casualPhraseCount++;
+      }
+    });
+  });
+  
+  // Determine overall style
+  let style = 'neutral';
+  let formality = 'neutral';
+  
+  if (slangCount > 2 || casualPhraseCount > 3) {
+    style = 'casual';
+  } else if (formalPhraseCount > 2) {
+    style = 'formal';
+  }
+  
+  if (shortSentenceCount > longSentenceCount * 2) {
+    style = style === 'casual' ? 'very_casual' : 'direct';
+  }
+  
+  if (emojiCount > 3) {
+    style = 'expressive';
+  }
+  
+  if (slangCount > 4 || casualPhraseCount > 5) {
+    formality = 'casual';
+    if (detectedPatterns.some(p => ['bruh', 'lol', 'lmao', 'bro', 'dude'].includes(p))) {
+      formality = 'very_casual';
+    }
+  } else if (formalPhraseCount > 3) {
+    formality = 'formal';
+  }
+  
+  return {
+    style,
+    formality,
+    usesSlang: slangCount > 1,
+    usesEmojis: emojiCount > 1,
+    prefersShorterSentences: shortSentenceCount > longSentenceCount,
+    detectedPatterns
+  };
+}
+
+// Update the processMessage function to include style analysis
+
+/**
  * LLM API request to process user messages
  * @param message User message
  * @param context Additional context like goals and actions
@@ -888,12 +1023,57 @@ export async function processMessage(
     // Get the user's selected personality from config
     const config = getConfig();
     const assistantName = config.assistant_name || "M8";
-    const personalityType = config.personality_type || "gentle";
-    console.log(`Using assistant name: ${assistantName}, personality type: ${personalityType}`);
+    let personalityType = config.personality_type || "gentle";
     
     // Get the personality prompt
-    const personalityPrompt = PERSONALITY_PROMPTS[personalityType as keyof typeof PERSONALITY_PROMPTS] || 
-                              PERSONALITY_PROMPTS.gentle;
+    let personalityPrompt = PERSONALITY_PROMPTS[personalityType as keyof typeof PERSONALITY_PROMPTS] || 
+                            PERSONALITY_PROMPTS.gentle;
+    
+    // If personality is set to adaptive, analyze the communication style and customize the personality prompt
+    if (personalityType === 'adaptive') {
+      const styleAnalysis = analyzeUserCommunicationStyle(messages);
+      console.log('User communication style analysis:', styleAnalysis);
+      
+      // Create a customized adaptive prompt based on the analysis
+      let basePersonality = "gentle";
+      
+      if (styleAnalysis.formality === 'very_casual' || 
+          (styleAnalysis.usesSlang && styleAnalysis.detectedPatterns.some(p => ['bruh', 'bro', 'dude'].includes(p)))) {
+        basePersonality = "sarcastic"; // Use the sarcastic personality for very casual users
+      } else if (styleAnalysis.style === 'direct' || styleAnalysis.formality === 'formal') {
+        basePersonality = "direct"; // Use the direct personality for formal users
+      } else if (styleAnalysis.style === 'expressive') {
+        basePersonality = "motivational"; // Use the motivational personality for expressive users
+      }
+      
+      // Get the base personality prompt
+      personalityPrompt = PERSONALITY_PROMPTS[basePersonality as keyof typeof PERSONALITY_PROMPTS];
+      
+      // Enhance it with adaptive capabilities
+      personalityPrompt = `${personalityPrompt}\n\nI've noticed your communication style is ${styleAnalysis.style} 
+      with ${styleAnalysis.formality} formality. ${styleAnalysis.usesSlang ? "You use casual language and slang terms." : ""} 
+      ${styleAnalysis.usesEmojis ? "You express yourself with emojis." : ""} 
+      ${styleAnalysis.prefersShorterSentences ? "You prefer concise communication." : "You use more detailed expressions."} 
+      I'll adapt my responses to match your preferred style while still providing helpful guidance.`;
+    }
+
+    console.log(`Using assistant name: ${assistantName}, personality type: ${personalityType}`);
+
+    // Get the user's todos for AI context
+    let userTodos = [];
+    if (context.userId) {
+      try {
+        const { data } = await supabase
+          .from('todos')
+          .select('*')
+          .eq('user_id', context.userId)
+          .order('created_at', { ascending: false });
+          
+        userTodos = data || [];
+      } catch (error) {
+        console.error('Error fetching todos for AI context:', error);
+      }
+    }
 
     // Add system message with context and personality
     const systemMessage = {
@@ -904,6 +1084,12 @@ Here is some context about the user:
 User's name: ${context.userNickname || 'Unknown'}
 
 Goals: ${context.goals?.map(g => `${g.goal_text} (ID: ${g.id})`).join(', ') || 'None'}
+
+Todos: ${userTodos.length > 0 ? 
+  userTodos.slice(0, 10).map(t => `"${t.content}" (${t.completed ? 'Completed' : 'Pending'})`).join(', ') + 
+  (userTodos.length > 10 ? ` and ${userTodos.length - 10} more todos` : '') : 
+  'None'
+}
 
 Actions: ${context.actions?.map(a => `${a.title} (ID: ${a.id}, Status: ${a.completed ? 'Completed' : 'Pending'}, Frequency: ${a.frequency})`).join(', ') || 'None'}
 
@@ -934,6 +1120,15 @@ When the user mentions their name or refers to themselves, use their name "${con
 IMPORTANT: LEARN ABOUT THE USER - As you chat with the user, try to learn more about them. When the user shares important information about themselves (like preferences, interests, family details, work information, health concerns, etc.), remember this information and use it to personalize future responses.
 
 IMPORTANT CONVERSATION HISTORY: If a user asks you to read through past conversations or remember something from before, you can use the command [ANALYZE_CONVERSATION_HISTORY] which will scan through past messages and extract important information to improve your context about the user. Use this command when users ask you to read or remember past conversations.
+
+IMPORTANT: BE PROACTIVE ABOUT CREATING ACTIONS - When a user has goals but few or no actions, be PROACTIVE in suggesting specific, actionable steps they could take. Offer to create these actions for them right away.
+
+For users who have just completed the setup wizard:
+1. Notice if they have goals but no actions
+2. Suggest 3-5 specific actions that would help with their goals
+3. Offer to set these up immediately
+4. If they show interest, create the actions using the CREATE_ACTION commands
+5. Explain how the actions relate to their goals and how they can track progress
 
 IMPORTANT: When a user asks you to create or manage goals or tasks, you CAN and SHOULD handle these by including special commands in your response. Use these formats:
 
@@ -1098,6 +1293,15 @@ Example response:
 Would you like more details about any specific goal?"
 
 DO NOT respond with "As an AI, I don't have the ability to directly access your goal progress" - you DO have this information in the context.
+
+You can help manage the user's todos with these special commands:
+- To create a new todo: [CREATE_TODO: task description]
+- To toggle a todo's completion status by ID: [TOGGLE_TODO: todo_id]
+- To toggle a todo's completion status by description: [TOGGLE_TODO_TEXT: task description]
+- To delete a todo by ID: [DELETE_TODO: todo_id]
+- To delete a todo by description: [DELETE_TODO_TEXT: task description]
+
+When using text-based commands, always try to use exact text from the todo to ensure the correct item is modified.
 `
     };
 
@@ -1421,6 +1625,65 @@ DO NOT respond with "As an AI, I don't have the ability to directly access your 
       }
     }
 
+    // Check for todo creation command
+    const createTodoMatch = aiResponse.match(/\[CREATE_TODO: (.*?)\]/);
+    if (createTodoMatch && context.userId) {
+      const todoContent = createTodoMatch[1].trim();
+      console.log("CREATE_TODO match found:", todoContent);
+      
+      const newTodo = await createTodo(context.userId, todoContent);
+      if (newTodo) {
+        action = `Todo "${todoContent}" created successfully`;
+        refresh = true;
+      } else {
+        action = `Failed to create todo "${todoContent}"`;
+      }
+    }
+
+    // Check for todo completion toggle command
+    const toggleTodoMatch = aiResponse.match(/\[TOGGLE_TODO: (.*?)\]/);
+    if (toggleTodoMatch && context.userId) {
+      const todoId = toggleTodoMatch[1].trim();
+      console.log("TOGGLE_TODO match found for ID:", todoId);
+      
+      const result = await toggleTodoStatus(context.userId, todoId);
+      action = result;
+      refresh = true;
+    }
+
+    // Check for todo completion toggle by text command
+    const toggleTodoTextMatch = aiResponse.match(/\[TOGGLE_TODO_TEXT: (.*?)\]/);
+    if (toggleTodoTextMatch && context.userId) {
+      const todoText = toggleTodoTextMatch[1].trim();
+      console.log("TOGGLE_TODO_TEXT match found:", todoText);
+      
+      const result = await toggleTodoStatus(context.userId, undefined, todoText);
+      action = result;
+      refresh = true;
+    }
+
+    // Check for delete todo command
+    const deleteTodoMatch = aiResponse.match(/\[DELETE_TODO: (.*?)\]/);
+    if (deleteTodoMatch && context.userId) {
+      const todoId = deleteTodoMatch[1].trim();
+      console.log("DELETE_TODO match found for ID:", todoId);
+      
+      const result = await deleteTodo(context.userId, todoId);
+      action = result;
+      refresh = true;
+    }
+
+    // Check for delete todo by text command
+    const deleteTodoTextMatch = aiResponse.match(/\[DELETE_TODO_TEXT: (.*?)\]/);
+    if (deleteTodoTextMatch && context.userId) {
+      const todoText = deleteTodoTextMatch[1].trim();
+      console.log("DELETE_TODO_TEXT match found:", todoText);
+      
+      const result = await deleteTodo(context.userId, undefined, todoText);
+      action = result;
+      refresh = true;
+    }
+
     // Process the final message to return
     let finalMessage = aiResponse;
     
@@ -1463,6 +1726,11 @@ DO NOT respond with "As an AI, I don't have the ability to directly access your 
         .replace(/\[UPDATE_GOAL_DESCRIPTION:[^\]]*\|[^\]]*\]/g, '')
         .replace(/\[UPDATE_GOAL_NOTES:[^\]]*\|[^\]]*\]/g, '')
         .replace(/\[ANALYZE_CONVERSATION_HISTORY\]/g, '')
+        .replace(/\[CREATE_TODO:[^\]]+\]/g, '')
+        .replace(/\[TOGGLE_TODO:[^\]]+\]/g, '')
+        .replace(/\[TOGGLE_TODO_TEXT:[^\]]+\]/g, '')
+        .replace(/\[DELETE_TODO:[^\]]+\]/g, '')
+        .replace(/\[DELETE_TODO_TEXT:[^\]]+\]/g, '')
         .trim(),
       action,
       navigate: navigateMatch ? navigateMatch[1] : undefined,
@@ -1621,4 +1889,191 @@ export async function analyzeAllUserConversations(userId: string): Promise<boole
  */
 function generateHistoryAnalysisResponse(): string {
   return "I've analyzed our past conversations and updated my understanding of your preferences, interests, and personal information. This gives me better context about our interactions and helps me provide more personalized responses in future conversations. I've saved important highlights from our chats so I can remember key details about you. If you'd like to see what I've learned, you can check the 'Conversation Highlights' section in your profile settings.";
+}
+
+/**
+ * Create a new todo item
+ * @param userId The user ID
+ * @param content The todo content
+ * @returns The created todo item or an error message
+ */
+export async function createTodo(userId: string, content: string): Promise<{ id: string; content: string; completed: boolean } | null> {
+  try {
+    // Data validation
+    if (!content?.trim()) {
+      console.error('Invalid todo content');
+      return null;
+    }
+
+    // Create the todo
+    const { data, error } = await supabase
+      .from('todos')
+      .insert({
+        user_id: userId,
+        content: content.trim(),
+        completed: false
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating todo:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in createTodo:', error);
+    return null;
+  }
+}
+
+/**
+ * Toggle the completion status of a todo item
+ * @param userId The user ID
+ * @param todoId The todo ID to update
+ * @param todoText Optional text to identify the todo if ID is not provided
+ * @returns A success message or an error message
+ */
+export async function toggleTodoStatus(
+  userId: string, 
+  todoId?: string, 
+  todoText?: string
+): Promise<string> {
+  try {
+    // Find the todo by ID or text if ID not provided
+    let todo;
+    
+    if (todoId) {
+      const { data, error } = await supabase
+        .from('todos')
+        .select('*')
+        .eq('id', todoId)
+        .eq('user_id', userId)
+        .single();
+        
+      if (error) {
+        console.error('Error finding todo by ID:', error);
+        return `Error finding todo with ID ${todoId}`;
+      }
+      
+      todo = data;
+    } else if (todoText) {
+      // Find by text - will match the first one with similar text
+      const { data, error } = await supabase
+        .from('todos')
+        .select('*')
+        .eq('user_id', userId)
+        .ilike('content', `%${todoText}%`)
+        .order('created_at', { ascending: false })
+        .limit(1);
+        
+      if (error) {
+        console.error('Error finding todo by text:', error);
+        return `Error finding todo with text "${todoText}"`;
+      }
+      
+      if (!data || data.length === 0) {
+        return `No todo found matching "${todoText}"`;
+      }
+      
+      todo = data[0];
+    } else {
+      return 'No todo ID or text provided';
+    }
+    
+    // Update the todo's completion status
+    const newStatus = !todo.completed;
+    const { error: updateError } = await supabase
+      .from('todos')
+      .update({ 
+        completed: newStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', todo.id)
+      .eq('user_id', userId);
+      
+    if (updateError) {
+      console.error('Error updating todo status:', updateError);
+      return `Error updating todo "${todo.content}"`;
+    }
+    
+    return `Todo "${todo.content}" ${newStatus ? 'completed' : 'marked as incomplete'}`;
+  } catch (error) {
+    console.error('Error in toggleTodoStatus:', error);
+    return `Error toggling todo status: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+/**
+ * Delete a todo item
+ * @param userId The user ID
+ * @param todoId The todo ID to delete
+ * @param todoText Optional text to identify the todo if ID is not provided
+ * @returns A success message or an error message
+ */
+export async function deleteTodo(
+  userId: string, 
+  todoId?: string, 
+  todoText?: string
+): Promise<string> {
+  try {
+    // Find the todo by ID or text if ID not provided
+    let todoToDelete;
+    
+    if (todoId) {
+      const { data, error } = await supabase
+        .from('todos')
+        .select('*')
+        .eq('id', todoId)
+        .eq('user_id', userId)
+        .single();
+        
+      if (error) {
+        console.error('Error finding todo by ID:', error);
+        return `Error finding todo with ID ${todoId}`;
+      }
+      
+      todoToDelete = data;
+    } else if (todoText) {
+      // Find by text - will match the first one with similar text
+      const { data, error } = await supabase
+        .from('todos')
+        .select('*')
+        .eq('user_id', userId)
+        .ilike('content', `%${todoText}%`)
+        .order('created_at', { ascending: false })
+        .limit(1);
+        
+      if (error) {
+        console.error('Error finding todo by text:', error);
+        return `Error finding todo with text "${todoText}"`;
+      }
+      
+      if (!data || data.length === 0) {
+        return `No todo found matching "${todoText}"`;
+      }
+      
+      todoToDelete = data[0];
+    } else {
+      return 'No todo ID or text provided';
+    }
+    
+    // Delete the todo
+    const { error: deleteError } = await supabase
+      .from('todos')
+      .delete()
+      .eq('id', todoToDelete.id)
+      .eq('user_id', userId);
+      
+    if (deleteError) {
+      console.error('Error deleting todo:', deleteError);
+      return `Error deleting todo "${todoToDelete.content}"`;
+    }
+    
+    return `Todo "${todoToDelete.content}" deleted successfully`;
+  } catch (error) {
+    console.error('Error in deleteTodo:', error);
+    return `Error deleting todo: ${error instanceof Error ? error.message : String(error)}`;
+  }
 }

@@ -17,6 +17,9 @@ const PERSONALITY_TYPES = Object.keys(PERSONALITY_PROMPTS).map(key => ({
   label: key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')
 }));
 
+// Update the recommended personalities list to include the adaptive option
+const RECOMMENDED_PERSONALITIES = ["gentle", "direct", "sarcastic", "motivational", "analytical", "adaptive"];
+
 interface GeneralAISettingsProps {
   enableAI: boolean;
   setEnableAI: (value: boolean) => void;

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,7 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
-const EditJournal = () => {
+export const EditJournal = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
