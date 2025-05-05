@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/sonner";
-import { Plus, Edit, Save, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Edit, Save, ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Select,
@@ -26,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { AIAssistantButton } from "@/components/AIAssistantButton";
 
 interface Goal {
   id: string;
@@ -348,37 +349,16 @@ const GoalDetail = () => {
 
         {/* Navigation row */}
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <Select
-              value={frequencyFilter}
-              onValueChange={(value) => setFrequencyFilter(value as "all" | Action["frequency"])}
-            >
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Filter actions" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Actions</SelectItem>
-                <SelectItem value="morning">Morning</SelectItem>
-                <SelectItem value="afternoon">Afternoon</SelectItem>
-                <SelectItem value="evening">Evening</SelectItem>
-                <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="weekly">Weekly</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <h2 className="text-lg font-semibold">Actions</h2>
           <div className="flex items-center gap-2">
-            <Link to={`/goals/${id}/edit`}>
-              <Button>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Goal
-              </Button>
+            <Link to="/goals" className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mr-2">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to Goals
             </Link>
-            <Link to="/goals">
-              <Button variant="outline">
-                Back to Goals
-              </Button>
+            <Link to={`/goals/${id}/edit`} className="p-2 cursor-pointer hover:bg-primary/10 rounded-md">
+              <Edit className="h-5 w-5" />
             </Link>
+            <AIAssistantButton question="Can you help me organize the actions for this goal?" />
             <MenuToggleButton />
           </div>
         </div>

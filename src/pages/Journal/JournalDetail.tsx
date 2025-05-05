@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Calendar, Clock, Edit, Trash, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Edit, Trash, Volume2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { getConfig } from "@/lib/configManager";
 import { textToSpeech } from "@/lib/api";
@@ -19,7 +19,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
 
 interface JournalEntry {
   id: string;
@@ -31,38 +30,11 @@ const JournalDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [entry, setEntry] = useState<JournalEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [hasBeenPlayed, setHasBeenPlayed] = useState(false);
-
-  useEffect(() => {
-    const fetchEntry = async () => {
-      if (!user || !id) return;
-
-      try {
-        const { data, error } = await supabase
-          .from("journal_entries")
-          .select("*")
-          .eq("id", id)
-          .eq("user_id", user.id)
-          .single();
-
-        if (error) throw error;
-        setEntry(data as JournalEntry);
-      } catch (error) {
-        console.error("Error fetching journal entry:", error);
-        toast.error("Failed to load journal entry");
-        navigate("/journal");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEntry();
-  }, [id, user, navigate]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -99,35 +71,18 @@ const JournalDetail = () => {
     }
   };
 
-  const readAloud = async () => {
+  const readAloud = useCallback(async () => {
     if (!entry?.content?.trim()) {
       toast.error("No content to read");
       return;
     }
-
-    if (isPlaying) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = "";
-        audioRef.current = null;
-      }
-      if (window.speechSynthesis.speaking) {
-        window.speechSynthesis.cancel();
-      }
-      setIsPlaying(false);
-      return;
-    }
-
     try {
+      // Stop and clean up any previous audio
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = "";
         audioRef.current = null;
       }
-      if (window.speechSynthesis.speaking) {
-        window.speechSynthesis.cancel();
-      }
-
       let config;
       try {
         config = getConfig();
@@ -144,12 +99,9 @@ const JournalDetail = () => {
       if (service === 'azure') voice = config.azure_voice || 'en-US-JennyNeural';
       if (service === 'amazon') voice = config.amazon_voice || 'Joanna';
 
-      setIsPlaying(true);
-      setHasBeenPlayed(true);
-
       if (service === 'browser') {
         if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
+          window.speechSynthesis.cancel(); // Stop any previous speech
           const utterance = new window.SpeechSynthesisUtterance(entry.content);
           const voices = window.speechSynthesis.getVoices();
           const selectedVoiceName = config.voice_gender === 'male' ? 'Alex' : 'Samantha';
@@ -161,17 +113,13 @@ const JournalDetail = () => {
             utterance.voice = selectedVoice;
           }
           utterance.rate = 1.0;
-          utterance.onend = () => {
-            setIsPlaying(false);
-          };
           window.speechSynthesis.speak(utterance);
         } else {
           toast.error("Text-to-speech is not supported in your browser");
-          setIsPlaying(false);
         }
         return;
       }
-      
+      // Use API-based TTS
       toast("Generating speech...");
       let audioBlob;
       try {
@@ -179,46 +127,68 @@ const JournalDetail = () => {
       } catch (apiError) {
         toast.error("TTS API error: " + (apiError instanceof Error ? apiError.message : String(apiError)));
         console.error("TTS API error:", apiError);
-        setIsPlaying(false);
         return;
       }
-      
       if (!audioBlob) {
         toast.error("No audio returned from TTS API");
-        setIsPlaying(false);
         return;
       }
-      
       try {
         const audioUrl = URL.createObjectURL(audioBlob as Blob);
         const audio = new Audio(audioUrl);
         audioRef.current = audio;
-        
         audio.onended = () => {
           URL.revokeObjectURL(audioUrl);
           audioRef.current = null;
-          setIsPlaying(false);
         };
-        
         audio.onerror = () => {
           URL.revokeObjectURL(audioUrl);
           audioRef.current = null;
-          setIsPlaying(false);
-          toast.error("Audio playback error");
         };
-        
         await audio.play();
       } catch (audioError) {
         toast.error("Failed to play audio: " + (audioError instanceof Error ? audioError.message : String(audioError)));
         console.error("Audio playback error:", audioError);
-        setIsPlaying(false);
       }
     } catch (error) {
       toast.error("Unexpected error: " + (error instanceof Error ? error.message : String(error)));
       console.error("Unexpected error in readAloud:", error);
-      setIsPlaying(false);
     }
-  };
+  }, [entry]);
+
+  useEffect(() => {
+    const fetchEntry = async () => {
+      if (!user || !id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from("journal_entries")
+          .select("*")
+          .eq("id", id)
+          .eq("user_id", user.id)
+          .single();
+
+        if (error) throw error;
+        setEntry(data as JournalEntry);
+        
+        // Auto-play if requested from the list view
+        if (location.state?.autoPlay && data) {
+          // Wait a brief moment for the component to fully render
+          setTimeout(() => {
+            readAloud();
+          }, 500);
+        }
+      } catch (error) {
+        console.error("Error fetching journal entry:", error);
+        toast.error("Failed to load journal entry");
+        navigate("/journal");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEntry();
+  }, [id, user, navigate, location.state]);
 
   if (loading) {
     return (
@@ -249,7 +219,7 @@ const JournalDetail = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto space-y-6 py-6">
+      <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <Link to="/journal">
@@ -261,22 +231,11 @@ const JournalDetail = () => {
             <h1 className="text-3xl font-bold">Journal Entry</h1>
           </div>
           <div className="space-x-2 flex items-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={readAloud}
-              className={cn(
-                isPlaying && "bg-green-100 text-green-600 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
-                hasBeenPlayed && !isPlaying && "text-green-600 border-green-300 dark:text-green-400 dark:border-green-800"
-              )}
-            >
-              <Volume2 className={cn("h-4 w-4 mr-1", isPlaying && "animate-pulse")} />
-              {isPlaying ? "Stop" : "Read Aloud"}
+            <Button variant="outline" onClick={readAloud}>
+              <Volume2 className="mr-2 h-4 w-4" />
+              Read Aloud
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => setDeleteDialogOpen(true)}
-            >
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(true)}>
               <Trash className="mr-2 h-4 w-4" />
               Delete
             </Button>
@@ -300,39 +259,15 @@ const JournalDetail = () => {
           </div>
         </div>
 
-        <Card 
-          className={cn(
-            "transition-all cursor-pointer",
-            isPlaying && "ring-2 ring-green-500 animate-pulse bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
-            hasBeenPlayed && !isPlaying && "ring-2 ring-green-500 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-          )}
-          onClick={readAloud}
-        >
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={readAloud}>
           <CardContent className="p-6">
-            <div className="prose dark:prose-invert max-w-none">
+            <div className="prose max-w-none">
               {entry.content.split("\n").map((paragraph, index) => (
                 <p key={index}>{paragraph}</p>
               ))}
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      <div className="fixed bottom-5 right-5">
-        <Button 
-          className={cn(
-            "rounded-full h-14 w-14 shadow-lg",
-            isPlaying && "bg-green-500 hover:bg-green-600 animate-pulse",
-            hasBeenPlayed && !isPlaying && "bg-green-100 text-green-600 border-green-300 hover:bg-green-200"
-          )}
-          onClick={readAloud}
-        >
-          {isPlaying ? (
-            <VolumeX className="h-6 w-6" />
-          ) : (
-            <Volume2 className="h-6 w-6" />
-          )}
-        </Button>
       </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
