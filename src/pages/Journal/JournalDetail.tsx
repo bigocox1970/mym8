@@ -5,7 +5,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Calendar, Clock, Edit, Trash, Volume2 } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Edit, Trash, Volume2, Play, Square } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { getConfig } from "@/lib/configManager";
 import { textToSpeech } from "@/lib/api";
@@ -38,23 +38,6 @@ export const JournalDetail = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-
-  // Set up a timer to check for playing state changes
-  useEffect(() => {
-    if (!id) return;
-    
-    const timer = setInterval(() => {
-      // Check if the current entry is playing
-      const playing = isEntryPlaying(id);
-      
-      // Update state if needed to trigger re-render
-      if (playing !== isPlaying) {
-        setIsPlaying(playing);
-      }
-    }, 500);
-    
-    return () => clearInterval(timer);
-  }, [id, isPlaying]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -96,14 +79,13 @@ export const JournalDetail = () => {
       toast.error("No content to read");
       return;
     }
-    
     // If already playing, stop it and return
-    if (isEntryPlaying(id)) {
+    if (isPlaying || isEntryPlaying(id)) {
       console.log('Stopping playback for entry:', id);
       stopAllAudio();
+      setIsPlaying(false); // Ensure UI updates immediately
       return;
     }
-    
     try {
       // Get configuration
       let config;
@@ -114,10 +96,7 @@ export const JournalDetail = () => {
         console.error("Config error:", e);
         return;
       }
-      
-      // Set loading state when starting to load audio
       setIsLoadingAudio(true);
-      
       const service = config.voice_service || 'browser';
       let voice = 'alloy';
       if (service === 'openai') voice = config.openai_voice || 'alloy';
@@ -125,10 +104,7 @@ export const JournalDetail = () => {
       if (service === 'google') voice = config.google_voice || 'en-US-Neural2-F';
       if (service === 'azure') voice = config.azure_voice || 'en-US-JennyNeural';
       if (service === 'amazon') voice = config.amazon_voice || 'Joanna';
-      
       console.log('Starting audio playback for entry:', id);
-      
-      // Use the chunked playback system
       await processAndPlayChunks(entry.content, {
         voiceService: service,
         voice: voice,
@@ -136,7 +112,6 @@ export const JournalDetail = () => {
         onChunkStart: (chunkIndex, totalChunks) => {
           console.log(`Starting chunk ${chunkIndex + 1}/${totalChunks}`);
           if (chunkIndex === 0) {
-            // First chunk is starting to play, clear loading state
             setIsLoadingAudio(false);
             setIsPlaying(true);
           }
@@ -147,7 +122,7 @@ export const JournalDetail = () => {
         onComplete: () => {
           console.log('All chunks complete');
           setIsLoadingAudio(false);
-          setIsPlaying(false);
+          setIsPlaying(false); // Ensure play button resets
         },
         onError: (error) => {
           console.error('Chunk playback error:', error);
@@ -162,7 +137,7 @@ export const JournalDetail = () => {
       setIsLoadingAudio(false);
       setIsPlaying(false);
     }
-  }, [entry, id]);
+  }, [entry, id, isPlaying]);
 
   useEffect(() => {
     const fetchEntry = async () => {
@@ -202,6 +177,7 @@ export const JournalDetail = () => {
   useEffect(() => {
     return () => {
       stopAllAudio();
+      setIsPlaying(false);
     };
   }, []);
 
@@ -246,13 +222,20 @@ export const JournalDetail = () => {
             <h1 className="text-3xl font-bold">Journal Entry</h1>
           </div>
           <div className="space-x-2 flex items-center">
-            <Button 
-              variant={isPlaying || isEntryPlaying(id) ? "default" : "outline"} 
+            <Button
+              variant={isPlaying ? "default" : "outline"}
               className={isLoadingAudio ? "animate-pulse" : ""}
               onClick={readAloud}
+              size="icon"
+              aria-label={isPlaying ? "Stop" : "Play"}
             >
-              <Volume2 className={`mr-2 h-4 w-4 ${isLoadingAudio ? "animate-pulse" : ""}`} />
-              {isLoadingAudio ? "Loading..." : isPlaying || isEntryPlaying(id) ? "Stop" : "Read Aloud"}
+              {isLoadingAudio ? (
+                <Play className="h-5 w-5 animate-pulse" />
+              ) : isPlaying ? (
+                <Square className="h-5 w-5 text-red-500" />
+              ) : (
+                <Play className="h-5 w-5" />
+              )}
             </Button>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(true)}>
               <Trash className="mr-2 h-4 w-4" />
@@ -280,7 +263,7 @@ export const JournalDetail = () => {
 
         <Card 
           className={`cursor-pointer hover:shadow-md transition-shadow ${
-            isPlaying || isEntryPlaying(id) ? "bg-green-50 dark:bg-green-900/20 ring-2 ring-green-500" : ""
+            isPlaying ? "bg-green-50 dark:bg-green-900/20 ring-2 ring-green-500" : ""
           }`} 
           onClick={readAloud}
         >

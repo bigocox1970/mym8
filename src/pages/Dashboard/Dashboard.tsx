@@ -450,6 +450,18 @@ const Dashboard = () => {
                     <span>Settings</span>
                   </Button>
                 </Link>
+                <Link to="/help">
+                  <Button variant="outline" className="w-full h-24 flex flex-col items-center justify-center gap-2 p-4 hover:bg-muted/50">
+                    <BookOpen className="h-6 w-6" />
+                    <span>Help</span>
+                  </Button>
+                </Link>
+                <Link to="/logs">
+                  <Button variant="outline" className="w-full h-24 flex flex-col items-center justify-center gap-2 p-4 hover:bg-muted/50">
+                    <ListTodo className="h-6 w-6" />
+                    <span>Activity Log</span>
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
@@ -517,80 +529,6 @@ const Dashboard = () => {
                         View All Actions
                       </Button>
                     </Link>
-                  </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Collapsible>
-          </Card>
-
-          {/* Goals Section */}
-          <Card>
-            <Collapsible open={isGoalsOpen} onOpenChange={setIsGoalsOpen}>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CollapsibleTrigger className="flex items-center gap-2 hover:opacity-80">
-                    <CardTitle className="flex items-center gap-2">
-                      <ListTodo className="h-5 w-5" />
-                      Help and AI Guide
-                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isGoalsOpen ? 'rotate-180' : ''}`} />
-                    </CardTitle>
-                  </CollapsibleTrigger>
-                  <CardDescription>Get help and learn about MyM8</CardDescription>
-                </div>
-                <Link to="/help">
-                  <Button size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Get Help
-                  </Button>
-                </Link>
-              </CardHeader>
-              <CollapsibleContent>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="p-3 border rounded-md hover:bg-muted/50 transition-colors">
-                      <Link to="/help/getting-started" className="block">
-                        <p className="font-medium">Getting Started</p>
-                        <p className="text-xs text-muted-foreground">
-                          Learn the basics of using MyM8
-                        </p>
-                      </Link>
-                    </div>
-                    
-                    <div className="p-3 border rounded-md hover:bg-muted/50 transition-colors">
-                      <Link to="/assistant" className="block">
-                        <p className="font-medium">Talk to MyM8</p>
-                        <p className="text-xs text-muted-foreground">
-                          Get personalized help from your AI assistant
-                        </p>
-                      </Link>
-                    </div>
-                    
-                    <div className="p-3 border rounded-md hover:bg-muted/50 transition-colors">
-                      <Link to="/help/features" className="block">
-                        <p className="font-medium">Features & Capabilities</p>
-                        <p className="text-xs text-muted-foreground">
-                          Discover what MyM8 can do for you
-                        </p>
-                      </Link>
-                    </div>
-                    
-                    <div className="p-3 border rounded-md hover:bg-muted/50 transition-colors">
-                      <Link to="/settings" className="block">
-                        <p className="font-medium">Customize MyM8</p>
-                        <p className="text-xs text-muted-foreground">
-                          Adjust settings to fit your preferences
-                        </p>
-                      </Link>
-                    </div>
-                    
-                    <div className="flex justify-end mt-4">
-                      <Link to="/help">
-                        <Button variant="outline" size="sm" className="text-xs">
-                          <ListTodo className="mr-1 h-3 w-3" />
-                          View All Help Topics
-                        </Button>
-                      </Link>
-                    </div>
                   </div>
                 </CardContent>
               </CollapsibleContent>

@@ -5,8 +5,9 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
-import { Mic, Square, Play, Save } from "lucide-react";
+import { Mic, Square, Play, Save, ArrowLeft } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { useTextToSpeech } from "@/hooks/use-text-to-speech";
 
 export const NewJournal = () => {
   const { user } = useAuth();
@@ -17,10 +18,29 @@ export const NewJournal = () => {
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const { speakText, isSpeaking, stopSpeaking } = useTextToSpeech();
 
-  const mockTranscribe = async (audioBlob: Blob): Promise<string> => {
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    return "This is a simulated transcription of your audio recording. In a real application, this would be the actual text from your voice recording, transcribed by a service like OpenAI Whisper API, Google Speech-to-Text, or similar.";
+  // Real transcription using OpenAI Whisper API
+  const transcribeWithOpenAI = async (audioBlob: Blob): Promise<string> => {
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    if (!apiKey) throw new Error("Missing OpenAI API key");
+    const formData = new FormData();
+    formData.append("file", audioBlob, "audio.webm");
+    formData.append("model", "whisper-1");
+    formData.append("response_format", "text");
+    
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: formData
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Transcription failed: ${errorText}`);
+    }
+    return await response.text();
   };
 
   const startRecording = async () => {
@@ -63,15 +83,13 @@ export const NewJournal = () => {
   const transcribeAudio = async (audioBlob: Blob) => {
     setIsTranscribing(true);
     try {
-      const transcription = await mockTranscribe(audioBlob);
-      
+      const transcription = await transcribeWithOpenAI(audioBlob);
       setContent(prev => {
         if (prev.trim()) {
           return `${prev}\n\n${transcription}`;
         }
         return transcription;
       });
-      
       toast.success("Audio transcribed successfully");
     } catch (error) {
       console.error("Transcription error:", error);
@@ -119,33 +137,47 @@ export const NewJournal = () => {
     <Layout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">New Journal Entry</h1>
-          <div className="space-x-2">
-            <Button 
-              variant={isRecording ? "destructive" : "outline"} 
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={isTranscribing}
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-3xl font-bold">New Journal Entry</h1>
+          </div>
+          <div className="space-x-2 flex items-center">
+            {/* Play Entry button (icon only, toggles to stop icon when playing) */}
+            <Button
+              variant={isSpeaking ? "default" : "outline"}
+              onClick={isSpeaking ? stopSpeaking : () => speakText(content)}
+              disabled={!content.trim() && !isSpeaking}
+              size="icon"
+              aria-label={isSpeaking ? "Stop" : "Play"}
             >
-              {isRecording ? (
-                <>
-                  <Square className="mr-2 h-4 w-4" />
-                  Stop Recording
-                </>
+              {isSpeaking ? (
+                <Square className="h-5 w-5 text-red-500" />
               ) : (
-                <>
-                  <Mic className="mr-2 h-4 w-4" />
-                  Start Recording
-                </>
+                <Play className="h-5 w-5" />
               )}
             </Button>
-            
+            {/* Mic (record) button */}
             <Button 
-              onClick={saveEntry} 
-              disabled={!content.trim() || isSaving || isTranscribing}
+              variant="outline"
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isTranscribing}
+              className={isRecording ? "animate-pulse bg-green-500 text-white" : ""}
+              size="icon"
+              aria-label={isRecording ? "Stop Recording" : "Start Recording"}
             >
-              <Save className="mr-2 h-4 w-4" />
-              {isSaving ? "Saving..." : "Save Entry"}
+              <Mic className="h-5 w-5" />
             </Button>
+            {content.trim() && (
+              <Button 
+                onClick={saveEntry} 
+                disabled={isSaving || isTranscribing}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {isSaving ? "Saving..." : "Save Entry"}
+              </Button>
+            )}
           </div>
         </div>
         

@@ -33,26 +33,6 @@ export const JournalList = () => {
     entryId: null
   });
 
-  // Set up a timer to check for playing state changes
-  useEffect(() => {
-    const timer = setInterval(() => {
-      // Get the current playing entry
-      const anyEntryPlaying = entries.some(entry => isEntryPlaying(entry.id));
-      const playingEntry = entries.find(entry => isEntryPlaying(entry.id));
-      
-      // Update state if needed to trigger re-render
-      if (anyEntryPlaying !== audioState.playing || 
-          (playingEntry && playingEntry.id !== audioState.entryId)) {
-        setAudioState({
-          playing: anyEntryPlaying,
-          entryId: playingEntry ? playingEntry.id : null
-        });
-      }
-    }, 500);
-    
-    return () => clearInterval(timer);
-  }, [entries, audioState]);
-
   useEffect(() => {
     const fetchEntries = async () => {
       if (!user) return;
@@ -82,24 +62,18 @@ export const JournalList = () => {
       console.error("No content to read");
       return;
     }
-    
     // If this entry is already playing, stop it and return
-    if (isEntryPlaying(entry.id)) {
+    if (audioState.playing && audioState.entryId === entry.id) {
       console.log('Stopping playback for entry:', entry.id);
       stopAllAudio();
-      
-      // Update UI to show stopped state
       setAudioState({
         playing: false,
         entryId: null
       });
-      
       return;
     }
-    
     // Always stop any currently playing audio before starting a new one
     stopAllAudio();
-    
     try {
       // Get configuration
       let config;
@@ -109,10 +83,7 @@ export const JournalList = () => {
         console.error("Config error:", e);
         return;
       }
-      
-      // Set loading state when audio starts loading
       setLoadingAudioId(entry.id);
-      
       const service = config.voice_service || 'browser';
       let voice = 'alloy';
       if (service === 'openai') voice = config.openai_voice || 'alloy';
@@ -120,11 +91,8 @@ export const JournalList = () => {
       if (service === 'google') voice = config.google_voice || 'en-US-Neural2-F';
       if (service === 'azure') voice = config.azure_voice || 'en-US-JennyNeural';
       if (service === 'amazon') voice = config.amazon_voice || 'Joanna';
-      
       console.log('Starting audio playback for entry:', entry.id);
       console.log(`[JOURNAL-DEBUG] Using voice service: ${service}, voice: ${voice}`);
-      
-      // Use the chunked playback system
       await processAndPlayChunks(entry.content, {
         voiceService: service,
         voice: voice,
@@ -132,9 +100,7 @@ export const JournalList = () => {
         onChunkStart: (chunkIndex, totalChunks) => {
           console.log(`Starting chunk ${chunkIndex + 1}/${totalChunks} for entry ${entry.id}`);
           if (chunkIndex === 0) {
-            // First chunk is starting to play, clear loading state
             setLoadingAudioId(null);
-            // Force a UI update
             setAudioState({
               playing: true,
               entryId: entry.id
@@ -147,7 +113,6 @@ export const JournalList = () => {
         onComplete: () => {
           console.log('All chunks complete for entry', entry.id);
           setLoadingAudioId(null);
-          // Force a UI update
           setAudioState({
             playing: false,
             entryId: null
@@ -155,14 +120,10 @@ export const JournalList = () => {
         },
         onError: (error) => {
           console.error('Chunk playback error:', error);
-          
-          // Don't show toast errors for expected interruptions
           if (!error.message.includes('interrupted') && !error.message.includes('canceled')) {
             console.error(`Unexpected playback error: ${error.message}`);
           }
-          
           setLoadingAudioId(null);
-          // Force a UI update
           setAudioState({
             playing: false,
             entryId: null
@@ -177,6 +138,14 @@ export const JournalList = () => {
         entryId: null
       });
     }
+  }, [audioState]);
+
+  // Stop audio playback when component unmounts
+  useEffect(() => {
+    return () => {
+      stopAllAudio();
+      setAudioState({ playing: false, entryId: null });
+    };
   }, []);
 
   const formatDate = (dateString: string) => {
@@ -231,7 +200,7 @@ export const JournalList = () => {
               <Card 
                 key={entry.id} 
                 className={`hover:shadow-md transition-shadow cursor-pointer ${
-                  isEntryPlaying(entry.id) || audioState.entryId === entry.id
+                  audioState.playing && audioState.entryId === entry.id
                     ? "bg-green-50 dark:bg-green-900/20 ring-2 ring-green-500" 
                     : ""
                 }`}
@@ -262,7 +231,7 @@ export const JournalList = () => {
                           </Button>
                         </Link>
                         <Button 
-                          variant={(isEntryPlaying(entry.id) || audioState.entryId === entry.id) ? "default" : "outline"} 
+                          variant={audioState.playing && audioState.entryId === entry.id ? "default" : "outline"} 
                           size="sm"
                           className={loadingAudioId === entry.id ? "animate-pulse" : ""}
                           onClick={(e) => {
@@ -271,7 +240,7 @@ export const JournalList = () => {
                           }}
                         >
                           <Volume2 className={`h-4 w-4 mr-1 ${loadingAudioId === entry.id ? "animate-pulse" : ""}`} />
-                          {isEntryPlaying(entry.id) || audioState.entryId === entry.id ? "Stop" : 
+                          {audioState.playing && audioState.entryId === entry.id ? "Stop" : 
                            loadingAudioId === entry.id ? "Loading..." : "Play"}
                         </Button>
                       </div>
