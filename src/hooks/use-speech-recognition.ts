@@ -3,7 +3,7 @@ import { toast } from '@/components/ui/sonner';
 import { SpeechRecognition, SpeechRecognitionEvent, SpeechRecognitionError } from '@/pages/AI/types';
 
 interface UseSpeechRecognitionProps {
-  onTranscript: (transcript: string) => void;
+  onTranscript: (transcript: string, isFinal: boolean) => void;
 }
 
 export function useSpeechRecognition({ onTranscript }: UseSpeechRecognitionProps) {
@@ -57,9 +57,9 @@ export function useSpeechRecognition({ onTranscript }: UseSpeechRecognitionProps
           .map(result => result[0])
           .map(result => result.transcript)
           .join('');
-          
-        console.log("Speech recognized:", transcript);
-        onTranscript(transcript);
+        const isFinal = event.results[event.results.length - 1].isFinal;
+        console.log("Speech recognized:", transcript, "isFinal:", isFinal);
+        onTranscript(transcript, isFinal);
         
         // On mobile, we often want to submit immediately after speaking
         if (isIOS && event.results[0].isFinal) {

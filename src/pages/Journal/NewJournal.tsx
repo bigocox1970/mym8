@@ -23,9 +23,11 @@ export const NewJournal = () => {
     toggleListening,
     isSpeechRecognitionSupported
   } = useSpeechRecognition({
-    onTranscript: (transcript) => {
-      setContent((prev) => prev.trim() ? `${prev}\n\n${transcript}` : transcript);
-      toast.success("Speech recognized and added to entry");
+    onTranscript: (transcript, isFinal) => {
+      if (isFinal) {
+        setContent((prev) => prev.trim() ? `${prev}\n\n${transcript}` : transcript);
+        toast.success("Speech recognized and added to entry");
+      }
     }
   });
 
