@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { Mic, Square, Play, Save, ArrowLeft } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
+import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 
 export const NewJournal = () => {
   const { user } = useAuth();
@@ -19,6 +20,22 @@ export const NewJournal = () => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { speakText, isSpeaking, stopSpeaking } = useTextToSpeech();
+
+  // Determine support for MediaRecorder and browser STT
+  const isMediaRecorderSupported = typeof window !== 'undefined' && 'MediaRecorder' in window;
+  const [browserSTTActive, setBrowserSTTActive] = useState(false);
+  const {
+    isListening: isBrowserSTTListening,
+    startListening: startBrowserSTT,
+    stopListening: stopBrowserSTT,
+    isSpeechRecognitionSupported
+  } = useSpeechRecognition({
+    onTranscript: (transcript) => {
+      setContent((prev) => prev.trim() ? `${prev}\n\n${transcript}` : transcript);
+      setBrowserSTTActive(false);
+      toast.success("Speech recognized and added to entry");
+    }
+  });
 
   // Real transcription using OpenAI Whisper API
   const transcribeWithOpenAI = async (audioBlob: Blob): Promise<string> => {
@@ -158,17 +175,46 @@ export const NewJournal = () => {
                 <Play className="h-5 w-5" />
               )}
             </Button>
-            {/* Mic (record) button */}
-            <Button 
-              variant="outline"
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={isTranscribing}
-              className={isRecording ? "animate-pulse bg-green-500 text-white" : ""}
-              size="icon"
-              aria-label={isRecording ? "Stop Recording" : "Start Recording"}
-            >
-              <Mic className="h-5 w-5" />
-            </Button>
+            {/* Mic (record) button for OpenAI Whisper (MediaRecorder) */}
+            {isMediaRecorderSupported ? (
+              <Button 
+                variant="outline"
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={isTranscribing}
+                className={isRecording ? "animate-pulse bg-green-500 text-white" : ""}
+                size="icon"
+                aria-label={isRecording ? "Stop Recording" : "Start Recording"}
+              >
+                <Mic className="h-5 w-5" />
+              </Button>
+            ) : null}
+            {/* Browser STT fallback button */}
+            {!isMediaRecorderSupported && isSpeechRecognitionSupported ? (
+              <Button
+                variant={isBrowserSTTListening ? "default" : "outline"}
+                onClick={() => {
+                  if (!isBrowserSTTListening) {
+                    setBrowserSTTActive(true);
+                    startBrowserSTT();
+                  } else {
+                    stopBrowserSTT();
+                    setBrowserSTTActive(false);
+                  }
+                }}
+                disabled={isTranscribing}
+                className={isBrowserSTTListening ? "animate-pulse bg-blue-500 text-white" : ""}
+                size="icon"
+                aria-label={isBrowserSTTListening ? "Stop Speech Recognition" : "Start Speech Recognition"}
+              >
+                <Mic className="h-5 w-5" />
+              </Button>
+            ) : null}
+            {/* If neither method is supported, show a disabled mic button with a tooltip */}
+            {!isMediaRecorderSupported && !isSpeechRecognitionSupported ? (
+              <Button variant="outline" disabled size="icon" aria-label="Speech input not supported">
+                <Mic className="h-5 w-5 opacity-50" />
+              </Button>
+            ) : null}
             {content.trim() && (
               <Button 
                 onClick={saveEntry} 
@@ -184,6 +230,12 @@ export const NewJournal = () => {
         {isTranscribing && (
           <div className="bg-blue-50 text-blue-700 p-4 rounded-md animate-pulse">
             Transcribing your recording... Please wait.
+          </div>
+        )}
+        
+        {browserSTTActive && isBrowserSTTListening && (
+          <div className="bg-blue-50 text-blue-700 p-4 rounded-md animate-pulse">
+            Listening... Speak now and your words will be transcribed.
           </div>
         )}
         
