@@ -617,18 +617,18 @@ const AIAssistant = () => {
   return (
     <Layout>
       {/* Fixed top header with hamburger menu - always visible */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-gray-900 text-white pt-2 pb-2">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gray-900 text-white pt-2 pb-2 px-4 md:px-8">
         <div className="flex items-center justify-between h-12">
           <span className="text-xl font-bold">MyM8 Dave</span>
           <MenuToggleButton />
         </div>
-        <div className="text-sm text-gray-300 pl-1 pb-2">
+        <div className="text-sm text-gray-300 pb-2">
           Chat with Dave your goal tracking AI assistant
         </div>
       </div>
       
-      {/* Chat header - positioned below the fixed top header */}
-      <div className="sticky top-[4.5rem] z-40 bg-background border-b mt-[5.5rem]">
+      {/* Chat header - fixed below the top header */}
+      <div className="fixed top-[5rem] left-0 right-0 z-40 bg-background border-b mt-0">
         <ChatHeader
           title={getCurrentConversationTitle()}
           showChatHistory={showChatHistory}
@@ -638,9 +638,9 @@ const AIAssistant = () => {
           onDeleteConversation={() => setShowDeleteDialog(true)}
         />
       </div>
-      {/* Main content, with adjusted height calculation to account for fixed headers */}
+      {/* Main content, with adjusted height calculation and padding to account for fixed headers */}
       <div className="w-full">
-        <div className="w-full h-[calc(100vh-16rem)] md:h-[calc(100vh-10rem)] flex flex-col no-scrollbar">
+        <div className="w-full h-[calc(100vh-16rem)] md:h-[calc(100vh-10rem)] flex flex-col no-scrollbar pt-[9rem]">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-4 flex-1 min-h-0 h-full">
             {/* Conversations sidebar */}
             <ChatHistory
