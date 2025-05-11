@@ -14,7 +14,6 @@ export const NewJournal = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [content, setContent] = useState("");
-  const [liveTranscript, setLiveTranscript] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const { speakText, isSpeaking, stopSpeaking } = useTextToSpeech();
 
@@ -25,7 +24,6 @@ export const NewJournal = () => {
     isSpeechRecognitionSupported
   } = useSpeechRecognition({
     onTranscript: (transcript, isFinal) => {
-      setLiveTranscript(isFinal ? "" : transcript);
       if (isFinal) {
         setContent((prev) => prev.trim() ? `${prev}\n\n${transcript}` : transcript);
         toast.success("Speech recognized and added to entry");
@@ -70,7 +68,7 @@ export const NewJournal = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-3xl font-bold">Entry</h1>
+            <h1 className="text-3xl font-bold">New</h1>
           </div>
           <div className="space-x-2 flex items-center">
             {/* Play Entry button (icon only, toggles to stop icon when playing) */}
@@ -121,7 +119,7 @@ export const NewJournal = () => {
         )}
         <div className="border rounded-md p-1">
           <Textarea
-            value={content + (liveTranscript ? (content ? "\n\n" : "") + liveTranscript : "")}
+            value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Start typing or use the mic to dictate your thoughts..."
             className="min-h-[300px] resize-none border-0 focus-visible:ring-0"

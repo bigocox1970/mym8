@@ -219,7 +219,6 @@ export const JournalDetail = () => {
                 Back
               </Button>
             </Link>
-            <h1 className="text-3xl font-bold">Entry</h1>
           </div>
           <div className="space-x-2 flex items-center">
             <Button
