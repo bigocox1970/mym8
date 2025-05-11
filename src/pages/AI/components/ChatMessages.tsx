@@ -9,14 +9,13 @@ import { getCachedAudioAsync, cacheAudioAsync } from '@/lib/audioCache';
 interface ChatMessagesProps {
   messages: Message[];
   onPlayMessage?: (messageContent: string, messageId: string) => void;
-  streamVersion?: number;
 }
 
 // Simple in-memory cache for last 10 audio blobs/URLs
 const audioCache = new Map<string, string>(); // messageId -> audioUrl
 const MAX_CACHE = 10;
 
-export function ChatMessages({ messages, onPlayMessage, streamVersion }: ChatMessagesProps) {
+export function ChatMessages({ messages, onPlayMessage }: ChatMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [audioStates, setAudioStates] = useState<Record<string, 'idle' | 'loading' | 'ready' | 'playing'>>({});
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
