@@ -23,16 +23,13 @@ export const NewJournal = () => {
 
   // Determine support for MediaRecorder and browser STT
   const isMediaRecorderSupported = typeof window !== 'undefined' && 'MediaRecorder' in window;
-  const [browserSTTActive, setBrowserSTTActive] = useState(false);
   const {
-    isListening: isBrowserSTTListening,
-    startListening: startBrowserSTT,
-    stopListening: stopBrowserSTT,
+    isListening,
+    toggleListening,
     isSpeechRecognitionSupported
   } = useSpeechRecognition({
     onTranscript: (transcript) => {
       setContent((prev) => prev.trim() ? `${prev}\n\n${transcript}` : transcript);
-      setBrowserSTTActive(false);
       toast.success("Speech recognized and added to entry");
     }
   });
@@ -191,20 +188,12 @@ export const NewJournal = () => {
             {/* Browser STT fallback button */}
             {!isMediaRecorderSupported && isSpeechRecognitionSupported ? (
               <Button
-                variant={isBrowserSTTListening ? "default" : "outline"}
-                onClick={() => {
-                  if (!isBrowserSTTListening) {
-                    setBrowserSTTActive(true);
-                    startBrowserSTT();
-                  } else {
-                    stopBrowserSTT();
-                    setBrowserSTTActive(false);
-                  }
-                }}
+                variant={isListening ? "default" : "outline"}
+                onClick={toggleListening}
                 disabled={isTranscribing}
-                className={isBrowserSTTListening ? "animate-pulse bg-blue-500 text-white" : ""}
+                className={isListening ? "animate-pulse bg-blue-500 text-white" : ""}
                 size="icon"
-                aria-label={isBrowserSTTListening ? "Stop Speech Recognition" : "Start Speech Recognition"}
+                aria-label={isListening ? "Stop Speech Recognition" : "Start Speech Recognition"}
               >
                 <Mic className="h-5 w-5" />
               </Button>
@@ -233,7 +222,7 @@ export const NewJournal = () => {
           </div>
         )}
         
-        {browserSTTActive && isBrowserSTTListening && (
+        {isListening && (
           <div className="bg-blue-50 text-blue-700 p-4 rounded-md animate-pulse">
             Listening... Speak now and your words will be transcribed.
           </div>
