@@ -617,18 +617,18 @@ const AIAssistant = () => {
   return (
     <Layout>
       {/* Fixed top header with hamburger menu - always visible */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-gray-900 text-white pt-2 pb-2 px-4 md:px-8">
-        <div className="flex items-center justify-between h-12">
+      <div className="fixed top-0 left-0 right-0 md:left-64 z-50 bg-gray-900 text-white pt-1 pb-1 px-4 md:px-8">
+        <div className="flex items-center justify-between h-10">
           <span className="text-xl font-bold">MyM8 Dave</span>
           <MenuToggleButton />
         </div>
-        <div className="text-sm text-gray-300 pb-2">
+        <div className="text-sm text-gray-300 pb-1">
           Chat with Dave your goal tracking AI assistant
         </div>
       </div>
       
       {/* Chat header - fixed below the top header */}
-      <div className="fixed top-[5rem] left-0 right-0 z-40 bg-background border-b mt-0">
+      <div className="fixed top-[4.25rem] left-0 right-0 md:left-64 z-40 bg-background border-b mt-0">
         <ChatHeader
           title={getCurrentConversationTitle()}
           showChatHistory={showChatHistory}
@@ -639,10 +639,10 @@ const AIAssistant = () => {
         />
       </div>
       {/* Main content, with adjusted height calculation and padding to account for fixed headers */}
-      <div className="w-full">
-        <div className="w-full h-[calc(100vh-16rem)] md:h-[calc(100vh-10rem)] flex flex-col no-scrollbar pt-[9rem]">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-4 flex-1 min-h-0 h-full">
-            {/* Conversations sidebar */}
+      <div className="w-full pt-[7.5rem]">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-4">
+          {/* Conversations sidebar - now with its own fixed height and independent scrolling */}
+          <div className="h-[calc(100vh-7.75rem)] md:h-[calc(100vh-6.75rem)]">
             <ChatHistory
               conversations={conversations}
               currentConversationId={currentConversationId}
@@ -652,38 +652,38 @@ const AIAssistant = () => {
               onNewConversation={() => setShowNewConversationDialog(true)}
               onDeleteConversations={handleDeleteMultipleConversations}
             />
-            {/* Main chat area */}
-            <div className={cn(
-              "lg:col-span-3 flex flex-col h-full min-h-0 w-full",
-              showChatHistory ? "hidden lg:flex" : "flex"
-            )}>
-              <Card className="flex flex-col flex-1 min-h-0 h-full relative overflow-hidden border-none shadow-md bg-background/95 dark:bg-background/90">
-                {/* Scrollable message area with invisible scrollbar - with increased padding at bottom to ensure content isn't hidden behind input on mobile */}
-                <div className="flex-1 min-h-0 h-full overflow-y-auto no-scrollbar pb-28 md:pb-20">
-                  <ChatMessages 
-                    messages={messages} 
-                    onPlayMessage={handlePlayMessage}
-                  />
-                </div>
-                {/* Fixed positioned footer at bottom of chat area for better mobile support */}
-                <div className="fixed md:absolute bottom-0 left-0 right-0 z-20 bg-background border-t w-full">
-                  <ChatInput
-                    input={input}
-                    setInput={handleInputChange}
-                    isProcessing={isProcessing}
-                    onSubmit={handleSubmit}
-                    isVoiceEnabled={isVoiceEnabled}
-                    toggleVoiceMode={toggleVoiceMode}
-                    isListening={isListening}
-                    toggleListening={toggleListening}
-                    isLoadingAudio={isLoadingAudio}
-                    isSpeaking={isSpeaking}
-                    isSubmitting={isSubmitting}
-                    stopSpeaking={stopSpeaking}
-                  />
-                </div>
-              </Card>
-            </div>
+          </div>
+          {/* Main chat area - with its own fixed height and independent scrolling */}
+          <div className={cn(
+            "lg:col-span-3 flex flex-col h-[calc(100vh-7.75rem)] md:h-[calc(100vh-6.75rem)]",
+            showChatHistory ? "hidden lg:flex" : "flex"
+          )}>
+            <Card className="flex flex-col h-full overflow-hidden border-none shadow-md bg-background/95 dark:bg-background/90 rounded-lg">
+              {/* Scrollable message area with invisible scrollbar and minimal bottom padding */}
+              <div className="flex-grow overflow-y-auto no-scrollbar pb-4">
+                <ChatMessages 
+                  messages={messages} 
+                  onPlayMessage={handlePlayMessage}
+                />
+              </div>
+              {/* Input area directly in the chat card */}
+              <div className="flex-shrink-0 bg-background border-t border-gray-200 dark:border-gray-800 px-2 sm:px-4">
+                <ChatInput
+                  input={input}
+                  setInput={handleInputChange}
+                  isProcessing={isProcessing}
+                  onSubmit={handleSubmit}
+                  isVoiceEnabled={isVoiceEnabled}
+                  toggleVoiceMode={toggleVoiceMode}
+                  isListening={isListening}
+                  toggleListening={toggleListening}
+                  isLoadingAudio={isLoadingAudio}
+                  isSpeaking={isSpeaking}
+                  isSubmitting={isSubmitting}
+                  stopSpeaking={stopSpeaking}
+                />
+              </div>
+            </Card>
           </div>
         </div>
       </div>

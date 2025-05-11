@@ -15,6 +15,101 @@ interface ChatMessagesProps {
 const audioCache = new Map<string, string>(); // messageId -> audioUrl
 const MAX_CACHE = 10;
 
+// Function to format message content for better display
+const formatMessageContent = (content: string) => {
+  if (!content) return null;
+  
+  // First, let's handle the case where the content might be a list with items separated by double line breaks
+  if (content.includes('\n\n')) {
+    const paragraphs = content.split('\n\n');
+    
+    // Check if most paragraphs look like list items
+    const listItemCount = paragraphs.filter(p => 
+      /^\d+\.\s/.test(p.trim()) || // Numbered list
+      /^[•\-*]\s/.test(p.trim())   // Bullet list
+    ).length;
+    
+    // If most paragraphs are list items, render as a list with extra spacing
+    if (listItemCount > 0 && listItemCount / paragraphs.length > 0.5) {
+      return (
+        <div className="space-y-4">
+          {paragraphs.map((paragraph, index) => {
+            if (!paragraph.trim()) return null;
+            
+            const isNumberedList = /^\d+\.\s/.test(paragraph.trim());
+            const isBulletList = /^[•\-*]\s/.test(paragraph.trim());
+            
+            if (isNumberedList || isBulletList) {
+              // For list items, add extra styling
+              return (
+                <div key={index} className="pl-2 border-l-2 border-gray-300 py-1">
+                  <strong>{paragraph.trim().split(' ')[0]}</strong> {paragraph.trim().split(' ').slice(1).join(' ')}
+                </div>
+              );
+            }
+            
+            return <p key={index} className="mb-2">{paragraph}</p>;
+          })}
+        </div>
+      );
+    }
+  }
+  
+  // Handle single-paragraph content that might contain a list with items on separate lines
+  const lines = content.split('\n');
+  
+  // If we have multiple lines, check if they form a list
+  if (lines.length > 1) {
+    // Check if lines start with list markers
+    const listItemCount = lines.filter(line => 
+      /^\d+\.\s/.test(line.trim()) || // Numbered list
+      /^[•\-*]\s/.test(line.trim())   // Bullet list
+    ).length;
+    
+    // If several lines are list items, render as a list
+    if (listItemCount > 0 && listItemCount / lines.length > 0.3) {
+      return (
+        <div className="space-y-2">
+          {lines.map((line, index) => {
+            if (!line.trim()) return <div key={index} className="h-2"></div>;
+            
+            const isNumberedList = /^\d+\.\s/.test(line.trim());
+            const isBulletList = /^[•\-*]\s/.test(line.trim());
+            
+            if (isNumberedList || isBulletList) {
+              // For list items, add extra styling
+              const parts = line.trim().split(' ');
+              const marker = parts[0];
+              const text = parts.slice(1).join(' ');
+              
+              return (
+                <div key={index} className="flex items-start">
+                  <span className="font-bold mr-2 min-w-[20px]">{marker}</span>
+                  <span>{text}</span>
+                </div>
+              );
+            }
+            
+            return <div key={index}>{line}</div>;
+          })}
+        </div>
+      );
+    }
+  }
+  
+  // If we get here, it's not a list, so render as normal paragraphs
+  const paragraphs = content.split('\n\n');
+  
+  return (
+    <div>
+      {paragraphs.map((paragraph, index) => {
+        if (!paragraph.trim()) return null;
+        return <p key={index} className="mb-3 last:mb-0">{paragraph}</p>;
+      })}
+    </div>
+  );
+};
+
 export function ChatMessages({ messages, onPlayMessage }: ChatMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [audioStates, setAudioStates] = useState<Record<string, 'idle' | 'loading' | 'ready' | 'playing'>>({});
@@ -181,7 +276,7 @@ export function ChatMessages({ messages, onPlayMessage }: ChatMessagesProps) {
 
   return (
     <div className="h-full overflow-y-auto no-scrollbar">
-      <div className="p-2 sm:p-4 space-y-3 sm:space-y-4 min-h-full">
+      <div className="p-2 sm:p-4 pb-0 space-y-3 sm:space-y-4 min-h-full">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -202,7 +297,9 @@ export function ChatMessages({ messages, onPlayMessage }: ChatMessagesProps) {
                 )}
               </div>
               <div>
-                <p className="text-sm whitespace-pre-line break-words">{message.content}</p>
+                <div className="text-sm whitespace-pre-line break-words">
+                  {formatMessageContent(message.content)}
+                </div>
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-[10px] sm:text-xs opacity-50">
                     {new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -226,7 +323,7 @@ export function ChatMessages({ messages, onPlayMessage }: ChatMessagesProps) {
             </div>
           </div>
         ))}
-        <div ref={messagesEndRef} className="h-4" />
+        <div ref={messagesEndRef} className="h-6" />
       </div>
     </div>
   );
