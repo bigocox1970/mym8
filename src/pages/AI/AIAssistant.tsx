@@ -667,8 +667,8 @@ const AIAssistant = () => {
                     onPlayMessage={handlePlayMessage}
                   />
                 </div>
-                {/* Fixed footer at bottom of viewport */}
-                <div className="fixed bottom-0 left-0 right-0 z-20 bg-background border-t md:left-64 lg:left-1/4">
+                {/* Absolute positioned footer at bottom of chat area */}
+                <div className="absolute bottom-0 left-0 right-0 z-20 bg-background border-t w-full">
                   <ChatInput
                     input={input}
                     setInput={handleInputChange}
