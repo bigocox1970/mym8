@@ -142,7 +142,14 @@ const ActivityLog = () => {
         };
       });
       
-      setLogItems(transformedLogs);
+      console.log(`Transformed ${transformedLogs.length} log items`);
+    
+    // Check for missing tasks or goals
+    const missingTaskCount = transformedLogs.filter(log => log.action_title === "Unknown Action").length;
+    const missingGoalCount = transformedLogs.filter(log => log.goal_title === "Unknown Goal").length;
+    console.log(`Items with missing tasks: ${missingTaskCount}, Items with missing goals: ${missingGoalCount}`);
+    
+    setLogItems(transformedLogs);
     } catch (error) {
       console.error("Error fetching activity logs:", error);
       toast.error("Failed to load activity logs");
@@ -346,7 +353,7 @@ const ActivityLog = () => {
             {loading ? (
               <div className="text-center py-8">Loading activity logs...</div>
             ) : filteredItems.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-4 no-scrollbar">
                 {filteredItems.map((item) => (
                   <div className="border-t py-4" key={item.id}>
                     <div className="flex justify-between items-start">

@@ -416,7 +416,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
           </aside>
         )}
         {/* Main content */}
-        <main className="flex-1 dark:bg-gray-900 dark:text-white w-full overflow-y-auto h-screen">
+        <main className="flex-1 dark:bg-gray-900 dark:text-white w-full overflow-y-auto h-screen no-scrollbar">
           <div className="p-4 md:p-8 w-full">
             {children}
           </div>
