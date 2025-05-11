@@ -31,6 +31,7 @@ import { Message } from "./types";
 const AIAssistant = () => {
   const { user, profile } = useAuth();
   const [input, setInput] = useState("");
+  const [inputLocked, setInputLocked] = useState(false);
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [showNewConversationDialog, setShowNewConversationDialog] = useState(false);
   const [newConversationTitle, setNewConversationTitle] = useState("");
@@ -164,7 +165,9 @@ const AIAssistant = () => {
     isListening,
     toggleListening
   } = useSpeechRecognition({
-    onTranscript: (transcript) => setInput(transcript)
+    onTranscript: (transcript) => {
+      if (!inputLocked) setInput(transcript);
+    }
   });
 
   // Check for a predefined question in localStorage and process it
@@ -576,7 +579,7 @@ const AIAssistant = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isProcessing || !currentConversationId) return;
-    
+    setInputLocked(true);
     // Create user message
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -600,7 +603,14 @@ const AIAssistant = () => {
       console.error("Error in handleSubmit:", error);
     } finally {
       setIsSubmitting(false);
+      setInputLocked(false);
     }
+  };
+
+  // Unlock input when user types
+  const handleInputChange = (val: string) => {
+    setInput(val);
+    setInputLocked(false);
   };
 
   // Handle creating a new conversation
@@ -633,79 +643,76 @@ const AIAssistant = () => {
 
   return (
     <Layout>
-      <div className="w-full h-[calc(100vh-4rem)] flex flex-col">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              MyM8 {assistantName && ` ${assistantName}`}
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              Chat with {assistantName ? `${assistantName} your` : "your"} goal tracking AI assistant
-            </p>
-          </div>
+      {/* Main sticky header */}
+      <header className="fixed top-0 left-0 w-full z-50 bg-gray-50 dark:bg-gray-900 border-b h-20 flex flex-col justify-center px-4 shadow-sm">
+        <div className="flex items-center justify-between h-12">
+          <span className="text-xl font-bold">MyM8 Dave</span>
           <MenuToggleButton />
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-4 flex-1 min-h-0">
-          {/* Conversations sidebar */}
-          <ChatHistory
-            conversations={conversations}
-            currentConversationId={currentConversationId}
-            showChatHistory={showChatHistory}
-            setShowChatHistory={setShowChatHistory}
-            setCurrentConversationId={handleConversationChange}
-            onNewConversation={() => setShowNewConversationDialog(true)}
-            onDeleteConversations={handleDeleteMultipleConversations}
-          />
-
-          {/* Main chat area - Fixed layout with sticky header and footer */}
-          <div className={cn(
-            "lg:col-span-3 flex flex-col h-[calc(100vh-10rem)] relative",
-            showChatHistory ? "hidden lg:flex" : "flex"
-          )}>
-            <Card className="border-none shadow-md flex flex-col flex-1 relative overflow-hidden bg-background/95 dark:bg-background/90">
-              {/* Sticky header */}
-              <div className="sticky top-0 z-10 bg-background/95 dark:bg-background/90 border-b">
-                <ChatHeader
-                  title={getCurrentConversationTitle()}
-                  showChatHistory={showChatHistory}
-                  setShowChatHistory={setShowChatHistory}
-                  onNewConversation={() => setShowNewConversationDialog(true)}
-                  onClearConversation={clearCurrentConversation}
-                  onDeleteConversation={() => setShowDeleteDialog(true)}
-                />
-              </div>
-              
-              {/* Scrollable message area - using flex instead of fixed height */}
-              <div className="flex-1 overflow-y-auto mb-[105px] sm:mb-[120px]">
-                <ChatMessages 
-                  messages={messages} 
-                  onPlayMessage={handlePlayMessage}
-                />
-              </div>
-              
-              {/* Fixed footer at bottom */}
-              <div className="absolute bottom-0 left-0 right-0 z-10 bg-background border-t">
-                <ChatInput
-                  input={input}
-                  setInput={setInput}
-                  isProcessing={isProcessing}
-                  onSubmit={handleSubmit}
-                  isVoiceEnabled={isVoiceEnabled}
-                  toggleVoiceMode={toggleVoiceMode}
-                  isListening={isListening}
-                  toggleListening={toggleListening}
-                  isLoadingAudio={isLoadingAudio}
-                  isSpeaking={isSpeaking}
-                  isSubmitting={isSubmitting}
-                  stopSpeaking={stopSpeaking}
-                />
-              </div>
-            </Card>
+        <div className="text-sm text-muted-foreground pl-1 pb-2">
+          Chat with Dave your goal tracking AI assistant
+        </div>
+      </header>
+      {/* Chat header sticky under main header */}
+      <div className="sticky top-20 z-40 bg-background border-b w-full">
+        <ChatHeader
+          title={getCurrentConversationTitle()}
+          showChatHistory={showChatHistory}
+          setShowChatHistory={setShowChatHistory}
+          onNewConversation={() => setShowNewConversationDialog(true)}
+          onClearConversation={clearCurrentConversation}
+          onDeleteConversation={() => setShowDeleteDialog(true)}
+        />
+      </div>
+      {/* Main content, with enough top padding */}
+      <div className="w-full">
+        <div className="w-full h-[calc(100vh-4rem)] flex flex-col no-scrollbar">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-4 flex-1 min-h-0 h-full">
+            {/* Conversations sidebar */}
+            <ChatHistory
+              conversations={conversations}
+              currentConversationId={currentConversationId}
+              showChatHistory={showChatHistory}
+              setShowChatHistory={setShowChatHistory}
+              setCurrentConversationId={handleConversationChange}
+              onNewConversation={() => setShowNewConversationDialog(true)}
+              onDeleteConversations={handleDeleteMultipleConversations}
+            />
+            {/* Main chat area */}
+            <div className={cn(
+              "lg:col-span-3 flex flex-col h-full min-h-0 w-full",
+              showChatHistory ? "hidden lg:flex" : "flex"
+            )}>
+              <Card className="flex flex-col flex-1 min-h-0 h-full relative overflow-hidden border-none shadow-md bg-background/95 dark:bg-background/90">
+                {/* Scrollable message area with invisible scrollbar */}
+                <div className="flex-1 min-h-0 h-full overflow-y-auto no-scrollbar">
+                  <ChatMessages 
+                    messages={messages} 
+                    onPlayMessage={handlePlayMessage}
+                  />
+                </div>
+                {/* Sticky footer at bottom */}
+                <div className="sticky bottom-0 left-0 right-0 z-20 bg-background border-t">
+                  <ChatInput
+                    input={input}
+                    setInput={handleInputChange}
+                    isProcessing={isProcessing}
+                    onSubmit={handleSubmit}
+                    isVoiceEnabled={isVoiceEnabled}
+                    toggleVoiceMode={toggleVoiceMode}
+                    isListening={isListening}
+                    toggleListening={toggleListening}
+                    isLoadingAudio={isLoadingAudio}
+                    isSpeaking={isSpeaking}
+                    isSubmitting={isSubmitting}
+                    stopSpeaking={stopSpeaking}
+                  />
+                </div>
+              </Card>
+            </div>
           </div>
         </div>
       </div>
-      
       {/* Dialogs */}
       <NewConversationDialog
         open={showNewConversationDialog}
@@ -714,7 +721,6 @@ const AIAssistant = () => {
         setTitle={setNewConversationTitle}
         onCreateConversation={handleNewConversation}
       />
-      
       <DeleteConversationDialog
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
