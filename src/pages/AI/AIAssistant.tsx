@@ -640,9 +640,9 @@ const AIAssistant = () => {
           />
         </div>
       </div>
-      {/* Main content, with enough top padding */}
+      {/* Main content, with fixed height calculation that works better on mobile */}
       <div className="w-full">
-        <div className="w-full h-[calc(100vh-4rem)] flex flex-col no-scrollbar">
+        <div className="w-full h-[calc(100vh-10rem)] md:h-[calc(100vh-4rem)] flex flex-col no-scrollbar">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-4 flex-1 min-h-0 h-full">
             {/* Conversations sidebar */}
             <ChatHistory
@@ -660,15 +660,15 @@ const AIAssistant = () => {
               showChatHistory ? "hidden lg:flex" : "flex"
             )}>
               <Card className="flex flex-col flex-1 min-h-0 h-full relative overflow-hidden border-none shadow-md bg-background/95 dark:bg-background/90">
-                {/* Scrollable message area with invisible scrollbar - with padding at bottom to ensure content isn't hidden behind input */}
-                <div className="flex-1 min-h-0 h-full overflow-y-auto no-scrollbar pb-20">
+                {/* Scrollable message area with invisible scrollbar - with increased padding at bottom to ensure content isn't hidden behind input on mobile */}
+                <div className="flex-1 min-h-0 h-full overflow-y-auto no-scrollbar pb-28 md:pb-20">
                   <ChatMessages 
                     messages={messages} 
                     onPlayMessage={handlePlayMessage}
                   />
                 </div>
-                {/* Absolute positioned footer at bottom of chat area */}
-                <div className="absolute bottom-0 left-0 right-0 z-20 bg-background border-t w-full">
+                {/* Fixed positioned footer at bottom of chat area for better mobile support */}
+                <div className="fixed md:absolute bottom-0 left-0 right-0 z-20 bg-background border-t w-full">
                   <ChatInput
                     input={input}
                     setInput={handleInputChange}
