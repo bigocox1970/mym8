@@ -237,6 +237,11 @@ export function useTextToSpeech({ initialEnabled = false }: UseTextToSpeechProps
       const audioUrl = URL.createObjectURL(audioBlob);
       const audioElement = new Audio(audioUrl);
       audioElementRef.current = audioElement;
+      // Ensure mobile speaker playback
+      audioElement.setAttribute('playsinline', 'true');
+      audioElement.setAttribute('autoplay', 'true');
+      audioElement.setAttribute('webkit-playsinline', 'true');
+      audioElement.crossOrigin = 'anonymous';
       
       // Set up event handlers
       audioElement.onended = () => {

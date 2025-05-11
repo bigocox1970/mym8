@@ -70,7 +70,7 @@ export const NewJournal = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-3xl font-bold">New Entry</h1>
+            <h1 className="text-3xl font-bold">Entry</h1>
           </div>
           <div className="space-x-2 flex items-center">
             {/* Play Entry button (icon only, toggles to stop icon when playing) */}
