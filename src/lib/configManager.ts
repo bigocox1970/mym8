@@ -1,7 +1,6 @@
 import appConfig from '@/config/app-config.json';
 import { toast } from '@/components/ui/sonner';
 import { supabase } from '@/lib/supabaseClient';
-import { Database } from '@/types/supabase';
 
 // Define the configuration interface
 export interface AppConfig {
@@ -44,6 +43,27 @@ delete (currentConfig as AppConfig & ApiKeyProperties).openai_api_key;
  * @returns The current application configuration
  */
 export function getConfig(): AppConfig {
+  // Always read from localStorage if available, to ensure latest settings are used
+  const savedConfig = localStorage.getItem('app-config');
+  if (savedConfig) {
+    try {
+      const parsedConfig = JSON.parse(savedConfig);
+      // Remove any API keys that might be in localStorage
+      delete parsedConfig.elevenlabs_api_key;
+      delete parsedConfig.google_api_key;
+      delete parsedConfig.azure_api_key;
+      delete parsedConfig.amazon_api_key;
+      delete parsedConfig.openai_api_key;
+      // Skip the default M8 assistant name
+      if (parsedConfig.assistant_name === 'M8') {
+        parsedConfig.assistant_name = '';
+      }
+      return { ...currentConfig, ...parsedConfig };
+    } catch (e: unknown) {
+      // Fallback to in-memory config if parsing fails
+      return { ...currentConfig };
+    }
+  }
   return { ...currentConfig };
 }
 
@@ -106,7 +126,7 @@ export async function updateConfig(newConfig: Partial<AppConfig>): Promise<void>
               toast.error('Failed to save preferences to database');
             }
           }
-        } catch (dbError: any) {
+        } catch (dbError: unknown) {
           console.error('Database operation failed:', dbError);
           toast.error('Failed to save preferences to database');
         }
