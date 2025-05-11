@@ -36,7 +36,8 @@ const styles = `
 // Context to share sidebar state with page components
 export const SidebarContext = React.createContext({
   toggleSidebar: () => {},
-  isOpen: true
+  isOpen: true,
+  setSidebarOpen: (open: boolean) => {},
 });
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
@@ -209,7 +210,8 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
   // Context value
   const contextValue = {
     toggleSidebar,
-    isOpen: sidebarOpen
+    isOpen: sidebarOpen,
+    setSidebarOpen,
   };
 
   return (
@@ -220,200 +222,197 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
       <div className="h-screen w-full bg-gray-50 flex dark:bg-gray-900 overflow-hidden">
         {/* Sidebar */}
         {user && (
-          <aside 
-            className={`${
-              sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-            } fixed md:static h-full z-40 w-64 bg-white border-r shadow-sm dark:bg-gray-800 dark:border-gray-700 flex flex-col transition-transform duration-300 ease-in-out`}
-            style={{ height: '100vh', maxHeight: '100vh', top: 0 }}
-          >
-            <div className="flex-shrink-0 pt-4 pb-4 flex justify-center items-center border-b dark:border-gray-700">
-              <Link to="/dashboard" className="flex justify-center w-full">
-                <img 
-                  src="/mym8-logo1.png" 
-                  alt="MyM8 Logo" 
-                  className="w-4/5 max-w-40" 
-                />
-              </Link>
-            </div>
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <nav className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
-                <Link to="/dashboard">
-                  <Button 
-                    variant={isActive("/dashboard") ? "default" : "ghost"} 
-                    className="w-full justify-start"
-                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
-                  >
-                    <Home className="mr-2 h-4 w-4" />
-                    <span>Dashboard</span>
-                  </Button>
+          <>
+            {/* Overlay for mobile sidebar */}
+            {sidebarOpen && (
+              <div
+                className="fixed inset-0 bg-black bg-opacity-40 z-40 md:hidden"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Close sidebar overlay"
+              />
+            )}
+            <aside 
+              className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed md:static h-full z-50 w-64 bg-white border-r shadow-sm dark:bg-gray-800 dark:border-gray-700 flex flex-col transition-transform duration-300 ease-in-out`}
+              style={{ height: '100vh', maxHeight: '100vh', top: 0 }}
+            >
+              <div className="flex-shrink-0 pt-4 pb-4 flex justify-center items-center border-b dark:border-gray-700">
+                <Link to="/dashboard" className="flex justify-center w-full" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                  <img 
+                    src="/mym8-logo1.png" 
+                    alt="MyM8 Logo" 
+                    className="w-4/5 max-w-40" 
+                  />
                 </Link>
-                <Link to="/goals">
-                  <Button 
-                    variant={isActive("/goals") ? "default" : "ghost"} 
-                    className="w-full justify-start"
-                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
-                  >
-                    <ListTodo className="mr-2 h-4 w-4" />
-                    <span>Goals</span>
-                  </Button>
-                </Link>
-                <Link to="/actions">
-                  <Button 
-                    variant={isActive("/actions") ? "default" : "ghost"} 
-                    className="w-full justify-start"
-                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
-                  >
-                    <CheckSquare className="mr-2 h-4 w-4" />
-                    <span>Actions</span>
-                  </Button>
-                </Link>
-                <Link to="/todo">
-                  <Button 
-                    variant={isActive("/todo") ? "default" : "ghost"} 
-                    className="w-full justify-start"
-                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
-                  >
-                    <ListTodo className="mr-2 h-4 w-4" />
-                    <span>To Do List</span>
-                  </Button>
-                </Link>
-                <Link to="/logs">
-                  <Button 
-                    variant={isActive("/logs") ? "default" : "ghost"} 
-                    className="w-full justify-start"
-                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
-                  >
-                    <ClipboardList className="mr-2 h-4 w-4" />
-                    <span>Activity Log</span>
-                  </Button>
-                </Link>
-                <Link to="/journal">
-                  <Button 
-                    variant={isActive("/journal") ? "default" : "ghost"} 
-                    className="w-full justify-start"
-                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
-                  >
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    <span>Journal</span>
-                  </Button>
-                </Link>
-                <Link to="/pricing">
-                  <Button 
-                    variant={isActive("/pricing") ? "default" : "ghost"} 
-                    className="w-full justify-start"
-                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
-                  >
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    <span>Subscription Plans</span>
-                  </Button>
-                </Link>
-                <Link to="/assistant">
-                  <Button 
-                    variant={isActive("/assistant") ? "default" : "ghost"} 
-                    className="w-full justify-start"
-                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
-                  >
-                    <Bot className="mr-2 h-4 w-4" />
-                    <span>AI Assistant</span>
-                  </Button>
-                </Link>
-                <Link to="/help">
-                  <Button 
-                    variant={isActive("/help") ? "default" : "ghost"} 
-                    className="w-full justify-start"
-                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
-                  >
-                    <HelpCircle className="mr-2 h-4 w-4" />
-                    <span>Help & AI Guide</span>
-                  </Button>
-                </Link>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
+              </div>
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <nav className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
+                  <Link to="/dashboard" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
                     <Button 
-                      variant={isActive("/wizard") ? "default" : "ghost"} 
+                      variant={isActive("/dashboard") ? "default" : "ghost"} 
+                      className="w-full justify-start"
+                    >
+                      <Home className="mr-2 h-4 w-4" />
+                      <span>Dashboard</span>
+                    </Button>
+                  </Link>
+                  <Link to="/goals" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    <Button 
+                      variant={isActive("/goals") ? "default" : "ghost"} 
+                      className="w-full justify-start"
+                    >
+                      <ListTodo className="mr-2 h-4 w-4" />
+                      <span>Goals</span>
+                    </Button>
+                  </Link>
+                  <Link to="/actions" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    <Button 
+                      variant={isActive("/actions") ? "default" : "ghost"} 
+                      className="w-full justify-start"
+                    >
+                      <CheckSquare className="mr-2 h-4 w-4" />
+                      <span>Actions</span>
+                    </Button>
+                  </Link>
+                  <Link to="/todo" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    <Button 
+                      variant={isActive("/todo") ? "default" : "ghost"} 
+                      className="w-full justify-start"
+                    >
+                      <ListTodo className="mr-2 h-4 w-4" />
+                      <span>To Do List</span>
+                    </Button>
+                  </Link>
+                  <Link to="/logs" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    <Button 
+                      variant={isActive("/logs") ? "default" : "ghost"} 
+                      className="w-full justify-start"
+                    >
+                      <ClipboardList className="mr-2 h-4 w-4" />
+                      <span>Activity Log</span>
+                    </Button>
+                  </Link>
+                  <Link to="/journal" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    <Button 
+                      variant={isActive("/journal") ? "default" : "ghost"} 
+                      className="w-full justify-start"
+                    >
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      <span>Journal</span>
+                    </Button>
+                  </Link>
+                  <Link to="/pricing" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    <Button 
+                      variant={isActive("/pricing") ? "default" : "ghost"} 
                       className="w-full justify-start"
                     >
                       <Sparkles className="mr-2 h-4 w-4" />
-                      <span>Setup Wizard</span>
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="max-w-md">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Run Setup Wizard Again?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Choose how you'd like to proceed with the wizard:
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-1 gap-3">
-                        <Button
-                          variant="outline"
-                          className="w-full p-3 h-auto flex flex-col items-center space-y-1 text-center"
-                          onClick={() => handleResetWizard(true)}
-                          disabled={resetWizardLoading}
-                        >
-                          <ArrowRight className="h-6 w-6 mb-1" />
-                          <span className="font-semibold">Keep Existing Data</span>
-                          <p className="text-xs text-muted-foreground">
-                            Keep all your current goals and actions while updating settings
-                          </p>
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          className="w-full p-3 h-auto flex flex-col items-center space-y-1 text-center"
-                          onClick={() => handleResetWizard(false)}
-                          disabled={resetWizardLoading}
-                        >
-                          <Trash className="h-6 w-6 mb-1" />
-                          <span className="font-semibold">Start Fresh</span>
-                          <p className="text-xs text-muted-foreground">
-                            Delete all existing goals and actions and start over completely
-                          </p>
-                        </Button>
-                      </div>
-                    </div>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                <Link to="/settings">
-                  <Button 
-                    variant={isActive("/settings") ? "default" : "ghost"} 
-                    className="w-full justify-start"
-                    onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
-                  >
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </Button>
-                </Link>
-                {user?.email === "admin@mym8.app" && (
-                  <Link to="/admin">
-                    <Button 
-                      variant={isActive("/admin") ? "default" : "ghost"} 
-                      className="w-full justify-start"
-                      onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
-                    >
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Admin</span>
+                      <span>Subscription Plans</span>
                     </Button>
                   </Link>
-                )}
-              </nav>
-              <div className="sticky bottom-0 p-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800 shadow-[0_-1px_2px_rgba(0,0,0,0.1)]">
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start font-medium" 
-                  onClick={handleSignOut}
-                  disabled={loading}
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>{loading ? "Logging out..." : "Logout"}</span>
-                </Button>
+                  <Link to="/assistant" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    <Button 
+                      variant={isActive("/assistant") ? "default" : "ghost"} 
+                      className="w-full justify-start"
+                    >
+                      <Bot className="mr-2 h-4 w-4" />
+                      <span>AI Assistant</span>
+                    </Button>
+                  </Link>
+                  <Link to="/help" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    <Button 
+                      variant={isActive("/help") ? "default" : "ghost"} 
+                      className="w-full justify-start"
+                    >
+                      <HelpCircle className="mr-2 h-4 w-4" />
+                      <span>Help & AI Guide</span>
+                    </Button>
+                  </Link>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant={isActive("/wizard") ? "default" : "ghost"} 
+                        className="w-full justify-start"
+                      >
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        <span>Setup Wizard</span>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="max-w-md">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Run Setup Wizard Again?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Choose how you'd like to proceed with the wizard:
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-1 gap-3">
+                          <Button
+                            variant="outline"
+                            className="w-full p-3 h-auto flex flex-col items-center space-y-1 text-center"
+                            onClick={() => handleResetWizard(true)}
+                            disabled={resetWizardLoading}
+                          >
+                            <ArrowRight className="h-6 w-6 mb-1" />
+                            <span className="font-semibold">Keep Existing Data</span>
+                            <p className="text-xs text-muted-foreground">
+                              Keep all your current goals and actions while updating settings
+                            </p>
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            className="w-full p-3 h-auto flex flex-col items-center space-y-1 text-center"
+                            onClick={() => handleResetWizard(false)}
+                            disabled={resetWizardLoading}
+                          >
+                            <Trash className="h-6 w-6 mb-1" />
+                            <span className="font-semibold">Start Fresh</span>
+                            <p className="text-xs text-muted-foreground">
+                              Delete all existing goals and actions and start over completely
+                            </p>
+                          </Button>
+                        </div>
+                      </div>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                  <Link to="/settings" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    <Button 
+                      variant={isActive("/settings") ? "default" : "ghost"} 
+                      className="w-full justify-start"
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </Button>
+                  </Link>
+                  {user?.email === "admin@mym8.app" && (
+                    <Link to="/admin" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                      <Button 
+                        variant={isActive("/admin") ? "default" : "ghost"} 
+                        className="w-full justify-start"
+                      >
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Admin</span>
+                      </Button>
+                    </Link>
+                  )}
+                </nav>
+                <div className="sticky bottom-0 p-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800 shadow-[0_-1px_2px_rgba(0,0,0,0.1)]">
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start font-medium" 
+                    onClick={handleSignOut}
+                    disabled={loading}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>{loading ? "Logging out..." : "Logout"}</span>
+                  </Button>
+                </div>
               </div>
-            </div>
-          </aside>
+            </aside>
+          </>
         )}
         {/* Main content */}
         <main className="flex-1 dark:bg-gray-900 dark:text-white w-full overflow-y-auto h-screen no-scrollbar">
@@ -428,14 +427,13 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
 // Export a menu button component that can be used directly in page headers
 export const MenuToggleButton = () => {
-  const { toggleSidebar, isOpen } = React.useContext(SidebarContext);
-  
+  const { isOpen, setSidebarOpen } = React.useContext(SidebarContext);
   return (
     <Button
       variant="outline"
       size="icon"
       className="md:hidden bg-white text-gray-800"
-      onClick={toggleSidebar}
+      onClick={() => setSidebarOpen(!isOpen)}
     >
       {isOpen ? <X size={20} /> : <Menu size={20} />}
     </Button>

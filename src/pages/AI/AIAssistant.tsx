@@ -616,26 +616,29 @@ const AIAssistant = () => {
 
   return (
     <Layout>
-      {/* Main sticky header */}
-      <header className="fixed top-0 left-0 w-full z-50 bg-gray-50 dark:bg-gray-900 border-b h-20 flex flex-col justify-center px-4 shadow-sm">
-        <div className="flex items-center justify-between h-12">
-          <span className="text-xl font-bold">MyM8 Dave</span>
-          <MenuToggleButton />
+      {/* Combined sticky header containing both the page header and chat controls */}
+      <div className="sticky top-0 z-40">
+        {/* Page-specific header - using dark background to match page color */}
+        <div className="pt-2 pb-2 bg-gray-900 text-white">
+          <div className="flex items-center justify-between h-12">
+            <span className="text-xl font-bold">MyM8 Dave</span>
+            <MenuToggleButton />
+          </div>
+          <div className="text-sm text-gray-300 pl-1 pb-2">
+            Chat with Dave your goal tracking AI assistant
+          </div>
         </div>
-        <div className="text-sm text-muted-foreground pl-1 pb-2">
-          Chat with Dave your goal tracking AI assistant
+        {/* Chat header - keeping original background */}
+        <div className="bg-background border-b">
+          <ChatHeader
+            title={getCurrentConversationTitle()}
+            showChatHistory={showChatHistory}
+            setShowChatHistory={setShowChatHistory}
+            onNewConversation={() => setShowNewConversationDialog(true)}
+            onClearConversation={clearCurrentConversation}
+            onDeleteConversation={() => setShowDeleteDialog(true)}
+          />
         </div>
-      </header>
-      {/* Chat header sticky under main header */}
-      <div className="sticky top-20 z-40 bg-background border-b w-full">
-        <ChatHeader
-          title={getCurrentConversationTitle()}
-          showChatHistory={showChatHistory}
-          setShowChatHistory={setShowChatHistory}
-          onNewConversation={() => setShowNewConversationDialog(true)}
-          onClearConversation={clearCurrentConversation}
-          onDeleteConversation={() => setShowDeleteDialog(true)}
-        />
       </div>
       {/* Main content, with enough top padding */}
       <div className="w-full">
@@ -657,15 +660,15 @@ const AIAssistant = () => {
               showChatHistory ? "hidden lg:flex" : "flex"
             )}>
               <Card className="flex flex-col flex-1 min-h-0 h-full relative overflow-hidden border-none shadow-md bg-background/95 dark:bg-background/90">
-                {/* Scrollable message area with invisible scrollbar */}
-                <div className="flex-1 min-h-0 h-full overflow-y-auto no-scrollbar">
+                {/* Scrollable message area with invisible scrollbar - with padding at bottom to ensure content isn't hidden behind input */}
+                <div className="flex-1 min-h-0 h-full overflow-y-auto no-scrollbar pb-20">
                   <ChatMessages 
                     messages={messages} 
                     onPlayMessage={handlePlayMessage}
                   />
                 </div>
-                {/* Sticky footer at bottom */}
-                <div className="sticky bottom-0 left-0 right-0 z-20 bg-background border-t">
+                {/* Fixed footer at bottom of viewport */}
+                <div className="fixed bottom-0 left-0 right-0 z-20 bg-background border-t md:left-64 lg:left-1/4">
                   <ChatInput
                     input={input}
                     setInput={handleInputChange}
