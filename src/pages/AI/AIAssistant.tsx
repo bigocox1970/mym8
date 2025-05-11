@@ -616,33 +616,31 @@ const AIAssistant = () => {
 
   return (
     <Layout>
-      {/* Combined sticky header containing both the page header and chat controls */}
-      <div className="sticky top-0 z-40">
-        {/* Page-specific header - using dark background to match page color */}
-        <div className="pt-2 pb-2 bg-gray-900 text-white">
-          <div className="flex items-center justify-between h-12">
-            <span className="text-xl font-bold">MyM8 Dave</span>
-            <MenuToggleButton />
-          </div>
-          <div className="text-sm text-gray-300 pl-1 pb-2">
-            Chat with Dave your goal tracking AI assistant
-          </div>
+      {/* Fixed top header with hamburger menu - always visible */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gray-900 text-white pt-2 pb-2">
+        <div className="flex items-center justify-between h-12">
+          <span className="text-xl font-bold">MyM8 Dave</span>
+          <MenuToggleButton />
         </div>
-        {/* Chat header - keeping original background */}
-        <div className="bg-background border-b">
-          <ChatHeader
-            title={getCurrentConversationTitle()}
-            showChatHistory={showChatHistory}
-            setShowChatHistory={setShowChatHistory}
-            onNewConversation={() => setShowNewConversationDialog(true)}
-            onClearConversation={clearCurrentConversation}
-            onDeleteConversation={() => setShowDeleteDialog(true)}
-          />
+        <div className="text-sm text-gray-300 pl-1 pb-2">
+          Chat with Dave your goal tracking AI assistant
         </div>
       </div>
-      {/* Main content, with fixed height calculation that works better on mobile */}
+      
+      {/* Chat header - positioned below the fixed top header */}
+      <div className="sticky top-[4.5rem] z-40 bg-background border-b mt-[5.5rem]">
+        <ChatHeader
+          title={getCurrentConversationTitle()}
+          showChatHistory={showChatHistory}
+          setShowChatHistory={setShowChatHistory}
+          onNewConversation={() => setShowNewConversationDialog(true)}
+          onClearConversation={clearCurrentConversation}
+          onDeleteConversation={() => setShowDeleteDialog(true)}
+        />
+      </div>
+      {/* Main content, with adjusted height calculation to account for fixed headers */}
       <div className="w-full">
-        <div className="w-full h-[calc(100vh-10rem)] md:h-[calc(100vh-4rem)] flex flex-col no-scrollbar">
+        <div className="w-full h-[calc(100vh-16rem)] md:h-[calc(100vh-10rem)] flex flex-col no-scrollbar">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-4 flex-1 min-h-0 h-full">
             {/* Conversations sidebar */}
             <ChatHistory
