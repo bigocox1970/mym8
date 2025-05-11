@@ -638,11 +638,11 @@ const AIAssistant = () => {
           onDeleteConversation={() => setShowDeleteDialog(true)}
         />
       </div>
-      {/* Main content, with adjusted height calculation and padding to account for fixed headers */}
-      <div className="w-full pt-[7.5rem]">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-4">
-          {/* Conversations sidebar - now with its own fixed height and independent scrolling */}
-          <div className="h-[calc(100vh-7.75rem)] md:h-[calc(100vh-6.75rem)]">
+      {/* Main content area with fixed headers and footer */}
+      <div className="w-full h-screen pt-[7.5rem] pb-[4.5rem] flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 sm:gap-4 h-full">
+          {/* Conversations sidebar - with fixed height and independent scrolling */}
+          <div className="h-full overflow-hidden">
             <ChatHistory
               conversations={conversations}
               currentConversationId={currentConversationId}
@@ -653,38 +653,50 @@ const AIAssistant = () => {
               onDeleteConversations={handleDeleteMultipleConversations}
             />
           </div>
-          {/* Main chat area - with its own fixed height and independent scrolling */}
+          {/* Main chat area - with fixed height and scrollable content */}
           <div className={cn(
-            "lg:col-span-3 flex flex-col h-[calc(100vh-7.75rem)] md:h-[calc(100vh-6.75rem)]",
+            "lg:col-span-3 flex flex-col h-full overflow-hidden",
             showChatHistory ? "hidden lg:flex" : "flex"
           )}>
             <Card className="flex flex-col h-full overflow-hidden border-none shadow-md bg-background/95 dark:bg-background/90 rounded-lg">
-              {/* Scrollable message area with invisible scrollbar and minimal bottom padding */}
-              <div className="flex-grow overflow-y-auto no-scrollbar pb-4">
-                <ChatMessages 
-                  messages={messages} 
-                  onPlayMessage={handlePlayMessage}
-                />
-              </div>
-              {/* Input area directly in the chat card */}
-              <div className="flex-shrink-0 bg-background border-t border-gray-200 dark:border-gray-800 px-2 sm:px-4">
-                <ChatInput
-                  input={input}
-                  setInput={handleInputChange}
-                  isProcessing={isProcessing}
-                  onSubmit={handleSubmit}
-                  isVoiceEnabled={isVoiceEnabled}
-                  toggleVoiceMode={toggleVoiceMode}
-                  isListening={isListening}
-                  toggleListening={toggleListening}
-                  isLoadingAudio={isLoadingAudio}
-                  isSpeaking={isSpeaking}
-                  isSubmitting={isSubmitting}
-                  stopSpeaking={stopSpeaking}
-                />
+              {/* Scrollable message area with invisible scrollbar */}
+              <div className="flex-grow overflow-y-auto no-scrollbar max-w-full">
+                <div className="w-full max-w-full px-2 sm:px-4">
+                  <ChatMessages 
+                    messages={messages} 
+                    onPlayMessage={handlePlayMessage}
+                  />
+                </div>
               </div>
             </Card>
           </div>
+        </div>
+      </div>
+      
+      {/* Fixed footer with input area - only in chat pane area */}
+      <div className={cn(
+        "fixed bottom-0 z-20 bg-background border-t border-gray-200 dark:border-gray-800",
+        showChatHistory ? 
+          // When chat history is visible (desktop view)
+          "right-0 md:left-64 lg:left-auto lg:w-[calc(75%-1rem)]" : 
+          // When chat history is hidden (mobile view)
+          "left-0 right-0 md:left-64"
+      )}>
+        <div className="w-full px-2 sm:px-4">
+          <ChatInput
+            input={input}
+            setInput={handleInputChange}
+            isProcessing={isProcessing}
+            onSubmit={handleSubmit}
+            isVoiceEnabled={isVoiceEnabled}
+            toggleVoiceMode={toggleVoiceMode}
+            isListening={isListening}
+            toggleListening={toggleListening}
+            isLoadingAudio={isLoadingAudio}
+            isSpeaking={isSpeaking}
+            isSubmitting={isSubmitting}
+            stopSpeaking={stopSpeaking}
+          />
         </div>
       </div>
       {/* Dialogs */}

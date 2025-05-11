@@ -255,6 +255,15 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                       <span>Dashboard</span>
                     </Button>
                   </Link>
+                  <Link to="/assistant" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
+                    <Button 
+                      variant={isActive("/assistant") ? "default" : "ghost"} 
+                      className="w-full justify-start"
+                    >
+                      <Bot className="mr-2 h-4 w-4" />
+                      <span>AI Assistant</span>
+                    </Button>
+                  </Link>
                   <Link to="/goals" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
                     <Button 
                       variant={isActive("/goals") ? "default" : "ghost"} 
@@ -307,15 +316,6 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                     >
                       <Sparkles className="mr-2 h-4 w-4" />
                       <span>Subscription Plans</span>
-                    </Button>
-                  </Link>
-                  <Link to="/assistant" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
-                    <Button 
-                      variant={isActive("/assistant") ? "default" : "ghost"} 
-                      className="w-full justify-start"
-                    >
-                      <Bot className="mr-2 h-4 w-4" />
-                      <span>AI Assistant</span>
                     </Button>
                   </Link>
                   <Link to="/help" onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}>
