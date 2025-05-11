@@ -82,5 +82,58 @@ app.post('/.netlify/functions/api/convert-audio', async (req, res) => {
   }
 });
 
+// Add a streaming chat completion endpoint for OpenAI
+app.post('/.netlify/functions/api/chat', async (req, res) => {
+  try {
+    console.log('[STREAM-DEBUG] Incoming /chat request body:', JSON.stringify(req.body));
+    const { messages, model = 'gpt-4', temperature = 0.7, max_tokens = 1000 } = req.body;
+    if (!messages || !Array.isArray(messages)) {
+      console.error('[STREAM-DEBUG] Invalid or missing messages array');
+      return res.status(400).json({ error: 'Missing or invalid messages array' });
+    }
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('[STREAM-DEBUG] Missing OpenAI API key');
+      return res.status(500).json({ error: 'Missing OpenAI API key' });
+    }
+
+    // Set headers for streaming
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const openaiRes = await performFetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens,
+        stream: true,
+      }),
+    });
+
+    if (!openaiRes.body) {
+      res.write(`data: {"error":"No response body from OpenAI"}\n\n`);
+      return res.end();
+    }
+
+    // Stream OpenAI response to client (Node.js stream)
+    for await (const chunk of openaiRes.body) {
+      res.write(chunk);
+      if (res.flush) res.flush();
+    }
+
+    res.end();
+  } catch (err) {
+    console.error('[STREAM-DEBUG] Error in /chat streaming endpoint:', err);
+    res.write(`data: {"error":"${err.message || 'Unknown error'}"}\n\n`);
+    res.end();
+  }
+});
+
 // Export the handler
 module.exports.handler = serverless(app);

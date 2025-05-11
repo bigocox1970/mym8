@@ -292,11 +292,6 @@ export async function processAndPlayChunks(
           // Play the audio
           const audioUrl = URL.createObjectURL(audioBlob);
           audioElement = new Audio(audioUrl);
-          // Ensure mobile speaker playback
-          audioElement.setAttribute('playsinline', 'true');
-          audioElement.setAttribute('autoplay', 'true');
-          audioElement.setAttribute('webkit-playsinline', 'true');
-          audioElement.crossOrigin = 'anonymous';
           globalAudioElement = audioElement; // Set global reference for control
           
           await new Promise<void>((resolve, reject) => {

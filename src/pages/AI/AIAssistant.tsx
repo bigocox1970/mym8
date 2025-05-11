@@ -15,7 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
 import { useConversations } from "@/hooks/use-conversations";
-import { useAIProcessing } from "@/hooks/use-ai-processing";
+import { useAIProcessing, processUserMessageStream } from "@/hooks/use-ai-processing";
 
 // Components
 import { ChatHistory } from "./components/ChatHistory";
@@ -44,6 +44,10 @@ const AIAssistant = () => {
   // Add new state variables for the visual feedback
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Add a ref and version state for streaming assistant message
+  const streamingContentRef = useRef<string>("");
+  const [streamVersion, setStreamVersion] = useState(0);
   
   // Get user goals and actions using React Query
   const { data: goals = [] } = useQuery({
@@ -576,7 +580,7 @@ const AIAssistant = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isProcessing || !currentConversationId) return;
-    
+
     // Create user message
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -584,28 +588,65 @@ const AIAssistant = () => {
       content: input,
       timestamp: new Date().toISOString(),
     };
-    
+
     // Clear input and add user message to UI
     setInput("");
     setIsSubmitting(true);
     await addMessage(userMessage);
-    
+
+    // Add a new assistant message with empty content for streaming
+    const assistantMessageId = uuidv4();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date().toISOString(),
+    };
+    await addMessage(assistantMessage);
+
+    // Reset streaming ref and version
+    streamingContentRef.current = "";
+    setStreamVersion(0);
+
     try {
-      // Process the message with the AI
-      const aiMessage = await processUserMessage(input, messages);
-      
-      // Add AI message to UI and database
-      await addMessage(aiMessage);
-      
-      // Speak the response if voice is enabled
-      if (shouldSpeakMessage(aiMessage.id, aiMessage.content)) {
-        setIsLoadingAudio(true);
-        updateLastSpokenRefs(aiMessage.id, aiMessage.content);
-        speakText(aiMessage.content, aiMessage.id);
-        setIsLoadingAudio(false);
-      }
+      // Stream the assistant reply
+      await processUserMessageStream(
+        input,
+        [...messages, userMessage],
+        {
+          goals,
+          actions,
+          userNickname: profile?.nickname || "",
+          userId: user?.id,
+          onStream: (partial) => {
+            streamingContentRef.current = partial;
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId ? { ...msg, content: partial } : msg
+              )
+            );
+            setStreamVersion((v) => v + 1); // force re-render
+          },
+        }
+      ).then(async (finalMessage) => {
+        // Update the message with the final content and save to DB
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId ? { ...msg, content: finalMessage.content } : msg
+          )
+        );
+        await saveMessage({ ...assistantMessage, content: finalMessage.content });
+      });
     } catch (error) {
-      console.error("Error in handleSubmit:", error);
+      console.error("Error in streaming assistant reply, falling back:", error);
+      // Fallback to non-streaming if streaming fails
+      const aiMessage = await processUserMessage(input, messages);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantMessageId ? { ...msg, content: aiMessage.content } : msg
+        )
+      );
+      await saveMessage({ ...assistantMessage, content: aiMessage.content });
     } finally {
       setIsSubmitting(false);
     }
@@ -638,25 +679,6 @@ const AIAssistant = () => {
       toast.error("Failed to delete conversations");
     }
   };
-
-  // Effect to speak new assistant messages, but not on initial load
-  React.useEffect(() => {
-    if (messages.length > 0) {
-      // Skip speaking on initial load of existing conversations
-      if (initialLoadRef.current) {
-        initialLoadRef.current = false;
-        return;
-      }
-      
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.role === 'assistant' && shouldSpeakMessage(lastMessage.id, lastMessage.content)) {
-        setIsLoadingAudio(true);
-        updateLastSpokenRefs(lastMessage.id, lastMessage.content);
-        speakText(lastMessage.content, lastMessage.id);
-        setIsLoadingAudio(false);
-      }
-    }
-  }, [messages]);
 
   return (
     <Layout>
@@ -708,6 +730,7 @@ const AIAssistant = () => {
                 <ChatMessages 
                   messages={messages} 
                   onPlayMessage={handlePlayMessage}
+                  streamVersion={streamVersion} // pass version to force re-render
                 />
               </div>
               

@@ -4,17 +4,19 @@ import { cn } from '@/lib/utils';
 import { Message } from '@/pages/AI/types';
 import { getConfig } from '@/lib/configManager';
 import { textToSpeech } from '@/lib/api';
+import { getCachedAudioAsync, cacheAudioAsync } from '@/lib/audioCache';
 
 interface ChatMessagesProps {
   messages: Message[];
   onPlayMessage?: (messageContent: string, messageId: string) => void;
+  streamVersion?: number;
 }
 
 // Simple in-memory cache for last 10 audio blobs/URLs
 const audioCache = new Map<string, string>(); // messageId -> audioUrl
 const MAX_CACHE = 10;
 
-export function ChatMessages({ messages, onPlayMessage }: ChatMessagesProps) {
+export function ChatMessages({ messages, onPlayMessage, streamVersion }: ChatMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [audioStates, setAudioStates] = useState<Record<string, 'idle' | 'loading' | 'ready' | 'playing'>>({});
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
@@ -44,6 +46,22 @@ export function ChatMessages({ messages, onPlayMessage }: ChatMessagesProps) {
     }
   }, [messages]);
 
+  // On mount or messages change, set state to 'ready' for cached messages
+  useEffect(() => {
+    (async () => {
+      for (const message of messages) {
+        if (message.role === 'assistant') {
+          const cached = await getCachedAudioAsync(message.id);
+          console.log('[AUDIO CACHE DEBUG] Checking cache for message', message.id, 'found:', !!cached);
+          if (cached) {
+            setAudioState(message.id, 'ready');
+          }
+        }
+      }
+    })();
+    // eslint-disable-next-line
+  }, [messages]);
+
   // Helper to update state for a message
   const setAudioState = (id: string, state: 'idle' | 'loading' | 'ready' | 'playing') => {
     setAudioStates((prev) => ({ ...prev, [id]: state }));
@@ -60,6 +78,11 @@ export function ChatMessages({ messages, onPlayMessage }: ChatMessagesProps) {
       }
       audioCache.set(id, url);
     }
+  };
+
+  // Helper to get last 10 assistant message IDs
+  const getLast10AssistantIds = () => {
+    return messages.filter(m => m.role === 'assistant').slice(-10).map(m => m.id);
   };
 
   // Real TTS API call
@@ -99,9 +122,10 @@ export function ChatMessages({ messages, onPlayMessage }: ChatMessagesProps) {
       setAudioState(id, 'ready');
       return;
     }
-    // If cached, play
-    if (audioCache.has(id)) {
-      const url = audioCache.get(id)!;
+    // If cached in memory or IndexedDB, play
+    const cached = await getCachedAudioAsync(id);
+    if (cached) {
+      const url = URL.createObjectURL(cached);
       playAudio(id, url);
       return;
     }
@@ -109,8 +133,8 @@ export function ChatMessages({ messages, onPlayMessage }: ChatMessagesProps) {
     setAudioState(id, 'loading');
     try {
       const blob = await fetchTTS(message.content);
+      await cacheAudioAsync(id, blob, getLast10AssistantIds());
       const url = URL.createObjectURL(blob);
-      cacheAudio(id, url);
       setAudioState(id, 'ready');
       playAudio(id, url);
     } catch (e) {
@@ -120,9 +144,18 @@ export function ChatMessages({ messages, onPlayMessage }: ChatMessagesProps) {
 
   // Play audio and update state
   const playAudio = (id: string, url: string) => {
+    // Stop any currently playing audio
     if (currentAudio) {
       currentAudio.pause();
       setCurrentAudio(null);
+      // Set all playing states to 'ready'
+      setAudioStates((prev) => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach((key) => {
+          if (updated[key] === 'playing') updated[key] = 'ready';
+        });
+        return updated;
+      });
     }
     const audio = new Audio(url);
     setCurrentAudio(audio);
