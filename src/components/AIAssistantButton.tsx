@@ -19,12 +19,7 @@ const AIAssistantButton: React.FC<AIAssistantButtonProps> = ({
   const navigate = useNavigate();
 
   const handleClick = () => {
-    // If a question is provided, store it in localStorage for the Assistant page to pick up
-    if (question) {
-      localStorage.setItem('assistantQuestion', question);
-    }
-    
-    // Navigate to the assistant page
+    // Navigate to the assistant page without setting any prefilled question
     navigate('/assistant');
   };
 

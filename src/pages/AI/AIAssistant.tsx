@@ -170,33 +170,6 @@ const AIAssistant = () => {
     }
   });
 
-  // Check for a predefined question in localStorage and process it
-  useEffect(() => {
-    const checkPredefinedQuestion = async () => {
-      // Skip if we don't have a conversation or user yet
-      if (!currentConversationId || !user) return;
-      
-      // Check if there's a question in localStorage and we haven't already submitted it
-      const question = localStorage.getItem('assistantQuestion');
-      if (question && !initialQuestionSubmittedRef.current) {
-        // Set the input to the question
-        setInput(question);
-        
-        // Clear the question from localStorage
-        localStorage.removeItem('assistantQuestion');
-        
-        // Small delay to ensure the conversation is ready
-        setTimeout(() => {
-          // Trigger the form submission programmatically
-          handleSubmit(new Event('submit') as unknown as React.FormEvent);
-          initialQuestionSubmittedRef.current = true;
-        }, 500);
-      }
-    };
-    
-    checkPredefinedQuestion();
-  }, [currentConversationId, user]);
-
   // Handle initial creation of conversation if needed (runs once on mount)
   useEffect(() => {
     const handleInitialConversation = async () => {
