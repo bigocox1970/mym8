@@ -123,6 +123,9 @@ const LandingPage: React.FC = () => {
               <p className="text-sm text-muted-foreground mt-2">
                 © {new Date().getFullYear()} MyM8. All rights reserved.
               </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                App design by <a href="https://diamondinternet.co.uk/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">Diamond Internet</a>
+              </p>
             </div>
             <div className="flex flex-wrap gap-4 justify-center">
               <Link to="/pricing" className="text-sm text-muted-foreground hover:text-foreground">
